@@ -88,7 +88,7 @@ const SECTOR_ENUM_TO_DISPLAY: Record<string, string> = {
 
 // Returns the sector display name (for dropdowns) from either a display name or enum value
 const sectorDisplay = (s: any) => {
-  const str = typeof s === "object" ? s.name || s.id || "" : s || "";
+  const str = s && typeof s === "object" ? s.name || s.id || "" : s || "";
   return SECTOR_ENUM_TO_DISPLAY[str] ?? str;
 };
 
@@ -3936,7 +3936,10 @@ function DashboardPage({
   const sectorData = SECTORS.map((s) => ({
     name: s,
     v: filtered.filter(
-      (t) => (typeof t.sector === "object" ? t.sector?.name : t.sector) === s,
+      (t) =>
+        (t.sector && typeof t.sector === "object"
+          ? t.sector.name
+          : t.sector) === s,
     ).length,
   }))
     .filter((x) => x.v > 0)
@@ -3945,8 +3948,9 @@ function DashboardPage({
     name: s,
     v: filtered.filter(
       (t) =>
-        (typeof t.sector === "object" ? t.sector?.name : t.sector) === s &&
-        t.status === "Concluído",
+        (t.sector && typeof t.sector === "object"
+          ? t.sector.name
+          : t.sector) === s && t.status === "Concluído",
     ).length,
   }))
     .filter((x) => x.v > 0)
@@ -5044,7 +5048,9 @@ function DashboardPage({
                 </div>
                 <div style={{ fontSize: 10, color: T.sub, marginTop: 1 }}>
                   {t.type} ·{" "}
-                  {typeof t.sector === "object" ? t.sector.name : t.sector}
+                  {t.sector && typeof t.sector === "object"
+                    ? t.sector.name
+                    : t.sector}
                 </div>
               </div>
               <span
@@ -5168,7 +5174,8 @@ function KanbanPage({
   const filtered = tasks.filter((t) => {
     if (search && !t.title.toLowerCase().includes(search.toLowerCase()))
       return false;
-    const sectorVal = typeof t.sector === "object" ? t.sector?.name : t.sector;
+    const sectorVal =
+      t.sector && typeof t.sector === "object" ? t.sector?.name : t.sector;
     if (fSector.length > 0 && !fSector.includes(sectorVal)) return false;
     if (fContract && t.contract !== fContract) return false;
     if (fCity && t.city !== fCity) return false;
