@@ -3,36 +3,15 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
-    const [cities, contracts] = await Promise.all([
+    const [cities, contracts, sectors, roles] = await Promise.all([
       prisma.city.findMany({
         include: { neighborhoods: true },
         orderBy: { name: "asc" },
       }),
       prisma.contract.findMany({ orderBy: { name: "asc" } }),
+      prisma.sector.findMany({ orderBy: { name: "asc" } }),
+      prisma.role.findMany({ orderBy: { name: "asc" } }),
     ]);
-
-    const staticSectors = [
-      "Administrativo",
-      "Atendimento ao Cliente",
-      "Atendimento Social",
-      "Cadastro",
-      "Controladoria",
-      "Coordenação",
-      "Engenharia",
-      "Financeiro",
-      "Gerência",
-      "Reurb",
-      "RH",
-      "TI",
-    ].map((name, index) => ({ id: name, name })); // Using name as ID for enum compatibility
-
-    const staticRoles = [
-      "Admin",
-      "Gestor",
-      "Coordenador",
-      "Gerente",
-      "Liderado",
-    ].map((name) => ({ id: name, name }));
 
     const citiesNeighborhoods = cities.reduce(
       (acc, city) => {
@@ -45,8 +24,8 @@ export async function GET() {
     return NextResponse.json({
       contracts: contracts.map((c) => c.name),
       cities_neighborhoods: citiesNeighborhoods,
-      sectors: staticSectors,
-      roles: staticRoles,
+      sectors: sectors, // Returns {id, name}
+      roles: roles, // Returns {id, name}
     });
   } catch (error) {
     console.error("Error fetching lookups:", error);

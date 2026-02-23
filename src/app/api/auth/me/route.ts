@@ -9,6 +9,7 @@ export async function POST(req: Request) {
 
     const user = await prisma.user.findUnique({
       where: { id: Number(id) },
+      include: { Role: true, Sector: true },
     });
 
     if (!user)
@@ -19,13 +20,12 @@ export async function POST(req: Request) {
     if (!user.active)
       return NextResponse.json({ error: "Usuário inativo" }, { status: 403 });
 
-    const { password_hash: _, ...userWithoutPassword } = user;
+    const { password_hash: _, ...userWithoutPassword } = user as any;
 
-    // Transform enum strings to objects for monolithic frontend compatibility
     return NextResponse.json({
       ...userWithoutPassword,
-      role: { name: user.role },
-      sector: { name: user.sector },
+      role: (user as any).Role,
+      sector: (user as any).Sector,
     });
   } catch (error) {
     console.error("Auth check error:", error);

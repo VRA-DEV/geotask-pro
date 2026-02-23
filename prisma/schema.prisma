@@ -7,36 +7,13 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  Admin
-  Gestor
-  Coordenador
-  Gerente
-  Liderado
-}
-
-enum Sector {
-  Administrativo
-  AtendimentoAoCliente
-  AtendimentoSocial
-  Cadastro
-  Controladoria
-  Coordenacao
-  Engenharia
-  Financeiro
-  Gerencia
-  Reurb
-  RH
-  TI
-}
-
 model User {
   id                   Int            @id @default(autoincrement())
   name                 String
   email                String         @unique
   password_hash        String         @default("mock")
-  role                 Role
-  sector               Sector
+  role_id              Int
+  sector_id            Int
   avatar               String?
   active               Boolean        @default(true)
   must_change_password Boolean        @default(true)
@@ -50,6 +27,8 @@ model User {
   tasks_responsible    Task[]         @relation("Responsible")
   task_history         TaskHistory[]
   templates            Template[]
+  Role                 Role           @relation(fields: [role_id], references: [id])
+  Sector               Sector         @relation(fields: [sector_id], references: [id])
 }
 
 model Task {
@@ -59,7 +38,7 @@ model Task {
   type            String?
   status          String         @default("A Fazer")
   priority        String?
-  sector          Sector?
+  sector_id       Int?
   responsible_id  Int?
   contract_id     Int?
   city_id         Int?
@@ -88,6 +67,7 @@ model Task {
   parent          Task?          @relation("TaskSubtasks", fields: [parent_id], references: [id])
   children        Task[]         @relation("TaskSubtasks")
   responsible     User?          @relation("Responsible", fields: [responsible_id], references: [id])
+  Sector          Sector?        @relation(fields: [sector_id], references: [id])
   history         TaskHistory[]
   pauses          TaskPause[]
 }
@@ -96,21 +76,23 @@ model Subtask {
   id             Int       @id @default(autoincrement())
   title          String
   done           Boolean   @default(false)
-  sector         Sector?
+  sector_id      Int?
   task_id        Int
   responsible_id Int?
   done_at        DateTime?
   responsible    User?     @relation(fields: [responsible_id], references: [id])
+  Sector         Sector?   @relation(fields: [sector_id], references: [id])
   task           Task      @relation(fields: [task_id], references: [id], onDelete: Cascade)
 }
 
 model Template {
   id            Int            @id @default(autoincrement())
   name          String
-  sector        Sector
+  sector_id     Int
   created_by_id Int?
   created_at    DateTime       @default(now())
   created_by    User?          @relation(fields: [created_by_id], references: [id])
+  Sector        Sector         @relation(fields: [sector_id], references: [id])
   tasks         TemplateTask[]
 }
 
@@ -154,7 +136,7 @@ model TaskPause {
 model Mention {
   id                  Int      @id @default(autoincrement())
   mention_type        String
-  mentioned_sector    Sector?
+  mentioned_sector_id Int?
   created_at          DateTime @default(now())
   comment_id          Int
   task_id             Int
@@ -162,6 +144,7 @@ model Mention {
   mentioned_by_id     Int?
   comment             Comment  @relation(fields: [comment_id], references: [id], onDelete: Cascade)
   mentioned_by        User?    @relation("MentionedBy", fields: [mentioned_by_id], references: [id])
+  Sector              Sector?  @relation(fields: [mentioned_sector_id], references: [id])
   mentioned_user      User?    @relation("MentionedUser", fields: [mentioned_user_id], references: [id])
   task                Task     @relation(fields: [task_id], references: [id], onDelete: Cascade)
 }
@@ -214,4 +197,25 @@ model TaskHistory {
   created_at DateTime @default(now())
   task       Task     @relation(fields: [task_id], references: [id], onDelete: Cascade)
   user       User?    @relation(fields: [user_id], references: [id])
+}
+
+model Role {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  permissions Json?
+  created_at  DateTime @default(now())
+  updated_at  DateTime
+  User        User[]
+}
+
+model Sector {
+  id         Int        @id @default(autoincrement())
+  name       String     @unique
+  created_at DateTime   @default(now())
+  updated_at DateTime
+  Mention    Mention[]
+  Subtask    Subtask[]
+  Task       Task[]
+  Template   Template[]
+  User       User[]
 }

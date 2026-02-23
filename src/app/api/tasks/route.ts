@@ -1,36 +1,17 @@
 import prisma from "@/lib/prisma";
-import { Sector } from "@prisma/client";
 import { NextResponse } from "next/server";
 
-const SECTOR_MAP: Record<string, Sector> = {
-  Administrativo: "Administrativo",
-  "Atendimento ao Cliente": "AtendimentoAoCliente",
-  "Atendimento Social": "AtendimentoSocial",
-  Cadastro: "Cadastro",
-  Controladoria: "Controladoria",
-  Coordenação: "Coordenacao",
-  Engenharia: "Engenharia",
-  Financeiro: "Financeiro",
-  Gerência: "Gerencia",
-  Reurb: "Reurb",
-  RH: "RH",
-  TI: "TI",
-  AtendimentoAoCliente: "AtendimentoAoCliente",
-  AtendimentoSocial: "AtendimentoSocial",
-  Coordenacao: "Coordenacao",
-  Gerencia: "Gerencia",
-};
+async function resolveSectorId(s: any): Promise<number | null> {
+  if (!s) return null;
+  if (typeof s === "number") return s;
+  if (!isNaN(Number(s))) return Number(s);
 
-const mapSector = (s: any): Sector | undefined => {
-  if (!s) return undefined;
-  const str = String(s);
-  return (
-    SECTOR_MAP[str] ||
-    (Object.values(Sector).includes(str as Sector)
-      ? (str as Sector)
-      : undefined)
-  );
-};
+  // Try to find by name
+  const sector = await prisma.sector.findUnique({
+    where: { name: String(s) },
+  });
+  return sector?.id || null;
+}
 
 async function notifyUser(
   userId: number,
@@ -72,18 +53,33 @@ export async function GET() {
   try {
     const tasks = await prisma.task.findMany({
       include: {
-        subtasks: { orderBy: { id: "asc" } },
-        children: {
-          orderBy: { id: "asc" },
-          include: { responsible: true },
-        },
-        contract: { select: { name: true } },
-        city: { select: { name: true } },
+        contract: { select: { id: true, name: true } },
+        city: { select: { id: true, name: true } },
+        Sector: { select: { id: true, name: true } },
         responsible: {
-          select: { id: true, name: true, role: true, sector: true },
+          select: {
+            id: true,
+            name: true,
+            Role: { select: { name: true } },
+            Sector: { select: { name: true } },
+          },
         },
         created_by: { select: { id: true, name: true } },
         pauses: true,
+        children: {
+          orderBy: { id: "asc" },
+          include: {
+            Sector: { select: { id: true, name: true } },
+            responsible: {
+              select: {
+                id: true,
+                name: true,
+                Role: { select: { name: true } },
+                Sector: { select: { name: true } },
+              },
+            },
+          },
+        },
       },
       orderBy: { created_at: "desc" },
     });
@@ -93,12 +89,18 @@ export async function GET() {
       contract: t.contract?.name ?? "",
       city: t.city?.name ?? "",
       // Return objects for role/sector
-      sector: t.sector ? { name: t.sector } : null,
+      sector: (t as any).Sector
+        ? { name: (t as any).Sector.name, id: (t as any).Sector.id }
+        : null,
       responsible: t.responsible
         ? {
             ...t.responsible,
-            role: { name: t.responsible.role },
-            sector: { name: t.responsible.sector },
+            role: (t.responsible as any).Role
+              ? { name: (t.responsible as any).Role.name }
+              : null,
+            sector: (t.responsible as any).Sector
+              ? { name: (t.responsible as any).Sector.name }
+              : null,
           }
         : null,
       responsible_id: t.responsible_id,
@@ -142,7 +144,9 @@ export async function GET() {
         ...(t.children || []).map((c: any) => ({
           id: c.id,
           title: c.title,
-          sector: c.sector ? { name: c.sector } : null,
+          sector: (c as any).Sector
+            ? { name: (c as any).Sector.name, id: (c as any).Sector.id }
+            : null,
           responsible_id: c.responsible_id,
           done: c.status === "Concluído",
           status: c.status,
@@ -151,8 +155,12 @@ export async function GET() {
           responsible: c.responsible
             ? {
                 ...c.responsible,
-                role: { name: c.responsible.role },
-                sector: { name: c.responsible.sector },
+                role: (c.responsible as any).Role
+                  ? { name: (c.responsible as any).Role.name }
+                  : null,
+                sector: (c.responsible as any).Sector
+                  ? { name: (c.responsible as any).Sector.name }
+                  : null,
               }
             : null,
         })),
@@ -181,6 +189,7 @@ export async function POST(req: Request) {
       priority,
       status,
       sector,
+      sector_id,
       responsible_id,
       contract,
       city,
@@ -207,15 +216,22 @@ export async function POST(req: Request) {
       if (c) cityId = c.id;
     }
 
-    let resolvedResponsibleId: number | null = responsible_id
-      ? Number(responsible_id)
-      : null;
-    if (!resolvedResponsibleId && body.responsible) {
+    let resolvedResponsibleId: number | null = null;
+    if (responsible_id && !isNaN(Number(responsible_id))) {
+      resolvedResponsibleId = Number(responsible_id);
+    } else if (body.responsible) {
       const u = await prisma.user.findFirst({
         where: { name: body.responsible },
       });
       if (u) resolvedResponsibleId = u.id;
     }
+
+    const resolvedSectorId = await resolveSectorId(sector_id || sector);
+
+    const createdById =
+      created_by && !isNaN(Number(created_by)) ? Number(created_by) : null;
+    const parentId =
+      parent_id && !isNaN(Number(parent_id)) ? Number(parent_id) : null;
 
     const taskData: any = {
       title,
@@ -223,7 +239,7 @@ export async function POST(req: Request) {
       type,
       priority,
       status: status || "A Fazer",
-      sector: mapSector(sector),
+      sector_id: resolvedSectorId,
       responsible_id: resolvedResponsibleId,
       contract_id: contractId,
       city_id: cityId,
@@ -242,22 +258,34 @@ export async function POST(req: Request) {
           })()
         : null,
       link: link || "",
-      created_by_id: created_by ? Number(created_by) : null,
-      parent_id: parent_id ? Number(parent_id) : null,
+      created_by_id: createdById,
+      parent_id: parentId,
     };
 
     if ((subtasks || children) && Array.isArray(subtasks || children)) {
       taskData.children = {
-        create: (subtasks || children).map((st: any) => ({
-          title: st.title,
-          status: st.status || "A Fazer",
-          sector: mapSector(st.sector) || mapSector(sector),
-          description: st.description || "",
-          priority: st.priority || priority,
-          type: st.type || type,
-          created_by_id: created_by ? Number(created_by) : null,
-          responsible_id: st.responsible_id ? Number(st.responsible_id) : null,
-        })),
+        create: await Promise.all(
+          (subtasks || children).map(async (st: any) => {
+            const sId =
+              st.sector_id || st.sector
+                ? await resolveSectorId(st.sector_id || st.sector)
+                : resolvedSectorId;
+
+            return {
+              title: st.title,
+              status: st.status || "A Fazer",
+              sector_id: sId,
+              description: st.description || "",
+              priority: st.priority || priority,
+              type: st.type || type,
+              created_by_id: createdById,
+              responsible_id:
+                st.responsible_id && !isNaN(Number(st.responsible_id))
+                  ? Number(st.responsible_id)
+                  : null,
+            };
+          }),
+        ),
       };
     }
 
@@ -394,7 +422,9 @@ export async function PATCH(req: Request) {
       fields.forEach((f) => {
         if (data[f] !== undefined) updateData[f] = data[f];
       });
-      if (data.sector) updateData.sector = mapSector(data.sector);
+      if (data.sector !== undefined) {
+        updateData.sector_id = await resolveSectorId(data.sector);
+      }
       if (data.responsible_id !== undefined)
         updateData.responsible_id = data.responsible_id
           ? Number(data.responsible_id)

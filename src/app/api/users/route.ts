@@ -1,43 +1,19 @@
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
-// Dynamic sector mapping to handle various input formats
-const SECTOR_MAP: Record<string, string> = {
-  Administrativo: "Administrativo",
-  "Atendimento ao Cliente": "AtendimentoAoCliente",
-  "Atendimento Social": "AtendimentoSocial",
-  Cadastro: "Cadastro",
-  Controladoria: "Controladoria",
-  Coordenação: "Coordenacao",
-  Engenharia: "Engenharia",
-  Financeiro: "Financeiro",
-  Gerência: "Gerencia",
-  Reurb: "Reurb",
-  RH: "RH",
-  TI: "TI",
-  AtendimentoAoCliente: "AtendimentoAoCliente",
-  AtendimentoSocial: "AtendimentoSocial",
-  Coordenacao: "Coordenacao",
-  Gerencia: "Gerencia",
-};
-
-const mapSector = (s: any): any => {
-  const str = String(s);
-  return SECTOR_MAP[str] || str;
-};
-
 // GET /api/users
 export async function GET() {
   try {
     const users = await prisma.user.findMany({
+      include: { Role: true, Sector: true },
       orderBy: { name: "asc" },
     });
 
     // Transform for frontend compatibility (monolith expects objects)
     const transformed = users.map((u: any) => ({
       ...u,
-      role: { name: u.role },
-      sector: { name: u.sector },
+      role: u.Role,
+      sector: u.Sector,
     }));
 
     return NextResponse.json(transformed);
@@ -57,12 +33,12 @@ export async function POST(req: Request) {
     const { name, email, role, sector, role_id, sector_id, avatar, password } =
       data;
 
-    const finalRole = role || role_id;
-    const finalSector = mapSector(sector || sector_id);
+    const finalRoleId = Number(role_id || role);
+    const finalSectorId = Number(sector_id || sector);
 
-    if (!name || !email || !finalRole || !finalSector) {
+    if (!name || !email || isNaN(finalRoleId) || isNaN(finalSectorId)) {
       return NextResponse.json(
-        { error: "Campos obrigatórios: name, email, role, sector" },
+        { error: "Campos obrigatórios: name, email, role_id, sector_id" },
         { status: 400 },
       );
     }
@@ -78,20 +54,21 @@ export async function POST(req: Request) {
       data: {
         name,
         email,
-        role: finalRole as any,
-        sector: finalSector as any,
+        role_id: finalRoleId,
+        sector_id: finalSectorId,
         avatar: avatar || initials,
         password_hash: password || "123456",
         must_change_password: true,
         active: true,
       },
+      include: { role: true, sector: true },
     });
 
     return NextResponse.json(
       {
         ...user,
-        role: { name: user.role },
-        sector: { name: user.sector },
+        role: (user as any).role,
+        sector: (user as any).sector,
       },
       { status: 201 },
     );
@@ -113,8 +90,8 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: "ID obrigatório" }, { status: 400 });
 
     const updateData: any = { ...data };
-    if (role || role_id) updateData.role = role || role_id;
-    if (sector || sector_id) updateData.sector = mapSector(sector || sector_id);
+    if (role || role_id) updateData.role_id = Number(role_id || role);
+    if (sector || sector_id) updateData.sector_id = Number(sector_id || sector);
     if (password) {
       updateData.password_hash = password;
       updateData.must_change_password = true;
@@ -123,11 +100,12 @@ export async function PATCH(req: Request) {
     const user: any = await prisma.user.update({
       where: { id: Number(id) },
       data: updateData,
+      include: { role: true, sector: true },
     });
     return NextResponse.json({
       ...user,
-      role: { name: user.role },
-      sector: { name: user.sector },
+      role: user.role,
+      sector: user.sector,
     });
   } catch (error) {
     console.error("Erro ao atualizar usuário:", error);

@@ -88,8 +88,9 @@ const SECTOR_ENUM_TO_DISPLAY: Record<string, string> = {
 
 // Returns the sector display name (for dropdowns) from either a display name or enum value
 const sectorDisplay = (s: any) => {
-  const str = s && typeof s === "object" ? s.name || s.id || "" : s || "";
-  return SECTOR_ENUM_TO_DISPLAY[str] ?? str;
+  if (!s) return "";
+  if (typeof s === "object") return s.name || s.id || "";
+  return SECTOR_ENUM_TO_DISPLAY[s] ?? String(s);
 };
 
 const TASK_TYPES = [
@@ -615,37 +616,49 @@ function NewTaskModal({
     if (!tpl) return;
 
     // TemplateTask has no sector in schema — only tpl.sector (template-level) is stored.
-    // Convert enum value (e.g. "AtendimentoAoCliente") → display name ("Atendimento ao Cliente")
-    const templateSector = sectorDisplay(tpl.sector || "");
+    const templateSectorObj =
+      typeof tpl.sector === "object" ? tpl.sector : null;
+    const templateSectorName = templateSectorObj
+      ? templateSectorObj.name
+      : tpl.sector;
+    const templateSectorId = templateSectorObj
+      ? templateSectorObj.id
+      : tpl.sector_id;
 
     // First task title becomes the main task title; rest become subtasks
     const firstTask = tpl.tasks?.[0];
     const mainTitle = firstTask?.title || tpl.name;
 
     // Pre-fill responsible from users matching template sector
-    const responsible = templateSector
-      ? users.find((u: any) => (u.sector?.name || u.sector) === templateSector)
-          ?.name || ""
+    const responsible = templateSectorName
+      ? users.find(
+          (u: any) => (u.sector?.name || u.sector) === templateSectorName,
+        )?.name || ""
       : "";
 
     setForm((f) => ({
       ...f,
       title: mainTitle,
-      sector: templateSector,
+      sector: templateSectorId || templateSectorName || "",
       responsible,
       subtasks: [
         // Include subtasks defined WITHIN the first task
         ...(firstTask?.subtasks || []).map((s: any) => ({
           id: Date.now() + Math.random(),
           title: s.title,
-          sector: s.sector || templateSector, // Use subtask sector if available (though API might return empty string currently)
+          sector:
+            s.sector_id ||
+            s.sector ||
+            templateSectorId ||
+            templateSectorName ||
+            "",
           responsible,
         })),
         // Include subsequent tasks as subtasks (legacy behavior)
         ...(tpl.tasks || []).slice(1).map((t: any) => ({
           id: Date.now() + Math.random(),
           title: t.title,
-          sector: templateSector,
+          sector: templateSectorId || templateSectorName || "",
           responsible,
         })),
       ],
@@ -667,10 +680,20 @@ function NewTaskModal({
 
   const neighborhoods = form.city ? citiesNeighborhoods[form.city] || [] : [];
   const sectorUsers = form.sector
-    ? users.filter((u: any) => (u.sector?.name || u.sector) === form.sector)
+    ? users.filter((u: any) => {
+        const uSid = String(u.sector_id || u.sector?.id || "");
+        const uSName = String(u.sector?.name || "");
+        const fSid = String(form.sector);
+        return uSid === fSid || (uSName && uSName === fSid);
+      })
     : [];
   const subSectorUsers = subForm?.sector
-    ? users.filter((u: any) => (u.sector?.name || u.sector) === subForm.sector)
+    ? users.filter((u: any) => {
+        const uSid = String(u.sector_id || u.sector?.id || "");
+        const uSName = String(u.sector?.name || "");
+        const fSid = String(subForm.sector);
+        return uSid === fSid || (uSName && uSName === fSid);
+      })
     : [];
 
   const STEPS = [
@@ -1479,7 +1502,7 @@ function NewTaskModal({
           ) : (
             <button
               onClick={() => {
-                // Resolve `responsible` name → `responsible_id` from users list
+                // Resolve IDs
                 const respUser = users.find(
                   (u: any) => u.name === form.responsible,
                 );
@@ -1487,11 +1510,27 @@ function NewTaskModal({
                   const subUser = users.find(
                     (u: any) => u.name === s.responsible,
                   );
-                  return { ...s, responsible_id: subUser?.id ?? null };
+                  // Handle sector_id or sector name
+                  const sId = !isNaN(Number(s.sector))
+                    ? Number(s.sector)
+                    : null;
+                  return {
+                    ...s,
+                    responsible_id: subUser?.id ?? null,
+                    sector_id: sId,
+                    sector: sId ? undefined : s.sector,
+                  };
                 });
+
+                const sectorId = !isNaN(Number(form.sector))
+                  ? Number(form.sector)
+                  : null;
+
                 onSave({
                   ...form,
                   responsible_id: respUser?.id ?? null,
+                  sector_id: sectorId,
+                  sector: sectorId ? undefined : form.sector,
                   subtasks: resolvedSubtasks,
                   status: "A Fazer",
                 });
@@ -2705,7 +2744,7 @@ export default function GeoTask() {
 
   // Lookups state
   const [contracts, setContracts] = useState<string[]>([]);
-  const [dbSectors, setDbSectors] = useState<string[]>([]);
+  const [dbSectors, setDbSectors] = useState<any[]>([]); // Array of {id, name}
 
   const [citiesNeighborhoods, setCitiesNeighborhoods] = useState<
     Record<string, string[]>
@@ -3487,13 +3526,19 @@ export default function GeoTask() {
               value={user.role?.name || ""}
               onChange={(e) => {
                 const roleName = e.target.value;
-                const u = dbUsers.find((u) => u.role?.name === roleName) || {
-                  ...user,
-                  role: { name: roleName }, // Mock role object
-                  id: 999999, // User simulado
-                  name: `Visualizando como ${roleName}`,
-                };
-                setUser(u);
+                const u = dbUsers.find((u) => u.role?.name === roleName);
+                if (u) {
+                  setUser(u);
+                  localStorage.setItem("geotask_user", JSON.stringify(u));
+                } else {
+                  // Fallback for simulation without breaking DB constraints
+                  setUser({
+                    ...user,
+                    role: { name: roleName },
+                    name: `Visualizando como ${roleName}`,
+                    // Don't change ID or we break foreign keys on creation
+                  });
+                }
                 setPage("dashboard");
               }}
               style={{
@@ -3781,7 +3826,11 @@ export default function GeoTask() {
           users={dbUsers}
           contracts={contracts}
           citiesNeighborhoods={citiesNeighborhoods}
-          sectors={dbSectors.length > 0 ? dbSectors : SECTORS}
+          sectors={
+            dbSectors.length > 0
+              ? dbSectors
+              : SECTORS.map((s) => ({ name: s, id: s }))
+          }
         />
       )}
       {showNewTask && (
@@ -3793,7 +3842,11 @@ export default function GeoTask() {
           contracts={contracts}
           citiesNeighborhoods={citiesNeighborhoods}
           templates={templates}
-          sectors={dbSectors.length > 0 ? dbSectors : SECTORS}
+          sectors={
+            dbSectors.length > 0
+              ? dbSectors
+              : SECTORS.map((s) => ({ name: s, id: s }))
+          }
         />
       )}
       {showTemplateModal && (
