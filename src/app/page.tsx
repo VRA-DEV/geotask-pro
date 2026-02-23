@@ -2083,9 +2083,9 @@ function TaskModal({
                         <>
                           <span>•</span>
                           <span>
-                            {typeof child.sector === "object"
+                            {child.sector && typeof child.sector === "object"
                               ? child.sector.name
-                              : child.sector}
+                              : child.sector || ""}
                           </span>
                         </>
                       )}
@@ -3830,7 +3830,7 @@ function DashboardPage({
   const [fStatus, setFStatus] = useState("");
   const [fType, setFType] = useState("");
   const [fPriority, setFPriority] = useState("");
-  const [fSector, setFSector] = useState("");
+  const [fSector, setFSector] = useState<string[]>([]);
   const [fUser, setFUser] = useState("");
   const [fDateFrom, setFDateFrom] = useState<DateRange | undefined>(undefined); // Prazo
   const [fDateTo, setFDateTo] = useState<DateRange | undefined>(undefined); // Criação
@@ -3852,11 +3852,11 @@ function DashboardPage({
     if (fStatus && t.status !== fStatus) return false;
     if (fType && t.type !== fType) return false;
     if (fPriority && t.priority !== fPriority) return false;
-    if (
-      fSector &&
-      (typeof t.sector === "object" ? t.sector?.name : t.sector) !== fSector
-    )
-      return false;
+    const sectorVal =
+      t.sector && typeof t.sector === "object"
+        ? t.sector?.name
+        : t.sector || "";
+    if (fSector.length > 0 && !fSector.includes(sectorVal)) return false;
     if (
       fUser &&
       (typeof t.responsible === "object"
@@ -3898,7 +3898,7 @@ function DashboardPage({
     setFStatus("");
     setFType("");
     setFPriority("");
-    setFSector("");
+    setFSector([]);
     setFUser("");
     setFDateFrom(undefined);
     setFDateTo(undefined);
@@ -3939,7 +3939,7 @@ function DashboardPage({
       (t) =>
         (t.sector && typeof t.sector === "object"
           ? t.sector.name
-          : t.sector) === s,
+          : t.sector || "") === s,
     ).length,
   }))
     .filter((x) => x.v > 0)
@@ -3950,7 +3950,7 @@ function DashboardPage({
       (t) =>
         (t.sector && typeof t.sector === "object"
           ? t.sector.name
-          : t.sector) === s && t.status === "Concluído",
+          : t.sector || "") === s && t.status === "Concluído",
     ).length,
   }))
     .filter((x) => x.v > 0)
@@ -4130,12 +4130,12 @@ function DashboardPage({
             opts={["A Fazer", "Em Andamento", "Pausado", "Concluído"]}
             placeholder="Todos status"
           />
-          <FilterSelect
+          <MultiSelect
             T={T}
             val={fSector}
             onChange={setFSector}
             opts={SECTORS}
-            placeholder="Todos setores"
+            placeholder="Setores"
           />
           <FilterSelect
             T={T}
@@ -5050,7 +5050,7 @@ function DashboardPage({
                   {t.type} ·{" "}
                   {t.sector && typeof t.sector === "object"
                     ? t.sector.name
-                    : t.sector}
+                    : t.sector || ""}
                 </div>
               </div>
               <span
@@ -5093,7 +5093,9 @@ function DashboardPage({
                   whiteSpace: "nowrap",
                 }}
               >
-                {t.contract || "—"}
+                {typeof t.contract === "object"
+                  ? t.contract?.name
+                  : t.contract || "—"}
               </div>
               <div
                 style={{
@@ -5104,7 +5106,7 @@ function DashboardPage({
                   whiteSpace: "nowrap",
                 }}
               >
-                {t.city || "—"}
+                {typeof t.city === "object" ? t.city?.name : t.city || "—"}
               </div>
               <div
                 style={{
@@ -5115,7 +5117,9 @@ function DashboardPage({
                   whiteSpace: "nowrap",
                 }}
               >
-                {t.nucleus || "—"}
+                {typeof t.nucleus === "object"
+                  ? t.nucleus?.name
+                  : t.nucleus || "—"}
               </div>
               <div style={{ fontSize: 11, color: T.sub }}>
                 {t.quadra || "—"}
@@ -5175,7 +5179,9 @@ function KanbanPage({
     if (search && !t.title.toLowerCase().includes(search.toLowerCase()))
       return false;
     const sectorVal =
-      t.sector && typeof t.sector === "object" ? t.sector?.name : t.sector;
+      t.sector && typeof t.sector === "object"
+        ? t.sector?.name
+        : t.sector || "";
     if (fSector.length > 0 && !fSector.includes(sectorVal)) return false;
     if (fContract && t.contract !== fContract) return false;
     if (fCity && t.city !== fCity) return false;
@@ -5681,9 +5687,9 @@ function KanbanPage({
                           }}
                         >
                           <Building2 size={9} />
-                          {typeof t.sector === "object"
+                          {t.sector && typeof t.sector === "object"
                             ? t.sector.name
-                            : t.sector}
+                            : t.sector || ""}
                         </span>
                         <span
                           style={{
@@ -5695,7 +5701,9 @@ function KanbanPage({
                           }}
                         >
                           <User size={9} />
-                          {t.responsible || "Não atribuído"}
+                          {t.responsible && typeof t.responsible === "object"
+                            ? t.responsible.name
+                            : t.responsible || "Não atribuído"}
                         </span>
                         <span
                           style={{
@@ -6743,7 +6751,7 @@ function CronogramaPage({
   citiesNeighborhoods = {},
 }: any) {
   const [search, setSearch] = useState("");
-  const [fSector, setFSector] = useState("");
+  const [fSector, setFSector] = useState<string[]>([]);
   const [fContract, setFContract] = useState("");
   const [fCity, setFCity] = useState("");
   const [fNeighbor, setFNeighbor] = useState("");
@@ -6765,7 +6773,9 @@ function CronogramaPage({
   const filtered = tasks.filter((t: any) => {
     if (search && !t.title.toLowerCase().includes(search.toLowerCase()))
       return false;
-    if (fSector && t.sector !== fSector) return false;
+    const sectorVal =
+      t.sector && typeof t.sector === "object" ? t.sector.name : t.sector || "";
+    if (fSector.length > 0 && !fSector.includes(sectorVal)) return false;
     if (fContract && t.contract !== fContract) return false;
     if (fCity && t.city !== fCity) return false;
     if (fNeighbor && t.nucleus !== fNeighbor) return false;
@@ -6786,7 +6796,7 @@ function CronogramaPage({
   });
 
   const activeFilters = [
-    fSector,
+    fSector.length > 0,
     fContract,
     fCity,
     fNeighbor,
@@ -6798,7 +6808,7 @@ function CronogramaPage({
 
   const clearAll = () => {
     setSearch("");
-    setFSector("");
+    setFSector([]);
     setFContract("");
     setFCity("");
     setFNeighbor("");
@@ -6913,7 +6923,8 @@ function CronogramaPage({
                 l: "Setor",
                 v: fSector,
                 s: setFSector,
-                o: SECTORS.map((s) => ({ label: s, value: s })),
+                o: SECTORS,
+                isMulti: true,
               },
               {
                 l: "Prioridade",
@@ -6987,27 +6998,37 @@ function CronogramaPage({
                     >
                       {f.l}
                     </label>
-                    <select
-                      value={f.v}
-                      onChange={(e) => f.s(e.target.value)}
-                      disabled={f.disabled}
-                      style={{
-                        width: "100%",
-                        padding: "8px",
-                        borderRadius: 8,
-                        border: `1px solid ${T.border}`,
-                        background: f.disabled ? T.col : T.inp,
-                        color: f.disabled ? T.sub : T.text,
-                        fontSize: 13,
-                      }}
-                    >
-                      <option value="">Todos</option>
-                      {f.o?.map((opt: any) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
+                    {f.isMulti ? (
+                      <MultiSelect
+                        T={T}
+                        val={f.v}
+                        onChange={f.s}
+                        opts={f.o}
+                        placeholder={f.l}
+                      />
+                    ) : (
+                      <select
+                        value={f.v}
+                        onChange={(e) => f.s(e.target.value)}
+                        disabled={f.disabled}
+                        style={{
+                          width: "100%",
+                          padding: "8px",
+                          borderRadius: 8,
+                          border: `1px solid ${T.border}`,
+                          background: f.disabled ? T.col : T.inp,
+                          color: f.disabled ? T.sub : T.text,
+                          fontSize: 13,
+                        }}
+                      >
+                        <option value="">Todos</option>
+                        {f.o?.map((opt: any) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </>
                 )}
               </div>
@@ -7123,7 +7144,9 @@ function CronogramaPage({
                 {t.title}
               </div>
               <div style={{ fontSize: 11, color: T.sub, marginTop: 1 }}>
-                {t.responsible}
+                {t.responsible && typeof t.responsible === "object"
+                  ? t.responsible.name
+                  : t.responsible || "Não atribuído"}
               </div>
             </div>
             <div
