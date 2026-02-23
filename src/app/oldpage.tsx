@@ -87,10 +87,7 @@ const SECTOR_ENUM_TO_DISPLAY: Record<string, string> = {
 };
 
 // Returns the sector display name (for dropdowns) from either a display name or enum value
-const sectorDisplay = (s: any) => {
-  const str = typeof s === "object" ? s.name || s.id || "" : s || "";
-  return SECTOR_ENUM_TO_DISPLAY[str] ?? str;
-};
+const sectorDisplay = (s: string) => SECTOR_ENUM_TO_DISPLAY[s] ?? s ?? "";
 
 const TASK_TYPES = [
   "Atendimento",
@@ -243,19 +240,11 @@ function FormSelect({
       }}
     >
       <option value="">{placeholder || "Selecionar..."}</option>
-      {opts.map((o: any, i: number) => {
-        const label = typeof o === "object" ? o.name || o.label : o;
-        const value = typeof o === "object" ? o.id || o.value : o;
-        const key =
-          typeof o === "object"
-            ? o.id || o.name || `opt-${i}`
-            : `opt-${o}-${i}`;
-        return (
-          <option key={key} value={value}>
-            {label}
-          </option>
-        );
-      })}
+      {opts.map((o) => (
+        <option key={o} value={o}>
+          {o}
+        </option>
+      ))}
     </select>
   );
 }
@@ -420,19 +409,12 @@ function MultiSelect({
             overflowY: "auto",
           }}
         >
-          {opts.map((o: any, i: number) => {
-            const label = typeof o === "object" ? o.name || o.label : o;
-            const value = typeof o === "object" ? o.id || o.value : o;
-            const selected = val.includes(value);
-            const key =
-              typeof o === "object"
-                ? o.id || o.name || `mopt-${i}`
-                : `mopt-${o}-${i}`;
-
+          {opts.map((o) => {
+            const selected = val.includes(o);
             return (
               <div
-                key={key}
-                onClick={() => toggle(value)}
+                key={o}
+                onClick={() => toggle(o)}
                 style={{
                   padding: "6px 10px",
                   borderRadius: 6,
@@ -469,7 +451,7 @@ function MultiSelect({
                 >
                   {selected && <Check size={10} color="white" />}
                 </div>
-                <span>{label}</span>
+                <span>{o}</span>
               </div>
             );
           })}
@@ -504,19 +486,9 @@ function FilterSelect({
       }}
     >
       <option value="">{placeholder || label}</option>
-      {opts.map((o: any, i: number) => {
-        const label = typeof o === "object" ? o.name || o.label : o;
-        const value = typeof o === "object" ? o.id || o.value : o;
-        const key =
-          typeof o === "object"
-            ? o.id || o.name || `fopt-${i}`
-            : `fopt-${o}-${i}`;
-        return (
-          <option key={key} value={value}>
-            {label}
-          </option>
-        );
-      })}
+      {opts.map((o) => (
+        <option key={o}>{o}</option>
+      ))}
     </select>
   );
 }
@@ -1133,14 +1105,9 @@ function NewTaskModal({
                           alignItems: "center",
                           justifyContent: "center",
                           flexShrink: 0,
-                          overflow: "hidden",
                         }}
                       >
-                        {typeof u.avatar === "string"
-                          ? u.avatar
-                          : u.name
-                            ? u.name.charAt(0)
-                            : "?"}
+                        {u.avatar}
                       </div>
                       <div style={{ flex: 1 }}>
                         <div
@@ -1153,7 +1120,7 @@ function NewTaskModal({
                           {u.name}
                         </div>
                         <div style={{ fontSize: 11, color: T.sub }}>
-                          {typeof u.role === "object" ? u.role.name : u.role}
+                          {u.role}
                         </div>
                       </div>
                       {form.responsible === u.name && (
@@ -1206,12 +1173,7 @@ function NewTaskModal({
                         fontSize: 11,
                       }}
                     >
-                      {k}:{" "}
-                      <b style={{ color: T.text }}>
-                        {typeof v === "object"
-                          ? (v as any).name || JSON.stringify(v)
-                          : v}
-                      </b>
+                      {k}: <b style={{ color: T.text }}>{v}</b>
                     </span>
                   ))}
                 </div>
@@ -1259,10 +1221,8 @@ function NewTaskModal({
                       {s.title}
                     </div>
                     <div style={{ fontSize: 11, color: T.sub, marginTop: 2 }}>
-                      {typeof s.sector === "object" ? s.sector.name : s.sector}
-                      {s.responsible
-                        ? ` · ${typeof s.responsible === "object" ? s.responsible.name : s.responsible}`
-                        : ""}
+                      {s.sector}
+                      {s.responsible ? ` · ${s.responsible}` : ""}
                     </div>
                   </div>
                   <button
@@ -2082,11 +2042,7 @@ function TaskModal({
                       {child.sector && (
                         <>
                           <span>•</span>
-                          <span>
-                            {typeof child.sector === "object"
-                              ? child.sector.name
-                              : child.sector}
-                          </span>
+                          <span>{child.sector}</span>
                         </>
                       )}
                     </div>
@@ -3852,18 +3808,8 @@ function DashboardPage({
     if (fStatus && t.status !== fStatus) return false;
     if (fType && t.type !== fType) return false;
     if (fPriority && t.priority !== fPriority) return false;
-    if (
-      fSector &&
-      (typeof t.sector === "object" ? t.sector?.name : t.sector) !== fSector
-    )
-      return false;
-    if (
-      fUser &&
-      (typeof t.responsible === "object"
-        ? t.responsible?.name
-        : t.responsible) !== fUser
-    )
-      return false;
+    if (fSector && t.sector !== fSector) return false;
+    if (fUser && t.responsible !== fUser) return false;
     if (fDateFrom?.from || fDateFrom?.to) {
       const td = parseDate(t.deadline);
       if (!td) return false;
@@ -3935,19 +3881,14 @@ function DashboardPage({
     .filter((d) => d.value > 0);
   const sectorData = SECTORS.map((s) => ({
     name: s,
-    v: filtered.filter(
-      (t) => (typeof t.sector === "object" ? t.sector?.name : t.sector) === s,
-    ).length,
+    v: filtered.filter((t) => t.sector === s).length,
   }))
     .filter((x) => x.v > 0)
     .sort((a, b) => b.v - a.v);
   const sectorRank = SECTORS.map((s) => ({
     name: s,
-    v: filtered.filter(
-      (t) =>
-        (typeof t.sector === "object" ? t.sector?.name : t.sector) === s &&
-        t.status === "Concluído",
-    ).length,
+    v: filtered.filter((t) => t.sector === s && t.status === "Concluído")
+      .length,
   }))
     .filter((x) => x.v > 0)
     .sort((a, b) => b.v - a.v);
@@ -3955,10 +3896,7 @@ function DashboardPage({
     .map((u) => ({
       name: u.name.split(" ")[0],
       v: filtered.filter(
-        (t) =>
-          (typeof t.responsible === "object"
-            ? t.responsible?.name
-            : t.responsible) === u.name && t.status === "Concluído",
+        (t) => t.responsible === u.name && t.status === "Concluído",
       ).length,
     }))
     .filter((x) => x.v > 0)
@@ -5043,8 +4981,7 @@ function DashboardPage({
                   {t.title}
                 </div>
                 <div style={{ fontSize: 10, color: T.sub, marginTop: 1 }}>
-                  {t.type} ·{" "}
-                  {typeof t.sector === "object" ? t.sector.name : t.sector}
+                  {t.type} · {t.sector}
                 </div>
               </div>
               <span
@@ -5168,8 +5105,7 @@ function KanbanPage({
   const filtered = tasks.filter((t) => {
     if (search && !t.title.toLowerCase().includes(search.toLowerCase()))
       return false;
-    const sectorVal = typeof t.sector === "object" ? t.sector?.name : t.sector;
-    if (fSector.length > 0 && !fSector.includes(sectorVal)) return false;
+    if (fSector.length > 0 && !fSector.includes(t.sector)) return false;
     if (fContract && t.contract !== fContract) return false;
     if (fCity && t.city !== fCity) return false;
     if (fNeighbor && t.nucleus !== fNeighbor) return false;
@@ -5674,9 +5610,7 @@ function KanbanPage({
                           }}
                         >
                           <Building2 size={9} />
-                          {typeof t.sector === "object"
-                            ? t.sector.name
-                            : t.sector}
+                          {t.sector}
                         </span>
                         <span
                           style={{
@@ -7418,9 +7352,7 @@ function TemplatesPage({
                   fontWeight: 600,
                 }}
               >
-                {typeof active.sector === "object"
-                  ? active.sector.name
-                  : active.sector}
+                {active.sector}
               </span>
             </div>
             {active.tasks.map((task: any, ti: number) => (
@@ -7626,19 +7558,11 @@ function TemplateModal({
       }}
     >
       <option value="">Setor...</option>
-      {sectors.map((s: any, i: number) => {
-        const label = typeof s === "object" ? s.name || s.label : s;
-        const value = typeof s === "object" ? s.id || s.value : s;
-        const key =
-          typeof s === "object"
-            ? s.id || s.name || `sec-${i}`
-            : `sec-${s}-${i}`;
-        return (
-          <option key={key} value={value}>
-            {label}
-          </option>
-        );
-      })}
+      {sectors.map((s) => (
+        <option key={s} value={s}>
+          {s}
+        </option>
+      ))}
     </select>
   );
 
