@@ -1,13 +1,13 @@
 "use client";
 
-import { AlertCircle, Save, X } from "lucide-react";
+import { AlertCircle, RefreshCw, Save, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface UserModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  user?: any; // If null, create mode
+  user?: any; // null = create mode
   roles: any[];
   sectors: any[];
   T: any;
@@ -26,7 +26,7 @@ export function UserModal({
   const [email, setEmail] = useState("");
   const [roleId, setRoleId] = useState("");
   const [sectorId, setSectorId] = useState("");
-  const [password, setPassword] = useState(""); // Only for create
+  const [resetPassword, setResetPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -39,13 +39,13 @@ export function UserModal({
         setSectorId(
           user.sector_id?.toString() || user.sector?.id?.toString() || "",
         );
-        setPassword(""); // Don't show password on edit
+        setResetPassword(false);
       } else {
         setName("");
         setEmail("");
         setRoleId("");
         setSectorId("");
-        setPassword("123456"); // Default password suggestion
+        setResetPassword(false);
       }
       setError("");
     }
@@ -73,10 +73,11 @@ export function UserModal({
 
       if (user) {
         body.id = user.id;
-        // Don't send password on edit typically, unless specific field
-      } else {
-        body.password = password;
+        if (resetPassword) {
+          body.resetPassword = true;
+        }
       }
+      // Novo usuário: senha padrão definida pela API automaticamente
 
       const res = await fetch("/api/users", {
         method,
@@ -96,6 +97,26 @@ export function UserModal({
     } finally {
       setLoading(false);
     }
+  };
+
+  const inp: React.CSSProperties = {
+    width: "100%",
+    padding: "10px 12px",
+    borderRadius: 8,
+    border: `1px solid ${T.border}`,
+    background: T.inp,
+    color: T.text,
+    fontSize: 14,
+    outline: "none",
+    boxSizing: "border-box",
+  };
+
+  const label: React.CSSProperties = {
+    display: "block",
+    fontSize: 12,
+    fontWeight: 600,
+    color: T.text,
+    marginBottom: 6,
   };
 
   return (
@@ -122,6 +143,7 @@ export function UserModal({
           boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
         }}
       >
+        {/* Header */}
         <div
           style={{
             display: "flex",
@@ -172,63 +194,23 @@ export function UserModal({
           style={{ display: "flex", flexDirection: "column", gap: 16 }}
         >
           <div>
-            <label
-              style={{
-                display: "block",
-                fontSize: 12,
-                fontWeight: 600,
-                color: T.text,
-                marginBottom: 6,
-              }}
-            >
-              Nome
-            </label>
+            <label style={label}>Nome</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                borderRadius: 8,
-                border: `1px solid ${T.border}`,
-                background: T.inp,
-                color: T.text,
-                fontSize: 14,
-                outline: "none",
-                boxSizing: "border-box",
-              }}
+              style={inp}
               placeholder="Ex: João Silva"
             />
           </div>
 
           <div>
-            <label
-              style={{
-                display: "block",
-                fontSize: 12,
-                fontWeight: 600,
-                color: T.text,
-                marginBottom: 6,
-              }}
-            >
-              E-mail
-            </label>
+            <label style={label}>E-mail</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                borderRadius: 8,
-                border: `1px solid ${T.border}`,
-                background: T.inp,
-                color: T.text,
-                fontSize: 14,
-                outline: "none",
-                boxSizing: "border-box",
-              }}
+              style={inp}
               placeholder="joao@geotask.com"
             />
           </div>
@@ -237,31 +219,11 @@ export function UserModal({
             style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}
           >
             <div>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: T.text,
-                  marginBottom: 6,
-                }}
-              >
-                Cargo
-              </label>
+              <label style={label}>Cargo</label>
               <select
                 value={roleId}
                 onChange={(e) => setRoleId(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  borderRadius: 8,
-                  border: `1px solid ${T.border}`,
-                  background: T.inp,
-                  color: T.text,
-                  fontSize: 14,
-                  outline: "none",
-                  boxSizing: "border-box",
-                }}
+                style={inp}
               >
                 <option value="">Selecione...</option>
                 {roles.map((r) => (
@@ -271,33 +233,12 @@ export function UserModal({
                 ))}
               </select>
             </div>
-
             <div>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: T.text,
-                  marginBottom: 6,
-                }}
-              >
-                Setor
-              </label>
+              <label style={label}>Setor</label>
               <select
                 value={sectorId}
                 onChange={(e) => setSectorId(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  borderRadius: 8,
-                  border: `1px solid ${T.border}`,
-                  background: T.inp,
-                  color: T.text,
-                  fontSize: 14,
-                  outline: "none",
-                  boxSizing: "border-box",
-                }}
+                style={inp}
               >
                 <option value="">Selecione...</option>
                 {sectors.map((s) => (
@@ -309,39 +250,64 @@ export function UserModal({
             </div>
           </div>
 
+          {/* Se criando: info sobre senha padrão */}
           {!user && (
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: T.text,
-                  marginBottom: 6,
-                }}
-              >
-                Senha Inicial
-              </label>
+            <div
+              style={{
+                padding: "10px 14px",
+                borderRadius: 8,
+                background: T.inp,
+                border: `1px solid ${T.border}`,
+                fontSize: 12,
+                color: T.sub,
+              }}
+            >
+              🔑 Senha padrão:{" "}
+              <strong style={{ color: T.text }}>Geogis2026</strong>
+              <br />O usuário será solicitado a alterar no primeiro acesso.
+            </div>
+          )}
+
+          {/* Se editando: opção de resetar senha */}
+          {user && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "10px 14px",
+                borderRadius: 8,
+                background: resetPassword ? "#fff7ed" : T.inp,
+                border: `1px solid ${resetPassword ? "#f97316" : T.border}`,
+                cursor: "pointer",
+              }}
+              onClick={() => setResetPassword(!resetPassword)}
+            >
               <input
-                type="text"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  borderRadius: 8,
-                  border: `1px solid ${T.border}`,
-                  background: T.inp,
-                  color: T.text,
-                  fontSize: 14,
-                  outline: "none",
-                  boxSizing: "border-box",
-                }}
+                type="checkbox"
+                checked={resetPassword}
+                readOnly
+                style={{ cursor: "pointer", accentColor: "#f97316" }}
               />
-              <p style={{ fontSize: 11, color: T.sub, marginTop: 4 }}>
-                O usuário será solicitado a alterar esta senha no primeiro
-                login.
-              </p>
+              <div>
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: T.text,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 5,
+                  }}
+                >
+                  <RefreshCw size={13} />
+                  Resetar senha para o padrão
+                </div>
+                <div style={{ fontSize: 11, color: T.sub }}>
+                  Senha voltará para <strong>Geogis2026</strong> e o usuário
+                  deverá alterá-la.
+                </div>
+              </div>
             </div>
           )}
 

@@ -1,15 +1,16 @@
 "use client";
 
-import { AlertCircle, Lock, Save, X } from "lucide-react";
+import { AlertCircle, CheckCircle, Lock, Save, X } from "lucide-react";
 import { useState } from "react";
 
 interface ChangePasswordModalProps {
   isOpen: boolean;
   onClose: () => void;
-  userId: number; // The user whose password is being changed
-  userName?: string; // Optional name for display
-  T: any; // Theme object
-  isAdmin?: boolean; // If true, doesn't ask for current password
+  userId: number;
+  userName?: string;
+  T: any;
+  isAdmin?: boolean; // Se true, não pede senha atual (reset admin)
+  isMandatory?: boolean; // Se true, modal não pode ser fechado sem trocar
 }
 
 export function ChangePasswordModal({
@@ -19,6 +20,7 @@ export function ChangePasswordModal({
   userName,
   T,
   isAdmin = false,
+  isMandatory = false,
 }: ChangePasswordModalProps) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -28,6 +30,19 @@ export function ChangePasswordModal({
   const [success, setSuccess] = useState(false);
 
   if (!isOpen) return null;
+
+  const handleClose = () => {
+    if (isMandatory) return; // Non-closeable if mandatory
+    onClose();
+  };
+
+  const resetForm = () => {
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setError("");
+    setSuccess(false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,46 +55,36 @@ export function ChangePasswordModal({
     }
 
     if (newPassword !== confirmPassword) {
-      setError("As senhas não coincidem");
+      setError("A confirmação de senha não coincide com a nova senha");
       return;
     }
 
     if (!isAdmin && !currentPassword) {
-      setError("Senha atual é obrigatória");
+      setError("Informe a senha atual");
       return;
     }
 
     setLoading(true);
 
     try {
-      let endpoint = "/api/auth/change-password";
-      let body: any = { userId, newPassword };
-
       if (isAdmin) {
-        // Admin uses patch user endpoint or a specific admin-reset endpoint
-        // Per plan: "Update to handle password reset (Admin action)" in /api/users via PATCH
-        endpoint = "/api/users";
-        body = { id: userId, password: newPassword };
-        // Use PATCH for admin reset
-        const res = await fetch(endpoint, {
+        // Admin reseta via PATCH /api/users (resetPassword flag)
+        const res = await fetch("/api/users", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
+          body: JSON.stringify({ id: userId, password: newPassword }),
         });
-
         if (!res.ok) {
           const data = await res.json();
           throw new Error(data.error || "Erro ao alterar senha");
         }
       } else {
-        // User changing their own password
-        body.currentPassword = currentPassword;
-        const res = await fetch(endpoint, {
+        // Usuário altera própria senha
+        const res = await fetch("/api/auth/change-password", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
+          body: JSON.stringify({ userId, currentPassword, newPassword }),
         });
-
         if (!res.ok) {
           const data = await res.json();
           throw new Error(data.error || "Erro ao alterar senha");
@@ -88,11 +93,8 @@ export function ChangePasswordModal({
 
       setSuccess(true);
       setTimeout(() => {
+        resetForm();
         onClose();
-        setSuccess(false);
-        setCurrentPassword("");
-        setNewPassword("");
-        setConfirmPassword("");
       }, 1500);
     } catch (err: any) {
       setError(err.message);
@@ -101,13 +103,33 @@ export function ChangePasswordModal({
     }
   };
 
+  const inp: React.CSSProperties = {
+    width: "100%",
+    padding: "10px 12px",
+    borderRadius: 8,
+    border: `1px solid ${T.border}`,
+    background: T.inp,
+    color: T.text,
+    fontSize: 14,
+    outline: "none",
+    boxSizing: "border-box",
+  };
+
+  const label: React.CSSProperties = {
+    display: "block",
+    fontSize: 12,
+    fontWeight: 600,
+    color: T.text,
+    marginBottom: 6,
+  };
+
   return (
     <div
       style={{
         position: "fixed",
         inset: 0,
         zIndex: 500,
-        background: "rgba(0,0,0,0.5)",
+        background: "rgba(0,0,0,0.6)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -120,24 +142,25 @@ export function ChangePasswordModal({
           border: `1px solid ${T.border}`,
           borderRadius: 16,
           width: "100%",
-          maxWidth: 400,
+          maxWidth: 420,
           padding: 24,
-          boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.25)",
         }}
       >
+        {/* Header */}
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 20,
+            alignItems: "flex-start",
+            marginBottom: isMandatory ? 8 : 20,
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div
               style={{
-                width: 36,
-                height: 36,
+                width: 38,
+                height: 38,
                 borderRadius: 10,
                 background: "#f3f4f6",
                 display: "flex",
@@ -145,7 +168,7 @@ export function ChangePasswordModal({
                 justifyContent: "center",
               }}
             >
-              <Lock size={18} color="#4b5563" />
+              <Lock size={18} color="#98af3b" />
             </div>
             <div>
               <h3
@@ -156,7 +179,7 @@ export function ChangePasswordModal({
                   color: T.text,
                 }}
               >
-                Alterar Senha
+                {isAdmin ? "Definir Nova Senha" : "Alterar Senha"}
               </h3>
               {userName && (
                 <p style={{ margin: 0, fontSize: 12, color: T.sub }}>
@@ -165,19 +188,40 @@ export function ChangePasswordModal({
               )}
             </div>
           </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              padding: 4,
-            }}
-          >
-            <X size={20} color={T.sub} />
-          </button>
+          {!isMandatory && (
+            <button
+              onClick={handleClose}
+              style={{
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                padding: 4,
+              }}
+            >
+              <X size={20} color={T.sub} />
+            </button>
+          )}
         </div>
 
+        {/* Aviso de troca obrigatória */}
+        {isMandatory && (
+          <div
+            style={{
+              marginBottom: 16,
+              padding: "10px 14px",
+              borderRadius: 8,
+              background: "#fff7ed",
+              border: "1px solid #fed7aa",
+              fontSize: 12,
+              color: "#9a3412",
+            }}
+          >
+            ⚠️ Por segurança, você deve definir uma nova senha antes de
+            continuar.
+          </div>
+        )}
+
+        {/* Error */}
         {error && (
           <div
             style={{
@@ -197,6 +241,7 @@ export function ChangePasswordModal({
           </div>
         )}
 
+        {/* Success */}
         {success && (
           <div
             style={{
@@ -211,7 +256,7 @@ export function ChangePasswordModal({
               gap: 8,
             }}
           >
-            <AlertCircle size={16} />
+            <CheckCircle size={16} />
             Senha alterada com sucesso!
           </div>
         )}
@@ -220,96 +265,62 @@ export function ChangePasswordModal({
           onSubmit={handleSubmit}
           style={{ display: "flex", flexDirection: "column", gap: 16 }}
         >
+          {/* Senha atual — somente para usuário (não-admin) */}
           {!isAdmin && (
             <div>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: T.text,
-                  marginBottom: 6,
-                }}
-              >
-                Senha Atual
-              </label>
+              <label style={label}>Senha Atual</label>
               <input
                 type="password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  borderRadius: 8,
-                  border: `1px solid ${T.border}`,
-                  background: T.inp,
-                  color: T.text,
-                  fontSize: 14,
-                  outline: "none",
-                  boxSizing: "border-box",
-                }}
+                style={inp}
+                placeholder="••••••••"
               />
             </div>
           )}
 
           <div>
-            <label
-              style={{
-                display: "block",
-                fontSize: 12,
-                fontWeight: 600,
-                color: T.text,
-                marginBottom: 6,
-              }}
-            >
-              Nova Senha
-            </label>
+            <label style={label}>Nova Senha</label>
             <input
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               style={{
-                width: "100%",
-                padding: "10px 12px",
-                borderRadius: 8,
-                border: `1px solid ${T.border}`,
-                background: T.inp,
-                color: T.text,
-                fontSize: 14,
-                outline: "none",
-                boxSizing: "border-box",
+                ...inp,
+                border: `1px solid ${
+                  newPassword && newPassword.length < 6 ? "#ef4444" : T.border
+                }`,
               }}
+              placeholder="Mínimo 6 caracteres"
             />
+            {newPassword && newPassword.length < 6 && (
+              <p style={{ fontSize: 11, color: "#ef4444", marginTop: 4 }}>
+                Mínimo de 6 caracteres
+              </p>
+            )}
           </div>
 
           <div>
-            <label
-              style={{
-                display: "block",
-                fontSize: 12,
-                fontWeight: 600,
-                color: T.text,
-                marginBottom: 6,
-              }}
-            >
-              Confirmar Nova Senha
-            </label>
+            <label style={label}>Confirmar Nova Senha</label>
             <input
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               style={{
-                width: "100%",
-                padding: "10px 12px",
-                borderRadius: 8,
-                border: `1px solid ${T.border}`,
-                background: T.inp,
-                color: T.text,
-                fontSize: 14,
-                outline: "none",
-                boxSizing: "border-box",
+                ...inp,
+                border: `1px solid ${
+                  confirmPassword && confirmPassword !== newPassword
+                    ? "#ef4444"
+                    : T.border
+                }`,
               }}
+              placeholder="Repita a nova senha"
             />
+            {confirmPassword && confirmPassword !== newPassword && (
+              <p style={{ fontSize: 11, color: "#ef4444", marginTop: 4 }}>
+                As senhas não coincidem
+              </p>
+            )}
           </div>
 
           <button

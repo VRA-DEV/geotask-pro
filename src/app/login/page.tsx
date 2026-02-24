@@ -1,6 +1,15 @@
 "use client";
 
-import { AlertCircle, ArrowRight, Loader2, Lock, Mail } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowRight,
+  Eye,
+  EyeOff,
+  Loader2,
+  Lock,
+  Mail,
+} from "lucide-react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -8,50 +17,50 @@ export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [vibrant, setVibrant] = useState(0);
 
   useEffect(() => {
-    // Check if already logged in
     const saved = localStorage.getItem("geotask_user");
-    if (saved) {
-      router.push("/");
-    }
-
-    // Simple animation effect
-    const interval = setInterval(() => {
-      setVibrant((v) => (v + 1) % 360);
-    }, 100);
-    return () => clearInterval(interval);
+    if (saved) router.push("/");
   }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
-
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-
       const data = await res.json();
-
       if (res.ok) {
         localStorage.setItem("geotask_user", JSON.stringify(data));
         router.push("/");
       } else {
-        setError(data.error || "Erro ao realizar login");
+        setError(data.error || "Credenciais inválidas");
       }
-    } catch (err) {
-      console.error(err);
+    } catch {
       setError("Erro de conexão com o servidor");
     } finally {
       setLoading(false);
     }
+  };
+
+  const inputBase: React.CSSProperties = {
+    width: "100%",
+    padding: "12px 14px 12px 44px",
+    background: "#f8fafc",
+    border: "1.5px solid #e2e8f0",
+    borderRadius: "12px",
+    color: "#1e293b",
+    fontSize: "15px",
+    outline: "none",
+    transition: "border-color 0.2s, box-shadow 0.2s",
+    boxSizing: "border-box",
   };
 
   return (
@@ -61,113 +70,123 @@ export default function LoginPage() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "#030712",
-        fontFamily: "system-ui, -apple-system, sans-serif",
+        background:
+          "linear-gradient(135deg, #f0f4e8 0%, #e8f0dc 50%, #f5f8f0 100%)",
+        fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
         position: "relative",
         overflow: "hidden",
       }}
     >
-      {/* Dynamic Background Elements */}
+      {/* Subtle background blobs */}
       <div
         style={{
           position: "absolute",
-          width: "500px",
-          height: "500px",
+          width: 480,
+          height: 480,
           borderRadius: "50%",
-          background: `radial-gradient(circle, hsla(${vibrant}, 70%, 50%, 0.15) 0%, transparent 70%)`,
-          top: "-100px",
-          right: "-100px",
-          filter: "blur(60px)",
-          zIndex: 0,
+          background:
+            "radial-gradient(circle, rgba(152,175,59,0.18) 0%, transparent 70%)",
+          top: -120,
+          right: -80,
+          filter: "blur(48px)",
+          pointerEvents: "none",
         }}
       />
       <div
         style={{
           position: "absolute",
-          width: "400px",
-          height: "400px",
+          width: 360,
+          height: 360,
           borderRadius: "50%",
           background:
-            "radial-gradient(circle, rgba(152, 175, 59, 0.1) 0%, transparent 70%)",
-          bottom: "-50px",
-          left: "-50px",
-          filter: "blur(50px)",
-          zIndex: 0,
+            "radial-gradient(circle, rgba(152,175,59,0.12) 0%, transparent 70%)",
+          bottom: -60,
+          left: -60,
+          filter: "blur(48px)",
+          pointerEvents: "none",
         }}
       />
 
+      {/* Card */}
       <div
         style={{
           width: "100%",
-          maxWidth: "400px",
-          padding: "40px",
-          background: "rgba(17, 24, 39, 0.8)",
-          backdropFilter: "blur(12px)",
-          borderRadius: "24px",
-          border: "1px solid rgba(255, 255, 255, 0.1)",
-          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
-          zIndex: 1,
+          maxWidth: 420,
+          padding: "44px 40px 36px",
+          background: "rgba(255,255,255,0.92)",
+          backdropFilter: "blur(16px)",
+          borderRadius: 28,
+          border: "1px solid rgba(152,175,59,0.18)",
+          boxShadow:
+            "0 4px 6px -1px rgba(0,0,0,0.05), 0 20px 60px -12px rgba(0,0,0,0.12)",
           position: "relative",
+          zIndex: 1,
         }}
       >
-        <div style={{ textAlign: "center", marginBottom: "32px" }}>
+        {/* Logo + heading */}
+        <div style={{ textAlign: "center", marginBottom: 36 }}>
           <div
             style={{
-              width: "64px",
-              height: "64px",
-              background: "#98af3b",
-              borderRadius: "16px",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              margin: "0 auto 16px",
-              boxShadow: "0 10px 20px rgba(152, 175, 59, 0.3)",
+              marginBottom: 20,
             }}
           >
-            <Lock size={32} color="white" />
+            <Image
+              src="/logo.png"
+              alt="Geogis Logo"
+              width={160}
+              height={52}
+              style={{ objectFit: "contain" }}
+              priority
+            />
           </div>
           <h1
             style={{
-              fontSize: "28px",
-              fontWeight: 800,
-              color: "white",
-              margin: "0 0 8px",
-              letterSpacing: "-0.025em",
+              fontSize: 20,
+              fontWeight: 600,
+              color: "#1e293b",
+              margin: "0 0 6px",
+              letterSpacing: "-0.02em",
             }}
           >
-            GeoTask Pro
+            Bem-vindo ao GeoTask Pro
           </h1>
-          <p style={{ color: "#9ca3af", fontSize: "14px", margin: 0 }}>
-            Painel de Controle e Gestão
+          <p style={{ color: "#64748b", fontSize: 14, margin: 0 }}>
+            Faça login para acessar o painel
           </p>
         </div>
 
         <form
           onSubmit={handleSubmit}
-          style={{ display: "flex", flexDirection: "column", gap: "20px" }}
+          style={{ display: "flex", flexDirection: "column", gap: 18 }}
         >
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          {/* Email */}
+          <div>
             <label
               style={{
-                fontSize: "12px",
+                display: "block",
+                fontSize: 12,
                 fontWeight: 600,
-                color: "#9ca3af",
+                color: "#475569",
                 textTransform: "uppercase",
-                letterSpacing: "0.05em",
-                marginLeft: "4px",
+                letterSpacing: "0.06em",
+                marginBottom: 6,
               }}
             >
               Email
             </label>
             <div style={{ position: "relative" }}>
               <Mail
-                size={18}
+                size={17}
                 style={{
                   position: "absolute",
-                  left: "14px",
+                  left: 14,
                   top: "50%",
                   transform: "translateY(-50%)",
-                  color: "#6b7280",
+                  color: "#94a3b8",
+                  pointerEvents: "none",
                 }}
               />
               <input
@@ -176,164 +195,178 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="seu@email.com"
                 required
-                style={{
-                  width: "100%",
-                  padding: "12px 14px 12px 42px",
-                  background: "rgba(31, 41, 55, 0.5)",
-                  border: "1px solid rgba(75, 85, 99, 0.3)",
-                  borderRadius: "12px",
-                  color: "white",
-                  fontSize: "15px",
-                  outline: "none",
-                  transition: "all 0.2s",
-                  boxSizing: "border-box",
-                }}
+                style={inputBase}
                 onFocus={(e) => {
                   e.target.style.borderColor = "#98af3b";
-                  e.target.style.background = "rgba(31, 41, 55, 0.8)";
+                  e.target.style.boxShadow = "0 0 0 3px rgba(152,175,59,0.15)";
                 }}
                 onBlur={(e) => {
-                  e.target.style.borderColor = "rgba(75, 85, 99, 0.3)";
-                  e.target.style.background = "rgba(31, 41, 55, 0.5)";
+                  e.target.style.borderColor = "#e2e8f0";
+                  e.target.style.boxShadow = "none";
                 }}
               />
             </div>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          {/* Password */}
+          <div>
             <label
               style={{
-                fontSize: "12px",
+                display: "block",
+                fontSize: 12,
                 fontWeight: 600,
-                color: "#9ca3af",
+                color: "#475569",
                 textTransform: "uppercase",
-                letterSpacing: "0.05em",
-                marginLeft: "4px",
+                letterSpacing: "0.06em",
+                marginBottom: 6,
               }}
             >
               Senha
             </label>
             <div style={{ position: "relative" }}>
               <Lock
-                size={18}
+                size={17}
                 style={{
                   position: "absolute",
-                  left: "14px",
+                  left: 14,
                   top: "50%",
                   transform: "translateY(-50%)",
-                  color: "#6b7280",
+                  color: "#94a3b8",
+                  pointerEvents: "none",
                 }}
               />
               <input
-                type="password"
+                type={showPwd ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
-                style={{
-                  width: "100%",
-                  padding: "12px 14px 12px 42px",
-                  background: "rgba(31, 41, 55, 0.5)",
-                  border: "1px solid rgba(75, 85, 99, 0.3)",
-                  borderRadius: "12px",
-                  color: "white",
-                  fontSize: "15px",
-                  outline: "none",
-                  transition: "all 0.2s",
-                  boxSizing: "border-box",
-                }}
+                style={{ ...inputBase, paddingRight: 44 }}
                 onFocus={(e) => {
                   e.target.style.borderColor = "#98af3b";
-                  e.target.style.background = "rgba(31, 41, 55, 0.8)";
+                  e.target.style.boxShadow = "0 0 0 3px rgba(152,175,59,0.15)";
                 }}
                 onBlur={(e) => {
-                  e.target.style.borderColor = "rgba(75, 85, 99, 0.3)";
-                  e.target.style.background = "rgba(31, 41, 55, 0.5)";
+                  e.target.style.borderColor = "#e2e8f0";
+                  e.target.style.boxShadow = "none";
                 }}
               />
+              <button
+                type="button"
+                onClick={() => setShowPwd((v) => !v)}
+                style={{
+                  position: "absolute",
+                  right: 13,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  padding: 2,
+                  color: "#94a3b8",
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
+                {showPwd ? <EyeOff size={17} /> : <Eye size={17} />}
+              </button>
             </div>
           </div>
 
+          {/* Error */}
           {error && (
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: "8px",
-                padding: "12px",
-                background: "rgba(239, 68, 68, 0.1)",
-                border: "1px solid rgba(239, 68, 68, 0.2)",
-                borderRadius: "10px",
-                color: "#f87171",
-                fontSize: "13px",
+                gap: 8,
+                padding: "11px 14px",
+                background: "#fef2f2",
+                border: "1px solid #fecaca",
+                borderRadius: 10,
+                color: "#dc2626",
+                fontSize: 13,
               }}
             >
-              <AlertCircle size={16} />
+              <AlertCircle size={15} />
               {error}
             </div>
           )}
 
+          {/* Submit */}
           <button
             type="submit"
             disabled={loading}
             style={{
               width: "100%",
               padding: "14px",
-              background: "#98af3b",
+              background: loading ? "#b8cc6b" : "#98af3b",
               color: "white",
               border: "none",
-              borderRadius: "12px",
-              fontSize: "16px",
+              borderRadius: 12,
+              fontSize: 15,
               fontWeight: 700,
               cursor: loading ? "not-allowed" : "pointer",
               transition: "all 0.2s",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              gap: "10px",
-              marginTop: "8px",
-              boxShadow: "0 10px 20px rgba(152, 175, 59, 0.2)",
+              gap: 10,
+              marginTop: 4,
+              boxShadow: "0 4px 14px rgba(152,175,59,0.35)",
+              letterSpacing: "-0.01em",
             }}
             onMouseEnter={(e) => {
-              if (!loading)
+              if (!loading) {
+                e.currentTarget.style.background = "#8a9f32";
                 e.currentTarget.style.transform = "translateY(-1px)";
-              if (!loading) e.currentTarget.style.background = "#a9c245";
+                e.currentTarget.style.boxShadow =
+                  "0 6px 20px rgba(152,175,59,0.45)";
+              }
             }}
             onMouseLeave={(e) => {
-              if (!loading) e.currentTarget.style.transform = "translateY(0)";
-              if (!loading) e.currentTarget.style.background = "#98af3b";
+              if (!loading) {
+                e.currentTarget.style.background = "#98af3b";
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow =
+                  "0 4px 14px rgba(152,175,59,0.35)";
+              }
             }}
           >
             {loading ? (
-              <Loader2 size={20} className="animate-spin" />
+              <Loader2
+                size={20}
+                style={{ animation: "spin 1s linear infinite" }}
+              />
             ) : (
               <>
                 Entrar
-                <ArrowRight size={20} />
+                <ArrowRight size={18} />
               </>
             )}
           </button>
         </form>
 
-        <div style={{ marginTop: "32px", textAlign: "center" }}>
-          <p style={{ color: "#4b5563", fontSize: "12px" }}>
-            © {new Date().getFullYear()} Geogis. Todos os direitos reservados.
-          </p>
-        </div>
+        <p
+          style={{
+            textAlign: "center",
+            color: "#94a3b8",
+            fontSize: 12,
+            marginTop: 28,
+            marginBottom: 0,
+          }}
+        >
+          © {new Date().getFullYear()} Geogis. Todos os direitos reservados.
+        </p>
       </div>
 
-      <style jsx global>{`
+      <style>{`
         @keyframes spin {
-          from {
-            transform: rotate(0deg);
-          }
-          to {
-            transform: rotate(360deg);
-          }
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
-        .animate-spin {
-          animation: spin 1s linear infinite;
-        }
+        input::placeholder { color: #b0bec5; }
+        * { box-sizing: border-box; }
       `}</style>
     </div>
   );

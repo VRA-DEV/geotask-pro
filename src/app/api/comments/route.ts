@@ -80,15 +80,12 @@ export async function GET(req: Request) {
     const comments = await prisma.comment.findMany({
       where: { task_id: taskId },
       include: {
-        user: {
-          select: { name: true, avatar: true },
-        },
         mentions: {
           include: {
             mentioned_user: {
               select: { name: true },
             },
-            mentioned_sector: {
+            Sector: {
               select: { name: true },
             },
           },
@@ -97,10 +94,26 @@ export async function GET(req: Request) {
       orderBy: { created_at: "asc" },
     });
 
+    // Fetch user names separately since Comment may not have a user relation
+    const userIds = [
+      ...new Set(comments.map((c) => c.user_id).filter(Boolean)),
+    ] as number[];
+    const usersMap: Record<number, { name: string; avatar: string | null }> =
+      {};
+    if (userIds.length > 0) {
+      const users = await prisma.user.findMany({
+        where: { id: { in: userIds } },
+        select: { id: true, name: true, avatar: true },
+      });
+      users.forEach((u) => {
+        usersMap[u.id] = { name: u.name, avatar: u.avatar };
+      });
+    }
+
     const commentsFormatted = comments.map((c) => ({
       ...c,
-      user_name: c.user?.name || "Anônimo",
-      user_avatar: c.user?.avatar || "?",
+      user_name: (c.user_id && usersMap[c.user_id]?.name) || "Anônimo",
+      user_avatar: (c.user_id && usersMap[c.user_id]?.avatar) || "?",
     }));
 
     return NextResponse.json(commentsFormatted);
@@ -136,7 +149,7 @@ export async function POST(req: Request) {
 
     const task = await prisma.task.findUnique({
       where: { id: Number(task_id) },
-      select: { title: true, sector: true },
+      select: { title: true, sector_id: true },
     });
     const taskTitle = task?.title || "uma tarefa";
 
@@ -148,20 +161,22 @@ export async function POST(req: Request) {
       if (u) authorName = u.name;
     }
 
-    // 2. Parse @User Mentions
-    const userMentionRegex = /@([A-ZÀ-Úa-zà-ú]+)/g;
+    // 2. Parse @User Mentions (match full name until space/punctuation, skip @# sector mentions)
+    // We use a greedy pattern to capture full names like "João Silva"
+    const userMentionRegex =
+      /@(?!#)([A-ZÀ-Úa-zà-ú][A-ZÀ-Úa-zà-ú0-9 ]*?)(?=\s{2}|[,.!?\n]|$)/g;
     let match;
     const mentionedUserIds = new Set<number>();
 
     userMentionRegex.lastIndex = 0;
 
     while ((match = userMentionRegex.exec(content)) !== null) {
-      const namePart = match[1];
-      if (content[match.index + 1] === "#") continue;
+      const namePart = match[1].trim();
+      if (!namePart) continue;
 
       console.log(`[API] Checking mention for: "${namePart}"`);
 
-      // Fuzzy search
+      // Fuzzy search — find first user whose name contains the mentioned part
       const mentionedUser = await prisma.user.findFirst({
         where: {
           name: { contains: namePart, mode: "insensitive" },
@@ -196,18 +211,21 @@ export async function POST(req: Request) {
       }
     }
 
-    // 3. Parse @#Sector Mentions
-    const sectorMentionRegex = /@#([A-ZÀ-Úa-zà-ú]+)/g;
-    const mentionedSectors = new Set<number>(); // Set of Sector IDs
+    // 3. Parse @#Sector Mentions (full sector name until trailing space/punctuation)
+    const sectorMentionRegex =
+      /@#([A-ZÀ-Úa-zà-ú][A-ZÀ-Úa-zà-ú0-9 ]*?)(?=\s{2}|[,.!?\n]|$)/g;
+    const mentionedSectors = new Set<number>();
 
     // Fetch all sectors for lookup
     const allSectors = await prisma.sector.findMany();
 
+    sectorMentionRegex.lastIndex = 0;
     while ((match = sectorMentionRegex.exec(content)) !== null) {
-      const sectorName = match[1];
+      const sectorName = match[1].trim();
+      if (!sectorName) continue;
       console.log(`[API] Checking sector mention: "${sectorName}"`);
 
-      // Find sector by name (case insensitive)
+      // Find sector by name (case insensitive, exact or partial)
       const targetSector = allSectors.find(
         (s) =>
           s.name.toLowerCase() === sectorName.toLowerCase() ||
@@ -229,7 +247,7 @@ export async function POST(req: Request) {
             },
           });
 
-          // Notify Users of that Sector
+          // Notify all users of that sector
           await notifySector(
             targetSector.id,
             "mention_sector",

@@ -281,6 +281,7 @@ async function main() {
     "Financeiro",
     "Operacional",
     "Comercial",
+    "Controladoria",
   ];
 
   for (const r of roles) {
@@ -300,9 +301,119 @@ async function main() {
   }
 
   const adminRole = await prisma.role.findUnique({ where: { name: "Admin" } });
-  const tiSector = await prisma.sector.findUnique({ where: { name: "TI" } });
+  const gerenteRole = await prisma.role.findUnique({
+    where: { name: "Gerente" },
+  });
+  const coordenadorRole = await prisma.role.findUnique({
+    where: { name: "Coordenador" },
+  });
+  const gestorRole = await prisma.role.findUnique({
+    where: { name: "Gestor" },
+  });
+  const lideradoRole = await prisma.role.findUnique({
+    where: { name: "Liderado" },
+  });
 
-  if (!adminRole || !tiSector) throw new Error("Failed to seed roles/sectors");
+  const tiSector = await prisma.sector.findUnique({ where: { name: "TI" } });
+  const controladoriaSector = await prisma.sector.findUnique({
+    where: { name: "Controladoria" },
+  });
+  const financeiroSector = await prisma.sector.findUnique({
+    where: { name: "Financeiro" },
+  });
+  const administrativoSector = await prisma.sector.findUnique({
+    where: { name: "Administrativo" },
+  });
+
+  if (!adminRole || !controladoriaSector)
+    throw new Error("Failed to seed roles/sectors");
+
+  // 1. Specific users for Controladoria
+  const controlUsers = [
+    {
+      name: "Admin Controladoria",
+      role: adminRole,
+      email: "admin.control@geotask.com",
+    },
+    {
+      name: "Gerente Controladoria",
+      role: gerenteRole,
+      email: "gerente.control@geotask.com",
+    },
+    {
+      name: "Coord Controladoria",
+      role: coordenadorRole,
+      email: "coord.control@geotask.com",
+    },
+  ];
+
+  for (const u of controlUsers) {
+    if (u.role) {
+      await prisma.user.upsert({
+        where: { email: u.email },
+        update: {
+          Role: { connect: { id: u.role.id } },
+          Sector: { connect: { id: controladoriaSector.id } },
+        },
+        create: {
+          email: u.email,
+          name: u.name,
+          password_hash: "123456",
+          Role: { connect: { id: u.role.id } },
+          Sector: { connect: { id: controladoriaSector.id } },
+          avatar: u.name.substring(0, 2).toUpperCase(),
+        },
+      });
+    }
+  }
+
+  // 2. Gestor and Liderado in different sectors
+  const crossSectorUsers = [
+    {
+      name: "Gestor Financeiro",
+      role: gestorRole,
+      sector: financeiroSector,
+      email: "gestor.fin@geotask.com",
+    },
+    {
+      name: "Liderado Financeiro",
+      role: lideradoRole,
+      sector: financeiroSector,
+      email: "liderado.fin@geotask.com",
+    },
+    {
+      name: "Gestor Admin",
+      role: gestorRole,
+      sector: administrativoSector,
+      email: "gestor.adm@geotask.com",
+    },
+    {
+      name: "Liderado Admin",
+      role: lideradoRole,
+      sector: administrativoSector,
+      email: "liderado.adm@geotask.com",
+    },
+  ];
+
+  for (const u of crossSectorUsers) {
+    if (u.role && u.sector) {
+      await prisma.user.upsert({
+        where: { email: u.email },
+        update: {
+          Role: { connect: { id: u.role.id } },
+          Sector: { connect: { id: u.sector.id } },
+        },
+        create: {
+          email: u.email,
+          name: u.name,
+          password_hash: "123456",
+          Role: { connect: { id: u.role.id } },
+          Sector: { connect: { id: u.sector.id } },
+          avatar: u.name.substring(0, 2).toUpperCase(),
+        },
+      });
+    }
+  }
 
   const adminEmail = "admin@admin.com";
   const admin = await prisma.user.upsert({
@@ -313,40 +424,13 @@ async function main() {
       name: "Vinicios Reis de Araújo",
       password_hash: "997578",
       Role: { connect: { id: adminRole.id } },
-      Sector: { connect: { id: tiSector.id } },
+      Sector: { connect: { id: tiSector!.id } },
       avatar: "VR",
       active: true,
       must_change_password: false,
     },
   });
-  console.log("👤 Admin user seeded:", admin.name);
-
-  // Seed users for other roles to test permissions
-  const otherRoles = ["Gerente", "Gestor", "Coordenador", "Liderado"];
-  for (const roleName of otherRoles) {
-    const r = await prisma.role.findUnique({ where: { name: roleName } });
-    if (r) {
-      const email = `${roleName.toLowerCase()}@admin.com`;
-      await prisma.user.upsert({
-        where: { email },
-        update: {
-          Role: { connect: { id: r.id } },
-          active: true,
-        },
-        create: {
-          email,
-          name: `Usuário ${roleName}`,
-          password_hash: "123456", // Default simple password for testing
-          Role: { connect: { id: r.id } },
-          Sector: { connect: { id: tiSector.id } },
-          avatar: roleName.substring(0, 2).toUpperCase(),
-          active: true,
-          must_change_password: true, // Force them to change
-        },
-      });
-      console.log(`👤 ${roleName} user seeded: ${email} (Pass: 123456)`);
-    }
-  }
+  console.log("👤 Default Admin user seeded:", admin.name);
 
   // 2. Contracts
   console.log("📄 Seeding Contracts...");

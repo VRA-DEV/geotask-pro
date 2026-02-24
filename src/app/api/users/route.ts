@@ -1,6 +1,8 @@
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
+const DEFAULT_PASSWORD = "Geogis2026";
+
 // GET /api/users
 export async function GET() {
   try {
@@ -9,7 +11,6 @@ export async function GET() {
       orderBy: { name: "asc" },
     });
 
-    // Transform for frontend compatibility (monolith expects objects)
     const transformed = users.map((u: any) => ({
       ...u,
       role: u.Role,
@@ -26,12 +27,11 @@ export async function GET() {
   }
 }
 
-// POST /api/users
+// POST /api/users — sempre usa senha padrão
 export async function POST(req: Request) {
   try {
     const data = await req.json();
-    const { name, email, role, sector, role_id, sector_id, avatar, password } =
-      data;
+    const { name, email, role, sector, role_id, sector_id, avatar } = data;
 
     const finalRoleId = Number(role_id || role);
     const finalSectorId = Number(sector_id || sector);
@@ -57,19 +57,15 @@ export async function POST(req: Request) {
         role_id: finalRoleId,
         sector_id: finalSectorId,
         avatar: avatar || initials,
-        password_hash: password || "123456",
+        password_hash: DEFAULT_PASSWORD,
         must_change_password: true,
         active: true,
       },
-      include: { role: true, sector: true },
+      include: { Role: true, Sector: true },
     });
 
     return NextResponse.json(
-      {
-        ...user,
-        role: (user as any).role,
-        sector: (user as any).sector,
-      },
+      { ...user, role: user.Role, sector: user.Sector },
       { status: 201 },
     );
   } catch (error) {
@@ -85,14 +81,30 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const body = await req.json();
-    const { id, role, sector, role_id, sector_id, password, ...data } = body;
+    const {
+      id,
+      role,
+      sector,
+      role_id,
+      sector_id,
+      password,
+      resetPassword,
+      ...data
+    } = body;
+
     if (!id)
       return NextResponse.json({ error: "ID obrigatório" }, { status: 400 });
 
     const updateData: any = { ...data };
     if (role || role_id) updateData.role_id = Number(role_id || role);
     if (sector || sector_id) updateData.sector_id = Number(sector_id || sector);
-    if (password) {
+
+    if (resetPassword) {
+      // Admin reseta para senha padrão
+      updateData.password_hash = DEFAULT_PASSWORD;
+      updateData.must_change_password = true;
+    } else if (password) {
+      // Admin define senha manual
       updateData.password_hash = password;
       updateData.must_change_password = true;
     }
@@ -100,13 +112,10 @@ export async function PATCH(req: Request) {
     const user: any = await prisma.user.update({
       where: { id: Number(id) },
       data: updateData,
-      include: { role: true, sector: true },
+      include: { Role: true, Sector: true },
     });
-    return NextResponse.json({
-      ...user,
-      role: user.role,
-      sector: user.sector,
-    });
+
+    return NextResponse.json({ ...user, role: user.Role, sector: user.Sector });
   } catch (error) {
     console.error("Erro ao atualizar usuário:", error);
     return NextResponse.json(
@@ -116,16 +125,18 @@ export async function PATCH(req: Request) {
   }
 }
 
-// DELETE /api/users
+// DELETE /api/users — soft delete (desativar)
 export async function DELETE(req: Request) {
   try {
     const id = new URL(req.url).searchParams.get("id");
     if (!id)
       return NextResponse.json({ error: "ID obrigatório" }, { status: 400 });
+
     await prisma.user.update({
       where: { id: Number(id) },
       data: { active: false },
     });
+
     return NextResponse.json({ message: "Usuário desativado" });
   } catch (error) {
     return NextResponse.json(

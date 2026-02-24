@@ -51,6 +51,7 @@ import {
   YAxis,
 } from "recharts";
 import { exportToExcel, exportToPDF, getKpiData } from "../lib/exportUtils";
+import { ChangePasswordModal } from "./components/ChangePasswordModal";
 import { DatePicker } from "./components/DatePicker";
 import { SettingsPage } from "./components/SettingsPage";
 
@@ -1879,9 +1880,14 @@ function TaskModal({
         const sectorQ = query.slice(1);
         const activeSectors = sectors.length > 0 ? sectors : SECTORS;
         const matches = activeSectors
-          .filter((s: string) => s.toLowerCase().startsWith(sectorQ))
+          .filter((s: any) => {
+            const name = typeof s === "string" ? s : s.name || "";
+            return name.toLowerCase().startsWith(sectorQ);
+          })
           .slice(0, 5);
-        setMentionSuggestions(matches.map((s: string) => `#${s}`));
+        setMentionSuggestions(
+          matches.map((s: any) => `#${typeof s === "string" ? s : s.name}`),
+        );
       } else {
         const matches = users
           .filter((u) => u.name.toLowerCase().startsWith(query))
@@ -3014,6 +3020,7 @@ export default function GeoTask() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTemplate, setActiveTemplate] = useState<any>(null);
   const [settingsTab, setSettingsTab] = useState("users");
+  const [showMustChangePassword, setShowMustChangePassword] = useState(false);
   const [showNewTask, setShowNewTask] = useState(false);
   const [dbUsers, setDbUsers] = useState<any[]>([]);
   const [templates, setTemplates] = useState<any[]>([]);
@@ -3201,6 +3208,10 @@ export default function GeoTask() {
                 "geotask_user",
                 JSON.stringify(refreshedUser),
               );
+              // Liderado doesn't have access to Dashboard — start on Kanban
+              if (refreshedUser?.role?.name === "Liderado") {
+                setPage("kanban");
+              }
               setLoading(false);
             } else {
               // Invalid session (user deleted, inactive, or db reset)
@@ -3232,6 +3243,10 @@ export default function GeoTask() {
       fetchTasks();
       fetchTemplates();
       fetchNotifications(user.id);
+      // Show mandatory password change if needed
+      if (user.must_change_password) {
+        setShowMustChangePassword(true);
+      }
       // Poll notifications every 30s
       const interval = setInterval(() => fetchNotifications(user.id), 30000);
       return () => clearInterval(interval);
@@ -3288,6 +3303,42 @@ export default function GeoTask() {
   const canCreate =
     user &&
     ["Admin", "Gerente", "Gestor", "Coordenador"].includes(user.role?.name);
+
+  // Task visibility based on role:
+  // - Liderado: only their assigned tasks
+  // - Gestor: only tasks from their own sector
+  // - Others (Admin, Gerente, Coordenador): all tasks
+  const isLiderado = user?.role?.name === "Liderado";
+  const isGestor = user?.role?.name === "Gestor";
+  const userSectorId = user?.sector?.id || user?.sector_id;
+  const userSectorName = user?.sector?.name || user?.sector;
+
+  const visibleTasks = (() => {
+    if (isLiderado) {
+      return tasks.filter(
+        (t: any) =>
+          t.responsible_id === user.id ||
+          t.responsible?.id === user.id ||
+          (t.subtasks || []).some(
+            (s: any) =>
+              s.responsible_id === user.id || s.responsible?.id === user.id,
+          ),
+      );
+    }
+    if (isGestor) {
+      return tasks.filter((t: any) => {
+        const tSectorId = t.sector_id || t.sector?.id;
+        const tSectorName =
+          typeof t.sector === "string" ? t.sector : t.sector?.name;
+        // Match by sector id or sector name
+        if (userSectorId && tSectorId) return tSectorId === userSectorId;
+        if (userSectorName && tSectorName)
+          return tSectorName.toLowerCase() === userSectorName.toLowerCase();
+        return false;
+      });
+    }
+    return tasks;
+  })();
 
   if (loading) {
     return (
@@ -3379,67 +3430,85 @@ export default function GeoTask() {
             gap: 2,
           }}
         >
-          {navItems.map(({ id, label, icon: Icon }) => {
-            const active = page === id;
-            return (
-              <button
-                key={id}
-                onClick={() => setPage(id)}
-                title={label}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  padding: sidebarOpen ? "10px 12px" : "10px",
-                  justifyContent: sidebarOpen ? "flex-start" : "center",
-                  borderRadius: 10,
-                  border: "none",
-                  background: active ? "#98af3b" : "transparent",
-                  color: active ? "white" : T.sub,
-                  fontSize: 13,
-                  fontWeight: active ? 600 : 500,
-                  cursor: "pointer",
-                  transition: "all 0.15s",
-                  width: "100%",
-                }}
-              >
-                <div
+          {navItems
+            .filter(({ id }) => {
+              const roleName = user?.role?.name || "";
+              const rolePerms: any = user?.role?.permissions || {};
+              // Settings: visible to all logged-in users (SettingsPage shows only Minha Conta tab for non-Admins)
+              if (id === "settings") return !!user;
+              // Dashboard: hidden for Liderado (perm = none or role = Liderado)
+              if (id === "dashboard") {
+                if (roleName === "Liderado") return false;
+                if (rolePerms["Dashboard"] === "none") return false;
+              }
+              // Templates: hidden for Liderado
+              if (id === "templates") {
+                if (roleName === "Liderado") return false;
+                if (rolePerms["Templates"] === "none") return false;
+              }
+              return true;
+            })
+            .map(({ id, label, icon: Icon }) => {
+              const active = page === id;
+              return (
+                <button
+                  key={id}
+                  onClick={() => setPage(id)}
+                  title={label}
                   style={{
-                    position: "relative",
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "center",
+                    gap: 10,
+                    padding: sidebarOpen ? "10px 12px" : "10px",
+                    justifyContent: sidebarOpen ? "flex-start" : "center",
+                    borderRadius: 10,
+                    border: "none",
+                    background: active ? "#98af3b" : "transparent",
+                    color: active ? "white" : T.sub,
+                    fontSize: 13,
+                    fontWeight: active ? 600 : 500,
+                    cursor: "pointer",
+                    transition: "all 0.15s",
+                    width: "100%",
                   }}
                 >
-                  <Icon size={17} />
-                  {id === "notifications" && unreadCount > 0 && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: -8,
-                        right: -8,
-                        background: "#ef4444",
-                        color: "white",
-                        fontSize: 9,
-                        fontWeight: 700,
-                        minWidth: 15,
-                        height: 15,
-                        borderRadius: 10,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        padding: "0 3px",
-                        border: `2px solid ${active ? "#98af3b" : T.sb}`,
-                      }}
-                    >
-                      {unreadCount > 99 ? "99+" : unreadCount}
-                    </div>
-                  )}
-                </div>
-                {sidebarOpen && <span>{label}</span>}
-              </button>
-            );
-          })}
+                  <div
+                    style={{
+                      position: "relative",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Icon size={17} />
+                    {id === "notifications" && unreadCount > 0 && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: -8,
+                          right: -8,
+                          background: "#ef4444",
+                          color: "white",
+                          fontSize: 9,
+                          fontWeight: 700,
+                          minWidth: 15,
+                          height: 15,
+                          borderRadius: 10,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          padding: "0 3px",
+                          border: `2px solid ${active ? "#98af3b" : T.sb}`,
+                        }}
+                      >
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                      </div>
+                    )}
+                  </div>
+                  {sidebarOpen && <span>{label}</span>}
+                </button>
+              );
+            })}
         </nav>
         <div style={{ padding: 10, borderTop: `1px solid ${T.border}` }}>
           {sidebarOpen ? (
@@ -3480,9 +3549,8 @@ export default function GeoTask() {
               </div>
               <button
                 onClick={() => {
-                  setUser(null);
                   localStorage.removeItem("geotask_user");
-                  setPage("dashboard");
+                  router.push("/login");
                 }}
                 style={{
                   background: "none",
@@ -3842,7 +3910,7 @@ export default function GeoTask() {
           {page === "dashboard" && (
             <DashboardPage
               T={T}
-              tasks={tasks}
+              tasks={visibleTasks}
               user={user}
               onSelect={setSelectedTask}
               users={dbUsers}
@@ -3854,7 +3922,7 @@ export default function GeoTask() {
           {page === "kanban" && (
             <KanbanPage
               T={T}
-              tasks={tasks}
+              tasks={visibleTasks}
               user={user}
               onSelect={setSelectedTask}
               canCreate={canCreate}
@@ -3887,12 +3955,12 @@ export default function GeoTask() {
             </div>
           )}
           {page === "mindmap" && (
-            <MindMapPage T={T} tasks={tasks} users={dbUsers} />
+            <MindMapPage T={T} tasks={visibleTasks} users={dbUsers} />
           )}
           {page === "cronograma" && (
             <CronogramaPage
               T={T}
-              tasks={tasks}
+              tasks={visibleTasks}
               onSelect={setSelectedTask}
               users={dbUsers}
               contracts={contracts}
@@ -4124,6 +4192,28 @@ export default function GeoTask() {
           sectors={mergedSectors}
         />
       )}
+
+      {/* Mandatory password change modal for first login */}
+      {showMustChangePassword && user && (
+        <ChangePasswordModal
+          isOpen={showMustChangePassword}
+          onClose={() => {
+            setShowMustChangePassword(false);
+            // Clear must_change_password from local user state so it doesn't re-trigger
+            setUser((prev: any) => ({ ...prev, must_change_password: false }));
+            localStorage.setItem(
+              "geotask_user",
+              JSON.stringify({ ...user, must_change_password: false }),
+            );
+          }}
+          userId={user.id}
+          userName={user.name}
+          T={T}
+          isAdmin={false}
+          isMandatory={true}
+        />
+      )}
+
       {showTemplateModal && (
         <TemplateModal
           T={T}
@@ -6236,6 +6326,7 @@ function MindMapPage({ T, tasks = [], users = [] }: any) {
       neighId = 0;
     tasks.forEach((t: any) => {
       if (!t.contract) return;
+      if (t.parent_id) return; // skip subtasks — they show under their parent
       if (!contractMap[t.contract]) {
         contractMap[t.contract] = { id: ++cid, name: t.contract, cities: [] };
       }

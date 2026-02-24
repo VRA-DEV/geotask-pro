@@ -328,7 +328,10 @@ export async function POST(req: Request) {
       };
     }
 
-    const newTask = await prisma.task.create({ data: taskData });
+    const newTask = await prisma.task.create({
+      data: taskData,
+      include: { children: true },
+    });
 
     let creatorName = "Alguém";
     if (created_by) {
@@ -340,14 +343,52 @@ export async function POST(req: Request) {
     const dateStr = new Date().toLocaleDateString();
     const timeStr = new Date().toLocaleTimeString().slice(0, 5);
 
+    // Notify responsible of the main task
     if (resolvedResponsibleId) {
       await notifyUser(
         resolvedResponsibleId,
         "task_assigned",
         "Nova Atribuição",
-        `${creatorName}, atribuiu uma tarefa a você na data ${dateStr} às ${timeStr}h: "${title}"`,
+        `${creatorName} atribuiu uma tarefa a você em ${dateStr} às ${timeStr}h: "${title}"`,
         newTask.id,
       );
+    }
+
+    // Notify responsible of each subtask (if set),
+    // OR notify the Gestor(es) of the subtask's sector (if only sector is set)
+    for (const child of newTask.children || []) {
+      if (child.responsible_id) {
+        // Only notify if different from the main task responsible (avoid duplicate)
+        if (child.responsible_id !== resolvedResponsibleId) {
+          await notifyUser(
+            child.responsible_id,
+            "task_assigned",
+            "Nova Atribuição (Subtarefa)",
+            `${creatorName} atribuiu uma subtarefa a você em ${dateStr} às ${timeStr}h: "${child.title}"`,
+            child.id,
+          );
+        }
+      } else if (child.sector_id) {
+        // No responsible — notify Gestores of that sector
+        const sectorGestores = await prisma.user.findMany({
+          where: {
+            sector_id: child.sector_id,
+            Role: {
+              name: { in: ["Gestor", "Gerente", "Coordenador", "Admin"] },
+            },
+          },
+          select: { id: true },
+        });
+        for (const g of sectorGestores) {
+          await notifyUser(
+            g.id,
+            "subtask_sector",
+            "Subtarefa sem responsável",
+            `${creatorName} criou a subtarefa "${child.title}" sem responsável atribuído no seu setor.`,
+            child.id,
+          );
+        }
+      }
     }
 
     return NextResponse.json({
@@ -534,6 +575,26 @@ export async function PATCH(req: Request) {
           rId,
         );
         updateData.responsible_id = rId;
+
+        // Notify the newly assigned responsible (if it changed and is not null)
+        if (rId && rId !== task.responsible_id) {
+          let changerName = "Alguém";
+          if (userId) {
+            const changer = await prisma.user.findUnique({
+              where: { id: userId },
+            });
+            if (changer) changerName = changer.name;
+          }
+          const ds = new Date().toLocaleDateString();
+          const ts = new Date().toLocaleTimeString().slice(0, 5);
+          await notifyUser(
+            rId,
+            "task_assigned",
+            "Nova Atribuição",
+            `${changerName} atribuiu a tarefa "${task.title}" a você em ${ds} às ${ts}h.`,
+            task.id,
+          );
+        }
       }
 
       if (data.contract !== undefined) {
