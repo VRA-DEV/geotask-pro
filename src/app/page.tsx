@@ -130,9 +130,28 @@ const parseDate = (str) => {
 /* Helper to convert string dd/mm/yyyy <-> Date */
 const parseDateStr = (s?: string) => {
   if (!s) return undefined;
-  // Assuming s is YYYY-MM-DD or ISO from DB
   const d = new Date(s);
-  return isNaN(d.getTime()) ? undefined : d;
+  if (!isNaN(d.getTime())) return d;
+  // Fallback for dd/mm/yyyy
+  return parseDate(s) || undefined;
+};
+
+const getTaskState = (task: any) => {
+  if (!task.deadline) return null;
+  const deadline = new Date(task.deadline);
+  const now = new Date();
+  const isDone = task.status === "Concluído";
+
+  if (!isDone) {
+    if (now > deadline) return { label: "Em Atraso", color: "#ef4444" };
+    return { label: "Dentro do Prazo", color: "#10b981" };
+  } else {
+    // For completed tasks, we'd ideally check completed_at, but we'll use now if missing
+    const doneAt = task.completed_at ? new Date(task.completed_at) : now;
+    if (doneAt > deadline)
+      return { label: "Atraso na Entrega", color: "#f59e0b" };
+    return null; // Or "No Prazo"
+  }
 };
 
 const theme = (d) =>
@@ -529,44 +548,22 @@ function DateRangePicker({ date, setDate, label, T }: any) {
         {label}
       </label>
       <div style={{ display: "flex", gap: 8 }}>
-        <input
-          type="date"
-          value={date?.from ? date.from.toISOString().split("T")[0] : ""}
-          onChange={(e) =>
-            setDate({
-              ...date,
-              from: e.target.value ? new Date(e.target.value) : undefined,
-            })
-          }
-          style={{
-            background: T.inp,
-            border: `1px solid ${T.border}`,
-            borderRadius: 8,
-            padding: "6px 8px",
-            color: T.text,
-            fontSize: 12,
-            width: "100%",
-          }}
-        />
-        <input
-          type="date"
-          value={date?.to ? date.to.toISOString().split("T")[0] : ""}
-          onChange={(e) =>
-            setDate({
-              ...date,
-              to: e.target.value ? new Date(e.target.value) : undefined,
-            })
-          }
-          style={{
-            background: T.inp,
-            border: `1px solid ${T.border}`,
-            borderRadius: 8,
-            padding: "6px 8px",
-            color: T.text,
-            fontSize: 12,
-            width: "100%",
-          }}
-        />
+        <div style={{ flex: 1 }}>
+          <DatePicker
+            T={T}
+            date={date?.from}
+            setDate={(d) => setDate({ ...date, from: d })}
+            label=""
+          />
+        </div>
+        <div style={{ flex: 1 }}>
+          <DatePicker
+            T={T}
+            date={date?.to}
+            setDate={(d) => setDate({ ...date, to: d })}
+            label=""
+          />
+        </div>
       </div>
     </div>
   );
@@ -997,6 +994,7 @@ function NewTaskModal({
                     date={dateVal}
                     setDate={setDateVal}
                     label=""
+                    openDirection="up"
                   />
                 </FormField>
                 <FormField label="Link Externo">
@@ -1526,6 +1524,17 @@ function NewTaskModal({
                   ? Number(form.sector)
                   : null;
 
+                // Deadline validation
+                if (form.deadline) {
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  const deadlineDate = parseDateStr(form.deadline);
+                  if (deadlineDate && deadlineDate < today) {
+                    alert("O prazo não pode ser menor que hoje.");
+                    return;
+                  }
+                }
+
                 onSave({
                   ...form,
                   responsible_id: respUser?.id ?? null,
@@ -1575,7 +1584,10 @@ function TaskModal({
   const sc = STATUS_COLOR[t.status];
 
   const [tab, setTab] = useState("dados");
-  const [form, setForm] = useState({ ...t });
+  const [form, setForm] = useState({
+    ...t,
+    sector: t.sector?.name || t.sector || "",
+  });
   const [saving, setSaving] = useState(false);
 
   // History State
@@ -1591,14 +1603,17 @@ function TaskModal({
   // Subtasks State
   const [newSubtask, setNewSubtask] = useState({
     title: "",
-    sector: "",
+    sector: t.sector?.name || t.sector || "",
     responsible_id: "",
     description: "",
   });
   const [creatingSubtask, setCreatingSubtask] = useState(false);
 
   useEffect(() => {
-    setForm({ ...t });
+    setForm({
+      ...t,
+      sector: t.sector?.name || t.sector || "",
+    });
   }, [t]);
 
   useEffect(() => {
@@ -1632,10 +1647,15 @@ function TaskModal({
           title: newSubtask.title,
           description: newSubtask.description,
           status: "A Fazer",
-          priority: "Média",
+          priority: form.priority || "Média",
+          type: form.type || "Vistoria",
+          deadline: form.deadline,
           sector: newSubtask.sector,
-          contract_id: t.contract_id,
-          city_id: t.city_id,
+          contract: form.contract,
+          city: form.city,
+          nucleus: form.nucleus,
+          quadra: form.quadra,
+          lote: form.lote,
           parent_id: t.id,
           created_by: user?.id,
           responsible_id: newSubtask.responsible_id || null,
@@ -1645,7 +1665,7 @@ function TaskModal({
         const data = await res.json();
         setNewSubtask({
           title: "",
-          sector: "",
+          sector: t.sector?.name || t.sector || "",
           responsible_id: "",
           description: "",
         });
@@ -1654,7 +1674,9 @@ function TaskModal({
           id: data.id,
           title: newSubtask.title,
           status: "A Fazer",
-          priority: "Média",
+          priority: t.priority || "Média",
+          type: t.type || "Vistoria",
+          deadline: t.deadline,
           sector: newSubtask.sector,
           responsible: newSubtask.responsible_id
             ? users.find((u: any) => u.id === Number(newSubtask.responsible_id))
@@ -1822,6 +1844,21 @@ function TaskModal({
                 {t.status}
               </span>
               <span style={{ fontSize: 11, color: T.sub }}>ID: #{t.id}</span>
+              {getTaskState(t) && (
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                    padding: "2px 8px",
+                    borderRadius: 4,
+                    background: getTaskState(t)!.color + "22",
+                    color: getTaskState(t)!.color,
+                    marginLeft: 8,
+                  }}
+                >
+                  {getTaskState(t)!.label}
+                </span>
+              )}
             </div>
             <input
               value={form.title}
@@ -1889,318 +1926,579 @@ function TaskModal({
             </button>
           ))}
         </div>
-        {tab === "dados" && (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 16,
-            }}
-          >
-            <div style={{ gridColumn: "1 / -1" }}>
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: T.sub,
-                  marginBottom: 4,
-                }}
-              >
-                DESCRIÇÃO
+        <div
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            overflowX: "hidden",
+            paddingRight: 8,
+            marginRight: -4,
+          }}
+        >
+          {tab === "dados" && (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 16,
+              }}
+            >
+              <div style={{ gridColumn: "1 / -1" }}>
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: T.sub,
+                    marginBottom: 4,
+                  }}
+                >
+                  DESCRIÇÃO
+                </div>
+                <textarea
+                  value={form.description || ""}
+                  disabled={!canEdit("description")}
+                  onChange={(e) =>
+                    setForm({ ...form, description: e.target.value })
+                  }
+                  rows={3}
+                  style={{
+                    width: "100%",
+                    padding: "10px",
+                    borderRadius: 8,
+                    border: `1px solid ${T.border}`,
+                    background: canEdit("description") ? T.inp : T.col,
+                    color: T.text,
+                    fontSize: 13,
+                    resize: "none",
+                  }}
+                />
               </div>
-              <textarea
-                value={form.description || ""}
-                disabled={!canEdit("description")}
-                onChange={(e) =>
-                  setForm({ ...form, description: e.target.value })
-                }
-                rows={3}
-                style={{
-                  width: "100%",
-                  padding: "10px",
-                  borderRadius: 8,
-                  border: `1px solid ${T.border}`,
-                  background: canEdit("description") ? T.inp : T.col,
-                  color: T.text,
-                  fontSize: 13,
-                  resize: "none",
-                }}
-              />
-            </div>
 
-            {[
-              {
-                l: "Prioridade",
-                f: "priority",
-                o: ["Alta", "Média", "Baixa"],
-              },
-              { l: "Tipo", f: "type", o: TASK_TYPES },
-              { l: "Setor", f: "sector", o: SECTORS },
-              {
-                l: "Responsável",
-                f: "responsible_id",
-                o: users.map((u: any) => ({ value: u.id, label: u.name })),
-              },
-              { l: "Contrato", f: "contract", o: contracts },
-              { l: "Cidade", f: "city", o: Object.keys(citiesNeighborhoods) },
-              { l: "Núcleo/Bairro", f: "nucleus" },
-              { l: "Quadra", f: "quadra" },
-              { l: "Lote", f: "lote" },
-              { l: "Prazo", f: "deadline", type: "date-picker" },
-            ].map(({ l, f, o, type }) => {
-              const disabled = !canEdit(
-                f === "responsible_id" ? "responsible" : f,
-              );
-              return (
-                <div key={f} style={{ marginBottom: 12 }}>
+              {[
+                {
+                  l: "Prioridade",
+                  f: "priority",
+                  o: ["Alta", "Média", "Baixa"],
+                },
+                { l: "Tipo", f: "type", o: TASK_TYPES },
+                {
+                  l: "Setor",
+                  f: "sector",
+                  o: sectors.map((s: any) =>
+                    typeof s === "object" ? s.name : s,
+                  ),
+                },
+                {
+                  l: "Responsável",
+                  f: "responsible_id",
+                  o: users.map((u: any) => ({ value: u.id, label: u.name })),
+                },
+                { l: "Contrato", f: "contract", o: contracts },
+                { l: "Cidade", f: "city", o: Object.keys(citiesNeighborhoods) },
+                { l: "Núcleo/Bairro", f: "nucleus" },
+                { l: "Quadra", f: "quadra" },
+                { l: "Lote", f: "lote" },
+                { l: "Prazo", f: "deadline", type: "date-picker" },
+              ].map(({ l, f, o, type }) => {
+                const disabled = !canEdit(
+                  f === "responsible_id" ? "responsible" : f,
+                );
+                return (
+                  <div key={f} style={{ marginBottom: 12 }}>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: T.sub,
+                        marginBottom: 4,
+                      }}
+                    >
+                      {l.toUpperCase()}
+                    </div>
+                    {o ? (
+                      <select
+                        value={form[f] || ""}
+                        disabled={disabled}
+                        onChange={(e) =>
+                          setForm({ ...form, [f]: e.target.value })
+                        }
+                        style={{
+                          width: "100%",
+                          padding: "8px 12px",
+                          borderRadius: 8,
+                          border: `1px solid ${T.border}`,
+                          background: disabled ? T.col : T.inp,
+                          color: disabled ? T.sub : T.text,
+                          fontSize: 13,
+                          appearance: "none",
+                        }}
+                      >
+                        <option value="">Selecione...</option>
+                        {o.map((opt: any) => {
+                          const val =
+                            typeof opt === "object" && opt !== null
+                              ? opt.value
+                              : opt;
+                          const lab =
+                            typeof opt === "object" && opt !== null
+                              ? opt.label
+                              : opt;
+                          return (
+                            <option key={val} value={val}>
+                              {lab}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    ) : (
+                      <div style={{ width: "100%" }}>
+                        {type === "date-picker" ? (
+                          <DatePicker
+                            T={T}
+                            date={parseDateStr(form[f])}
+                            setDate={(d) =>
+                              setForm({
+                                ...form,
+                                [f]: d ? d.toISOString() : "",
+                              })
+                            }
+                            label=""
+                            openDirection="up"
+                          />
+                        ) : (
+                          <input
+                            type={type || "text"}
+                            value={form[f] || ""}
+                            disabled={disabled}
+                            onChange={(e) =>
+                              setForm({ ...form, [f]: e.target.value })
+                            }
+                            style={{
+                              width: "100%",
+                              padding: "8px 12px",
+                              borderRadius: 8,
+                              border: `1px solid ${T.border}`,
+                              background: disabled ? T.col : T.inp,
+                              color: disabled ? T.sub : T.text,
+                              fontSize: 13,
+                            }}
+                          />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              <div style={{ gridColumn: "1 / -1", paddingTop: 10 }}>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  style={{
+                    width: "100%",
+                    padding: "12px",
+                    background: "#98af3b",
+                    color: "white",
+                    border: "none",
+                    borderRadius: 10,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    opacity: saving ? 0.7 : 1,
+                  }}
+                >
+                  {saving ? "Salvando..." : "Salvar Alterações"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {tab === "subtarefas" && (
+            <div style={{ paddingBottom: 20 }}>
+              <div style={{ marginBottom: 16 }}>
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: T.sub,
+                    marginBottom: 8,
+                  }}
+                >
+                  SUBTAREFAS ({(form.subtasks || []).length})
+                </div>
+                {(form.subtasks || []).length === 0 && (
                   <div
+                    style={{ fontSize: 13, color: T.sub, fontStyle: "italic" }}
+                  >
+                    Nenhuma subtarefa.
+                  </div>
+                )}
+                {(form.subtasks || []).map((child: any) => (
+                  <div
+                    key={child.id}
                     style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: T.sub,
-                      marginBottom: 4,
+                      padding: "10px",
+                      border: `1px solid ${T.border}`,
+                      borderRadius: 8,
+                      marginBottom: 8,
+                      background: T.card,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
                     }}
                   >
-                    {l.toUpperCase()}
+                    <div>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: T.text,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                        }}
+                      >
+                        {child.title}
+                        {getTaskState(child) && (
+                          <span
+                            style={{
+                              fontSize: 9,
+                              fontWeight: 700,
+                              padding: "1px 6px",
+                              borderRadius: 4,
+                              background: getTaskState(child)!.color + "22",
+                              color: getTaskState(child)!.color,
+                            }}
+                          >
+                            {getTaskState(child)!.label}
+                          </span>
+                        )}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 11,
+                          color: T.sub,
+                          display: "flex",
+                          gap: 6,
+                          marginTop: 2,
+                        }}
+                      >
+                        <span>{child.status}</span>
+                        <span>•</span>
+                        <span>{child.priority}</span>
+                        {child.responsible && (
+                          <>
+                            <span>•</span>
+                            <span>{child.responsible.name || "Resp."}</span>
+                          </>
+                        )}
+                        {child.sector && (
+                          <>
+                            <span>•</span>
+                            <span>
+                              {child.sector && typeof child.sector === "object"
+                                ? child.sector.name
+                                : child.sector || ""}
+                            </span>
+                          </>
+                        )}
+                        {child.created_by && (
+                          <>
+                            <span>•</span>
+                            <span title="Criado por">
+                              {typeof child.created_by === "object"
+                                ? child.created_by.name
+                                : child.created_by}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      title="Visualizar Tarefa"
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                      }}
+                      onClick={() => {
+                        // Switch selected task to subtask
+                        const fullTask = tasks.find(
+                          (tk: any) => tk.id === child.id,
+                        );
+                        if (fullTask) {
+                          setSelectedTask(fullTask);
+                        } else {
+                          // If not in main list (unlikely), use child as is
+                          setSelectedTask(child);
+                        }
+                      }}
+                    >
+                      <Eye size={18} color={T.sub} />
+                    </button>
                   </div>
-                  {o ? (
+                ))}
+              </div>
+
+              <div
+                style={{
+                  background: T.col,
+                  padding: 12,
+                  borderRadius: 10,
+                  border: `1px solid ${T.border}`,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: "#98af3b",
+                    marginBottom: 8,
+                  }}
+                >
+                  Nova Subtarefa
+                </div>
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 10 }}
+                >
+                  <input
+                    value={newSubtask.title}
+                    onChange={(e) =>
+                      setNewSubtask({ ...newSubtask, title: e.target.value })
+                    }
+                    placeholder="Título *"
+                    style={{
+                      width: "100%",
+                      padding: "8px 12px",
+                      borderRadius: 8,
+                      border: `1px solid ${T.border}`,
+                      background: T.inp,
+                      color: T.text,
+                      fontSize: 13,
+                    }}
+                  />
+                  <textarea
+                    value={newSubtask.description}
+                    onChange={(e) =>
+                      setNewSubtask({
+                        ...newSubtask,
+                        description: e.target.value,
+                      })
+                    }
+                    placeholder="Descrição (opcional)"
+                    rows={2}
+                    style={{
+                      width: "100%",
+                      padding: "8px 12px",
+                      borderRadius: 8,
+                      border: `1px solid ${T.border}`,
+                      background: T.inp,
+                      color: T.text,
+                      fontSize: 13,
+                      resize: "none",
+                    }}
+                  />
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: 10,
+                    }}
+                  >
                     <select
-                      value={form[f] || ""}
-                      disabled={disabled}
+                      value={newSubtask.sector}
                       onChange={(e) =>
-                        setForm({ ...form, [f]: e.target.value })
+                        setNewSubtask({ ...newSubtask, sector: e.target.value })
                       }
                       style={{
                         width: "100%",
                         padding: "8px 12px",
                         borderRadius: 8,
                         border: `1px solid ${T.border}`,
-                        background: disabled ? T.col : T.inp,
-                        color: disabled ? T.sub : T.text,
+                        background: T.inp,
+                        color: T.text,
                         fontSize: 13,
-                        appearance: "none",
                       }}
                     >
-                      <option value="">Selecione...</option>
-                      {o.map((opt: any) => {
-                        const val =
-                          typeof opt === "object" && opt !== null
-                            ? opt.value
-                            : opt;
-                        const lab =
-                          typeof opt === "object" && opt !== null
-                            ? opt.label
-                            : opt;
+                      <option value="">Setor *</option>
+                      {sectors.map((s: any) => {
+                        const name = typeof s === "object" ? s.name : s;
                         return (
-                          <option key={val} value={val}>
-                            {lab}
+                          <option key={name} value={name}>
+                            {name}
                           </option>
                         );
                       })}
                     </select>
-                  ) : (
-                    <div style={{ width: "100%" }}>
-                      {type === "date-picker" ? (
-                        <DatePicker
-                          T={T}
-                          date={parseDateStr(form[f])}
-                          setDate={(d) =>
-                            setForm({
-                              ...form,
-                              [f]: d ? d.toISOString() : "",
-                            })
-                          }
-                          label=""
-                        />
-                      ) : (
-                        <input
-                          type={type || "text"}
-                          value={form[f] || ""}
-                          disabled={disabled}
-                          onChange={(e) =>
-                            setForm({ ...form, [f]: e.target.value })
-                          }
-                          style={{
-                            width: "100%",
-                            padding: "8px 12px",
-                            borderRadius: 8,
-                            border: `1px solid ${T.border}`,
-                            background: disabled ? T.col : T.inp,
-                            color: disabled ? T.sub : T.text,
-                            fontSize: 13,
-                          }}
-                        />
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
-            <div style={{ gridColumn: "1 / -1", paddingTop: 10 }}>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                style={{
-                  width: "100%",
-                  padding: "12px",
-                  background: "#98af3b",
-                  color: "white",
-                  border: "none",
-                  borderRadius: 10,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  opacity: saving ? 0.7 : 1,
-                }}
-              >
-                {saving ? "Salvando..." : "Salvar Alterações"}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {tab === "subtarefas" && (
-          <div style={{ paddingBottom: 20 }}>
-            <div style={{ marginBottom: 16 }}>
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: T.sub,
-                  marginBottom: 8,
-                }}
-              >
-                SUBTAREFAS ({(form.subtasks || []).length})
-              </div>
-              {(form.subtasks || []).length === 0 && (
-                <div
-                  style={{ fontSize: 13, color: T.sub, fontStyle: "italic" }}
-                >
-                  Nenhuma subtarefa.
-                </div>
-              )}
-              {(form.subtasks || []).map((child: any) => (
-                <div
-                  key={child.id}
-                  style={{
-                    padding: "10px",
-                    border: `1px solid ${T.border}`,
-                    borderRadius: 8,
-                    marginBottom: 8,
-                    background: T.card,
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <div>
-                    <div
-                      style={{ fontSize: 13, fontWeight: 600, color: T.text }}
-                    >
-                      {child.title}
-                    </div>
-                    <div
+                    <select
+                      value={newSubtask.responsible_id}
+                      onChange={(e) =>
+                        setNewSubtask({
+                          ...newSubtask,
+                          responsible_id: e.target.value,
+                        })
+                      }
                       style={{
-                        fontSize: 11,
-                        color: T.sub,
-                        display: "flex",
-                        gap: 6,
-                        marginTop: 2,
+                        width: "100%",
+                        padding: "8px 12px",
+                        borderRadius: 8,
+                        border: `1px solid ${T.border}`,
+                        background: T.inp,
+                        color: T.text,
+                        fontSize: 13,
                       }}
                     >
-                      <span>{child.status}</span>
-                      <span>•</span>
-                      <span>{child.priority}</span>
-                      {child.responsible && (
-                        <>
-                          <span>•</span>
-                          <span>{child.responsible.name || "Resp."}</span>
-                        </>
-                      )}
-                      {child.sector && (
-                        <>
-                          <span>•</span>
-                          <span>
-                            {child.sector && typeof child.sector === "object"
-                              ? child.sector.name
-                              : child.sector || ""}
-                          </span>
-                        </>
-                      )}
-                    </div>
+                      <option value="">Responsável...</option>
+                      {users.map((u: any) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                  <button
-                    title="Visualizar Tarefa"
-                    style={{
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                    }}
-                    onClick={() => {
-                      // Ideally we switch context, for now alert
-                      alert(
-                        `Visualizar tarefa ${child.id} - Funcionalidade em desenvolvimento (Navegação aninhada)`,
-                      );
-                    }}
-                  >
-                    <Eye size={18} color={T.sub} />
-                  </button>
+                  <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                    <button
+                      onClick={() =>
+                        setNewSubtask({
+                          title: "",
+                          sector: "",
+                          responsible_id: "",
+                          description: "",
+                        })
+                      }
+                      style={{
+                        flex: 1,
+                        padding: "8px",
+                        background: "transparent",
+                        color: T.sub,
+                        border: `1px solid ${T.border}`,
+                        borderRadius: 8,
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleAddSubtask}
+                      disabled={
+                        creatingSubtask ||
+                        !newSubtask.title ||
+                        !newSubtask.sector
+                      }
+                      style={{
+                        flex: 2,
+                        padding: "8px",
+                        background: "#98af3b",
+                        color: "white",
+                        border: "none",
+                        borderRadius: 8,
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        opacity:
+                          creatingSubtask ||
+                          !newSubtask.title ||
+                          !newSubtask.sector
+                            ? 0.6
+                            : 1,
+                      }}
+                    >
+                      {creatingSubtask ? "Salvando..." : "Salvar Subtarefa"}
+                    </button>
+                  </div>
                 </div>
-              ))}
+              </div>
             </div>
+          )}
 
-            <div
-              style={{
-                background: T.col,
-                padding: 12,
-                borderRadius: 10,
-                border: `1px solid ${T.border}`,
-              }}
-            >
+          {tab === "comentarios" && (
+            <div>
               <div
                 style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: "#98af3b",
-                  marginBottom: 8,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 12,
+                  marginBottom: 20,
                 }}
               >
-                Nova Subtarefa
+                {comments.map((c: any) => (
+                  <div
+                    key={c.id}
+                    style={{ background: T.col, borderRadius: 10, padding: 12 }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        marginBottom: 6,
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 20,
+                          height: 20,
+                          borderRadius: "50%",
+                          background: "#98af3b",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: "white",
+                          fontSize: 9,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {c.user_avatar || "?"}
+                      </div>
+                      <span
+                        style={{ fontSize: 12, fontWeight: 600, color: T.text }}
+                      >
+                        {c.user_name}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 10,
+                          color: T.sub,
+                          marginLeft: "auto",
+                        }}
+                      >
+                        {new Date(c.created_at).toLocaleString("pt-BR")}
+                      </span>
+                    </div>
+                    <div
+                      style={{ fontSize: 13, color: T.text, lineHeight: 1.5 }}
+                    >
+                      {c.content}
+                    </div>
+                  </div>
+                ))}
+                {comments.length === 0 && (
+                  <div
+                    style={{ textAlign: "center", color: T.sub, fontSize: 13 }}
+                  >
+                    Nenhum comentário.
+                  </div>
+                )}
               </div>
-              <div
-                style={{ display: "flex", flexDirection: "column", gap: 10 }}
-              >
-                <input
-                  value={newSubtask.title}
-                  onChange={(e) =>
-                    setNewSubtask({ ...newSubtask, title: e.target.value })
-                  }
-                  placeholder="Título *"
-                  style={{
-                    width: "100%",
-                    padding: "8px 12px",
-                    borderRadius: 8,
-                    border: `1px solid ${T.border}`,
-                    background: T.inp,
-                    color: T.text,
-                    fontSize: 13,
-                  }}
-                />
+
+              <div style={{ position: "relative" }}>
                 <textarea
-                  value={newSubtask.description}
-                  onChange={(e) =>
-                    setNewSubtask({
-                      ...newSubtask,
-                      description: e.target.value,
-                    })
-                  }
-                  placeholder="Descrição (opcional)"
+                  value={commentText}
+                  onChange={(e) => handleCommentChange(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      submitComment();
+                    }
+                  }}
+                  placeholder="Escreva um comentário..."
                   rows={2}
                   style={{
                     width: "100%",
-                    padding: "8px 12px",
-                    borderRadius: 8,
+                    padding: "12px",
+                    borderRadius: 10,
                     border: `1px solid ${T.border}`,
                     background: T.inp,
                     color: T.text,
@@ -2208,382 +2506,186 @@ function TaskModal({
                     resize: "none",
                   }}
                 />
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: 10,
-                  }}
-                >
-                  <select
-                    value={newSubtask.sector}
-                    onChange={(e) =>
-                      setNewSubtask({ ...newSubtask, sector: e.target.value })
-                    }
-                    style={{
-                      width: "100%",
-                      padding: "8px 12px",
-                      borderRadius: 8,
-                      border: `1px solid ${T.border}`,
-                      background: T.inp,
-                      color: T.text,
-                      fontSize: 13,
-                    }}
-                  >
-                    <option value="">Setor *</option>
-                    {SECTORS.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    value={newSubtask.responsible_id}
-                    onChange={(e) =>
-                      setNewSubtask({
-                        ...newSubtask,
-                        responsible_id: e.target.value,
-                      })
-                    }
-                    style={{
-                      width: "100%",
-                      padding: "8px 12px",
-                      borderRadius: 8,
-                      border: `1px solid ${T.border}`,
-                      background: T.inp,
-                      color: T.text,
-                      fontSize: 13,
-                    }}
-                  >
-                    <option value="">Responsável...</option>
-                    {users.map((u: any) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-                  <button
-                    onClick={() =>
-                      setNewSubtask({
-                        title: "",
-                        sector: "",
-                        responsible_id: "",
-                        description: "",
-                      })
-                    }
-                    style={{
-                      flex: 1,
-                      padding: "8px",
-                      background: "transparent",
-                      color: T.sub,
-                      border: `1px solid ${T.border}`,
-                      borderRadius: 8,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={handleAddSubtask}
-                    disabled={
-                      creatingSubtask || !newSubtask.title || !newSubtask.sector
-                    }
-                    style={{
-                      flex: 2,
-                      padding: "8px",
-                      background: "#98af3b",
-                      color: "white",
-                      border: "none",
-                      borderRadius: 8,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      opacity:
-                        creatingSubtask ||
-                        !newSubtask.title ||
-                        !newSubtask.sector
-                          ? 0.6
-                          : 1,
-                    }}
-                  >
-                    {creatingSubtask ? "Salvando..." : "Salvar Subtarefa"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {tab === "comentarios" && (
-          <div>
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 12,
-                marginBottom: 20,
-              }}
-            >
-              {comments.map((c: any) => (
-                <div
-                  key={c.id}
-                  style={{ background: T.col, borderRadius: 10, padding: 12 }}
-                >
+                {mentionSuggestions.length > 0 && (
                   <div
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      marginBottom: 6,
+                      position: "absolute",
+                      bottom: "100%",
+                      left: 0,
+                      right: 0,
+                      background: T.card,
+                      border: `1px solid ${T.border}`,
+                      borderRadius: 10,
+                      boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
+                      zIndex: 200,
+                      overflow: "hidden",
                     }}
                   >
-                    <div
-                      style={{
-                        width: 20,
-                        height: 20,
-                        borderRadius: "50%",
-                        background: "#98af3b",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: "white",
-                        fontSize: 9,
-                        fontWeight: 700,
-                      }}
-                    >
-                      {c.user_avatar || "?"}
-                    </div>
-                    <span
-                      style={{ fontSize: 12, fontWeight: 600, color: T.text }}
-                    >
-                      {c.user_name}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 10,
-                        color: T.sub,
-                        marginLeft: "auto",
-                      }}
-                    >
-                      {new Date(c.created_at).toLocaleString("pt-BR")}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 13, color: T.text, lineHeight: 1.5 }}>
-                    {c.content}
-                  </div>
-                </div>
-              ))}
-              {comments.length === 0 && (
-                <div
-                  style={{ textAlign: "center", color: T.sub, fontSize: 13 }}
-                >
-                  Nenhum comentário.
-                </div>
-              )}
-            </div>
-
-            <div style={{ position: "relative" }}>
-              <textarea
-                value={commentText}
-                onChange={(e) => handleCommentChange(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    submitComment();
-                  }
-                }}
-                placeholder="Escreva um comentário..."
-                rows={2}
-                style={{
-                  width: "100%",
-                  padding: "12px",
-                  borderRadius: 10,
-                  border: `1px solid ${T.border}`,
-                  background: T.inp,
-                  color: T.text,
-                  fontSize: 13,
-                  resize: "none",
-                }}
-              />
-              {mentionSuggestions.length > 0 && (
-                <div
-                  style={{
-                    position: "absolute",
-                    bottom: "100%",
-                    left: 0,
-                    right: 0,
-                    background: T.card,
-                    border: `1px solid ${T.border}`,
-                    borderRadius: 10,
-                    boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
-                    zIndex: 200,
-                    overflow: "hidden",
-                  }}
-                >
-                  {mentionSuggestions.map((s) => (
-                    <button
-                      key={s}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        insertMention(s);
-                      }}
-                      style={{
-                        display: "block",
-                        width: "100%",
-                        padding: "8px 12px",
-                        textAlign: "left",
-                        background: "transparent",
-                        border: "none",
-                        fontSize: 13,
-                        color: T.text,
-                        cursor: "pointer",
-                      }}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {tab === "historico" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div
-              style={{
-                marginBottom: 20,
-                padding: 16,
-                background: T.col,
-                borderRadius: 12,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                position: "relative",
-              }}
-            >
-              <div
-                style={{
-                  position: "absolute",
-                  left: 40,
-                  right: 40,
-                  top: 24,
-                  height: 2,
-                  background: T.border,
-                  zIndex: 0,
-                }}
-              />
-              {[
-                { label: "Criação", date: t.created },
-                { label: "Início", date: t.started },
-                { label: "Prazo", date: t.deadline },
-                { label: "Conclusão", date: t.completed },
-              ]
-                .filter((e) => e.date)
-                .map((evt: any, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      zIndex: 1,
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      gap: 6,
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 10,
-                        height: 10,
-                        borderRadius: "50%",
-                        background: "#98af3b",
-                        boxShadow: `0 0 0 4px ${T.card}`,
-                      }}
-                    />
-                    <div style={{ textAlign: "center" }}>
-                      <div
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 700,
-                          color: T.sub,
-                          textTransform: "uppercase",
+                    {mentionSuggestions.map((s) => (
+                      <button
+                        key={s}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          insertMention(s);
                         }}
-                      >
-                        {evt.label}
-                      </div>
-                      <div
                         style={{
-                          fontSize: 11,
-                          fontWeight: 600,
+                          display: "block",
+                          width: "100%",
+                          padding: "8px 12px",
+                          textAlign: "left",
+                          background: "transparent",
+                          border: "none",
+                          fontSize: 13,
                           color: T.text,
+                          cursor: "pointer",
                         }}
                       >
-                        {evt.date}
-                      </div>
-                    </div>
+                        {s}
+                      </button>
+                    ))}
                   </div>
-                ))}
+                )}
+              </div>
             </div>
-            {loadingHistory && (
-              <div style={{ textAlign: "center", color: T.sub, fontSize: 12 }}>
-                Carregando...
-              </div>
-            )}
-            {!loadingHistory && history.length === 0 && (
-              <div style={{ textAlign: "center", color: T.sub, fontSize: 13 }}>
-                Nenhum histórico registrado.
-              </div>
-            )}
-            {history.map((h: any) => (
+          )}
+
+          {tab === "historico" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div
-                key={h.id}
                 style={{
+                  marginBottom: 20,
+                  padding: 16,
+                  background: T.col,
+                  borderRadius: 12,
                   display: "flex",
-                  gap: 10,
-                  paddingBottom: 12,
-                  borderBottom: `1px dashed ${T.border}`,
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  position: "relative",
                 }}
               >
                 <div
                   style={{
-                    marginTop: 2,
-                    width: 8,
-                    height: 8,
-                    borderRadius: "50%",
-                    background: "#98af3b",
-                    flexShrink: 0,
+                    position: "absolute",
+                    left: 40,
+                    right: 40,
+                    top: 24,
+                    height: 2,
+                    background: T.border,
+                    zIndex: 0,
                   }}
                 />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, color: T.text }}>
-                    <span style={{ fontWeight: 600 }}>
-                      {h.user?.name || "Sistema"}
-                    </span>{" "}
-                    alterou <b>{h.field}</b>
-                  </div>
-                  <div style={{ fontSize: 12, color: T.sub, marginTop: 4 }}>
-                    <span
-                      style={{ textDecoration: "line-through", opacity: 0.7 }}
+                {[
+                  { label: "Criação", date: t.created },
+                  { label: "Início", date: t.started },
+                  { label: "Prazo", date: t.deadline },
+                  { label: "Conclusão", date: t.completed },
+                ]
+                  .filter((e) => e.date)
+                  .map((evt: any, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        zIndex: 1,
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
                     >
-                      {h.old_value || "(vazio)"}
-                    </span>
-                    {" ➝ "}
-                    <span style={{ color: "#98af3b", fontWeight: 600 }}>
-                      {h.new_value || "(vazio)"}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 10, color: T.sub, marginTop: 4 }}>
-                    {new Date(h.created_at).toLocaleString("pt-BR")}
+                      <div
+                        style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: "50%",
+                          background: "#98af3b",
+                          boxShadow: `0 0 0 4px ${T.card}`,
+                        }}
+                      />
+                      <div style={{ textAlign: "center" }}>
+                        <div
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: T.sub,
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          {evt.label}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: T.text,
+                          }}
+                        >
+                          {evt.date}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+              {loadingHistory && (
+                <div
+                  style={{ textAlign: "center", color: T.sub, fontSize: 12 }}
+                >
+                  Carregando...
+                </div>
+              )}
+              {!loadingHistory && history.length === 0 && (
+                <div
+                  style={{ textAlign: "center", color: T.sub, fontSize: 13 }}
+                >
+                  Nenhum histórico registrado.
+                </div>
+              )}
+              {history.map((h: any) => (
+                <div
+                  key={h.id}
+                  style={{
+                    display: "flex",
+                    gap: 10,
+                    paddingBottom: 12,
+                    borderBottom: `1px dashed ${T.border}`,
+                  }}
+                >
+                  <div
+                    style={{
+                      marginTop: 2,
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      background: "#98af3b",
+                      flexShrink: 0,
+                    }}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, color: T.text }}>
+                      <span style={{ fontWeight: 600 }}>
+                        {h.user?.name || "Sistema"}
+                      </span>{" "}
+                      alterou <b>{h.field}</b>
+                    </div>
+                    <div style={{ fontSize: 12, color: T.sub, marginTop: 4 }}>
+                      <span
+                        style={{ textDecoration: "line-through", opacity: 0.7 }}
+                      >
+                        {h.old_value || "(vazio)"}
+                      </span>
+                      {" ➝ "}
+                      <span style={{ color: "#98af3b", fontWeight: 600 }}>
+                        {h.new_value || "(vazio)"}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 10, color: T.sub, marginTop: 4 }}>
+                      {new Date(h.created_at).toLocaleString("pt-BR")}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
 
         {["Admin", "Gestor", "Liderado", "Gerente", "Coordenador"].includes(
           user.role?.name,
@@ -2989,7 +3091,7 @@ export default function GeoTask() {
       const res = await fetch("/api/tasks", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, action, ...data }),
+        body: JSON.stringify({ id, action, user_id: user?.id, ...data }),
       });
 
       if (res.ok) {
@@ -7545,6 +7647,22 @@ function TemplatesPage({
                   >
                     {task.title}
                   </span>
+                  {getTaskState(task) && (
+                    <div
+                      style={{
+                        fontSize: 9,
+                        fontWeight: 700,
+                        padding: "2px 6px",
+                        borderRadius: 4,
+                        background: getTaskState(task)!.color + "22",
+                        color: getTaskState(task)!.color,
+                        marginLeft: "auto",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {getTaskState(task)!.label}
+                    </div>
+                  )}
                 </div>
                 {task.subtasks.map((st, si) => (
                   <div
@@ -7889,6 +8007,21 @@ function TemplateModal({
                         outline: "none",
                       }}
                     />
+                    {getTaskState(t) && (
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          padding: "2px 8px",
+                          borderRadius: 4,
+                          background: getTaskState(t)!.color + "22",
+                          color: getTaskState(t)!.color,
+                          marginLeft: 8,
+                        }}
+                      >
+                        {getTaskState(t)!.label}
+                      </span>
+                    )}
                     <SectorSelect
                       value={t.sector}
                       onChange={(v) => handleTaskField(i, "sector", v)}

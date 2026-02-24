@@ -1,7 +1,9 @@
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
-async function resolveSectorId(s: any): Promise<number | null> {
+async function resolveSectorId(
+  s: string | number | null | undefined,
+): Promise<number | null> {
   if (!s) return null;
   if (typeof s === "number") return s;
   if (!isNaN(Number(s))) return Number(s);
@@ -37,7 +39,9 @@ async function notifyManagers(
 ) {
   try {
     const managers = await prisma.user.findMany({
-      where: { role: { in: ["Gestor", "Gerente", "Coordenador", "Admin"] } },
+      where: {
+        Role: { name: { in: ["Gestor", "Gerente", "Coordenador", "Admin"] } },
+      },
       select: { id: true },
     });
     for (const m of managers) {
@@ -66,10 +70,12 @@ export async function GET() {
         },
         created_by: { select: { id: true, name: true } },
         pauses: true,
+        subtasks: true,
         children: {
           orderBy: { id: "asc" },
           include: {
             Sector: { select: { id: true, name: true } },
+            created_by: { select: { id: true, name: true } },
             responsible: {
               select: {
                 id: true,
@@ -140,13 +146,11 @@ export async function GET() {
         : null,
       time: t.time_spent ? Math.round(t.time_spent / 60) : 0,
       subtasks: [
-        ...(t.subtasks || []).map((s) => ({ ...s, isLegacy: true })),
+        ...(t.subtasks || []).map((s: any) => ({ ...s, isLegacy: true })),
         ...(t.children || []).map((c: any) => ({
           id: c.id,
           title: c.title,
-          sector: (c as any).Sector
-            ? { name: (c as any).Sector.name, id: (c as any).Sector.id }
-            : null,
+          sector: c.Sector ? { name: c.Sector.name, id: c.Sector.id } : null,
           responsible_id: c.responsible_id,
           done: c.status === "Concluído",
           status: c.status,
@@ -155,11 +159,11 @@ export async function GET() {
           responsible: c.responsible
             ? {
                 ...c.responsible,
-                role: (c.responsible as any).Role
-                  ? { name: (c.responsible as any).Role.name }
+                role: c.responsible.Role
+                  ? { name: c.responsible.Role.name }
                   : null,
-                sector: (c.responsible as any).Sector
-                  ? { name: (c.responsible as any).Sector.name }
+                sector: c.responsible.Sector
+                  ? { name: c.responsible.Sector.name }
                   : null,
               }
             : null,
@@ -204,14 +208,16 @@ export async function POST(req: Request) {
       parent_id,
     } = body;
 
-    let contractId: number | null = null;
-    if (contract) {
+    let contractId: number | null = body.contract_id
+      ? Number(body.contract_id)
+      : null;
+    if (!contractId && contract) {
       const c = await prisma.contract.findUnique({ where: { name: contract } });
       if (c) contractId = c.id;
     }
 
-    let cityId: number | null = null;
-    if (city) {
+    let cityId: number | null = body.city_id ? Number(body.city_id) : null;
+    if (!cityId && city) {
       const c = await prisma.city.findUnique({ where: { name: city } });
       if (c) cityId = c.id;
     }
@@ -248,12 +254,13 @@ export async function POST(req: Request) {
       lote: lote || "",
       deadline: deadline
         ? (() => {
-            if (typeof deadline === "string" && deadline.includes("/")) {
-              const [d, m, y] = deadline.split("/");
+            const dStr = String(deadline);
+            if (dStr.includes("/")) {
+              const [d, m, y] = dStr.split("/");
               const parsed = new Date(`${y}-${m}-${d}`);
               return isNaN(parsed.getTime()) ? null : parsed;
             }
-            const parsed = new Date(deadline);
+            const parsed = new Date(dStr);
             return isNaN(parsed.getTime()) ? null : parsed;
           })()
         : null,
@@ -279,6 +286,11 @@ export async function POST(req: Request) {
               priority: st.priority || priority,
               type: st.type || type,
               created_by_id: createdById,
+              contract_id: contractId,
+              city_id: cityId,
+              nucleus: nucleus,
+              quadra: quadra || "",
+              lote: lote || "",
               responsible_id:
                 st.responsible_id && !isNaN(Number(st.responsible_id))
                   ? Number(st.responsible_id)
@@ -325,10 +337,61 @@ export async function POST(req: Request) {
 }
 
 // PATCH /api/tasks
+const FIELD_NAMES: Record<string, string> = {
+  title: "Título",
+  description: "Descrição",
+  priority: "Prioridade",
+  type: "Tipo",
+  nucleus: "Bairro",
+  quadra: "Quadra",
+  lote: "Lote",
+  deadline: "Prazo",
+  status: "Status",
+  sector_id: "Setor",
+  responsible_id: "Responsável",
+  contract_id: "Contrato",
+  city_id: "Cidade",
+};
+
+async function logHistory(
+  taskId: number,
+  userId: number | null,
+  field: string,
+  oldValue: any,
+  newValue: any,
+) {
+  const maskedField = FIELD_NAMES[field] || field;
+
+  const formatValue = (v: any) => {
+    if (v instanceof Date) return v.toLocaleDateString("pt-BR");
+    if (typeof v === "object" && v !== null) return JSON.stringify(v);
+    const s = String(v || "");
+    return s === "null" || s === "undefined" ? "" : s;
+  };
+
+  const ov = formatValue(oldValue);
+  const nv = formatValue(newValue);
+
+  if (ov === nv) return;
+
+  await prisma.taskHistory.create({
+    data: {
+      task_id: taskId,
+      user_id: userId,
+      field: maskedField,
+      old_value: ov,
+      new_value: nv,
+    },
+  });
+}
+
+// PATCH /api/tasks
 export async function PATCH(req: Request) {
   try {
     const body = await req.json();
-    const { id, action, ...data } = body;
+    const { id, action, user_id, ...data } = body;
+    const userId = user_id ? Number(user_id) : null;
+
     if (!id)
       return NextResponse.json({ error: "ID é obrigatório" }, { status: 400 });
 
@@ -358,6 +421,7 @@ export async function PATCH(req: Request) {
         else if (status === "Concluído") updateData.completed_at = new Date();
       }
 
+      await logHistory(task.id, userId, "status", task.status, status);
       await prisma.task.update({ where: { id: Number(id) }, data: updateData });
 
       if (status === "Pausado") {
@@ -390,7 +454,8 @@ export async function PATCH(req: Request) {
           }
           if (status === "Concluído") {
             const allDone = parent.children.every(
-              (c) => (c.id === task.id ? status : c.status) === "Concluído",
+              (c: any) =>
+                (c.id === task.id ? status : c.status) === "Concluído",
             );
             if (allDone && parent.status !== "Concluído") {
               await prisma.task.update({
@@ -410,7 +475,7 @@ export async function PATCH(req: Request) {
           Number(id),
         );
     } else if (action === "update_fields") {
-      const fields = [
+      const basicFields = [
         "title",
         "description",
         "priority",
@@ -419,18 +484,61 @@ export async function PATCH(req: Request) {
         "quadra",
         "lote",
       ];
-      fields.forEach((f) => {
-        if (data[f] !== undefined) updateData[f] = data[f];
-      });
-      if (data.sector !== undefined) {
-        updateData.sector_id = await resolveSectorId(data.sector);
+      for (const f of basicFields) {
+        if (data[f] !== undefined) {
+          await logHistory(task.id, userId, f, (task as any)[f], data[f]);
+          updateData[f] = data[f];
+        }
       }
-      if (data.responsible_id !== undefined)
-        updateData.responsible_id = data.responsible_id
-          ? Number(data.responsible_id)
-          : null;
-      if (data.deadline !== undefined)
-        updateData.deadline = data.deadline ? new Date(data.deadline) : null;
+
+      if (data.sector !== undefined) {
+        const sId = await resolveSectorId(data.sector);
+        await logHistory(task.id, userId, "sector_id", task.sector_id, sId);
+        updateData.sector_id = sId;
+      }
+
+      if (data.responsible_id !== undefined) {
+        const rId = data.responsible_id ? Number(data.responsible_id) : null;
+        await logHistory(
+          task.id,
+          userId,
+          "responsible_id",
+          task.responsible_id,
+          rId,
+        );
+        updateData.responsible_id = rId;
+      }
+
+      if (data.contract !== undefined) {
+        const c = await prisma.contract.findUnique({
+          where: { name: data.contract },
+        });
+        if (c) {
+          await logHistory(
+            task.id,
+            userId,
+            "contract_id",
+            task.contract_id,
+            c.id,
+          );
+          updateData.contract_id = c.id;
+        }
+      }
+
+      if (data.city !== undefined) {
+        const c = await prisma.city.findUnique({ where: { name: data.city } });
+        if (c) {
+          await logHistory(task.id, userId, "city_id", task.city_id, c.id);
+          updateData.city_id = c.id;
+        }
+      }
+
+      if (data.deadline !== undefined) {
+        const d = data.deadline ? new Date(data.deadline) : null;
+        await logHistory(task.id, userId, "deadline", task.deadline, d);
+        updateData.deadline = d;
+      }
+
       await prisma.task.update({ where: { id: Number(id) }, data: updateData });
     } else if (action === "toggle_subtask") {
       const { subtask_id, done } = data;

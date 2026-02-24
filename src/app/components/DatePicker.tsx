@@ -10,11 +10,13 @@ export function DatePicker({
   setDate,
   label,
   T,
+  openDirection = "down",
 }: {
   date: Date | undefined;
   setDate: (d: Date | undefined) => void;
   label: string;
   T: any;
+  openDirection?: "up" | "down";
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -43,6 +45,25 @@ export function DatePicker({
     displayValue = format(date, "dd/MM/yyyy", { locale: ptBR });
   }
 
+  const dropdownStyle: React.CSSProperties = {
+    position: "absolute",
+    left: 0,
+    background: T.card,
+    border: `1px solid ${T.border}`,
+    borderRadius: 12,
+    boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
+    zIndex: 9999,
+    padding: 8,
+  };
+
+  if (openDirection === "up") {
+    dropdownStyle.bottom = "100%";
+    dropdownStyle.marginBottom = 4;
+  } else {
+    dropdownStyle.top = "100%";
+    dropdownStyle.marginTop = 4;
+  }
+
   return (
     <div ref={containerRef} style={{ position: "relative" }}>
       <label
@@ -62,14 +83,14 @@ export function DatePicker({
           display: "flex",
           alignItems: "center",
           gap: 8,
-          padding: "8px 10px",
+          padding: "6px 10px",
           background: T.card,
           border: `1px solid ${T.border}`,
           borderRadius: 8,
           cursor: "pointer",
           fontSize: 13,
           color: date ? T.text : T.sub,
-          minWidth: 160,
+          minWidth: 140,
         }}
       >
         <CalendarIcon size={14} color={T.sub} />
@@ -94,27 +115,16 @@ export function DatePicker({
       </div>
 
       {isOpen && (
-        <div
-          style={{
-            position: "absolute",
-            top: "100%",
-            left: 0,
-            marginTop: 4,
-            background: T.card,
-            border: `1px solid ${T.border}`,
-            borderRadius: 12,
-            boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
-            zIndex: 9999,
-            padding: 10,
-          }}
-        >
+        <div style={dropdownStyle}>
           <style>{`
-            .rdp { --rdp-cell-size: 32px; margin: 0; }
+            .rdp { --rdp-cell-size: 24px; margin: 0; padding: 0px; }
+            .rdp-nav { color: ${T.text}; }
+            .rdp-head_cell { font-size: 11px; color: ${T.sub} !important; font-weight: 600; text-transform: uppercase; }
+            .rdp-caption_label { font-size: 13px; font-weight: 700; color: ${T.text}; text-transform: capitalize; }
+            .rdp-day { font-size: 11px; }
             .rdp-day_selected { background-color: #98af3b !important; color: white !important; }
             .rdp-day_today { font-weight: bold; color: #98af3b; }
             .rdp-button:hover:not([disabled]):not(.rdp-day_selected) { background-color: ${T.inp}; }
-             /* Darken week day labels */
-            .rdp-head_cell { color: #64748b !important; font-weight: 600; }
           `}</style>
           <DayPicker
             mode="single"

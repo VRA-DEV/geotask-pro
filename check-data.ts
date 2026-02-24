@@ -7,12 +7,12 @@ async function main() {
   console.log("Sectors:", JSON.stringify(sectors, null, 2));
 
   const users = await prisma.user.findMany({
-    include: { sector: true },
+    include: { Sector: true },
   });
   console.log(
     "Users:",
     JSON.stringify(
-      users.map((u) => ({ id: u.id, name: u.name, sector: u.sector })),
+      users.map((u: any) => ({ id: u.id, name: u.name, sector: u.Sector })),
       null,
       2,
     ),
