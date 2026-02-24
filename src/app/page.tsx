@@ -37,7 +37,7 @@ import {
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DateRange } from "react-day-picker";
 import {
   Bar,
@@ -50,8 +50,56 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { exportToExcel, exportToPDF, getKpiData } from "../lib/exportUtils";
 import { DatePicker } from "./components/DatePicker";
 import { SettingsPage } from "./components/SettingsPage";
+
+const ExportButtons = ({ T, filtered, kpi, users }: any) => (
+  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+    <button
+      onClick={() => exportToExcel(filtered)}
+      style={{
+        background: "#10b981",
+        color: "white",
+        border: "none",
+        padding: "6px 12px",
+        borderRadius: 8,
+        fontSize: 11,
+        fontWeight: 600,
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        gap: 4,
+        transition: "filter 0.1s",
+      }}
+      onMouseEnter={(e) => (e.currentTarget.style.filter = "brightness(0.9)")}
+      onMouseLeave={(e) => (e.currentTarget.style.filter = "none")}
+    >
+      <FileText size={13} /> EXCEL
+    </button>
+    <button
+      onClick={() => exportToPDF(filtered, kpi, users)}
+      style={{
+        background: "#ef4444",
+        color: "white",
+        border: "none",
+        padding: "6px 12px",
+        borderRadius: 8,
+        fontSize: 11,
+        fontWeight: 600,
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        gap: 4,
+        transition: "filter 0.1s",
+      }}
+      onMouseEnter={(e) => (e.currentTarget.style.filter = "brightness(0.9)")}
+      onMouseLeave={(e) => (e.currentTarget.style.filter = "none")}
+    >
+      <FileText size={13} /> PDF
+    </button>
+  </div>
+);
 
 // ── DADOS ─────────────────────────────────────────────────────
 
@@ -138,19 +186,21 @@ const parseDateStr = (s?: string) => {
 
 const getTaskState = (task: any) => {
   if (!task.deadline) return null;
-  const deadline = new Date(task.deadline);
+  const deadlineDate = parseDateStr(task.deadline);
+  if (!deadlineDate) return null;
+  // Compare by date only or EOD
+  deadlineDate.setHours(23, 59, 59, 999);
   const now = new Date();
   const isDone = task.status === "Concluído";
 
   if (!isDone) {
-    if (now > deadline) return { label: "Em Atraso", color: "#ef4444" };
+    if (now > deadlineDate) return { label: "Em Atraso", color: "#ef4444" };
     return { label: "Dentro do Prazo", color: "#10b981" };
   } else {
-    // For completed tasks, we'd ideally check completed_at, but we'll use now if missing
     const doneAt = task.completed_at ? new Date(task.completed_at) : now;
-    if (doneAt > deadline)
+    if (doneAt > deadlineDate)
       return { label: "Atraso na Entrega", color: "#f59e0b" };
-    return null; // Or "No Prazo"
+    return null;
   }
 };
 
@@ -626,36 +676,68 @@ function NewTaskModal({
     const firstTask = tpl.tasks?.[0];
     const mainTitle = firstTask?.title || tpl.name;
 
-    // Pre-fill responsible from users matching template sector
-    const responsible = templateSectorName
-      ? users.find(
-          (u: any) => (u.sector?.name || u.sector) === templateSectorName,
-        )?.name || ""
+    // Pre-fill responsible from users matching template sector (robust check)
+    // Find the actual sector object from dbSectors if possible
+    const foundSector = sectors.find(
+      (s: any) =>
+        String(s.id) === String(templateSectorId) ||
+        String(s.name).toLowerCase().trim() ===
+          String(templateSectorName).toLowerCase().trim(),
+    );
+
+    const responsible = foundSector
+      ? users.find((u: any) => {
+          const uSid = String(u.sector_id || u.sector?.id || "");
+          const fSid = String(foundSector.id);
+          const uSName = String(u.sector?.name || u.sector || "")
+            .toLowerCase()
+            .trim();
+          const fSName = String(foundSector.name).toLowerCase().trim();
+          return uSid === fSid || uSName === fSName;
+        })?.name || ""
       : "";
 
     setForm((f) => ({
       ...f,
       title: mainTitle,
-      sector: templateSectorId || templateSectorName || "",
+      sector: foundSector ? String(foundSector.id) : templateSectorName || "",
       responsible,
       subtasks: [
         // Include subtasks defined WITHIN the first task
-        ...(firstTask?.subtasks || []).map((s: any) => ({
-          id: Date.now() + Math.random(),
-          title: s.title,
-          sector:
-            s.sector_id ||
-            s.sector ||
-            templateSectorId ||
-            templateSectorName ||
-            "",
-          responsible,
-        })),
+        ...(firstTask?.subtasks || []).map((s: any) => {
+          // Priority: subtask's own sector -> main task's sector
+          const sVal =
+            s.sector?.id || s.sector?.name || s.sector || s.sector_id;
+          const fs = sectors.find(
+            (sec: any) =>
+              String(sec.id) === String(sVal) ||
+              String(sec.name).toLowerCase().trim() ===
+                String(sVal || "")
+                  .toLowerCase()
+                  .trim(),
+          );
+
+          // Priority: subtask's own responsible -> main task's responsible
+          const sResp = s.responsible?.name || s.responsible || responsible;
+
+          return {
+            id: Date.now() + Math.random(),
+            title: s.title,
+            sector: fs
+              ? String(fs.id)
+              : sVal
+                ? String(sVal)
+                : foundSector?.id
+                  ? String(foundSector.id)
+                  : "",
+            responsible: sResp,
+          };
+        }),
         // Include subsequent tasks as subtasks (legacy behavior)
         ...(tpl.tasks || []).slice(1).map((t: any) => ({
           id: Date.now() + Math.random(),
           title: t.title,
-          sector: templateSectorId || templateSectorName || "",
+          sector: foundSector ? String(foundSector.id) : "",
           responsible,
         })),
       ],
@@ -676,22 +758,31 @@ function NewTaskModal({
   }, [dateVal]);
 
   const neighborhoods = form.city ? citiesNeighborhoods[form.city] || [] : [];
-  const sectorUsers = form.sector
-    ? users.filter((u: any) => {
-        const uSid = String(u.sector_id || u.sector?.id || "");
-        const uSName = String(u.sector?.name || "");
-        const fSid = String(form.sector);
-        return uSid === fSid || (uSName && uSName === fSid);
-      })
-    : [];
-  const subSectorUsers = subForm?.sector
-    ? users.filter((u: any) => {
-        const uSid = String(u.sector_id || u.sector?.id || "");
-        const uSName = String(u.sector?.name || "");
-        const fSid = String(subForm.sector);
-        return uSid === fSid || (uSName && uSName === fSid);
-      })
-    : [];
+  const sectorUsers = useMemo(() => {
+    if (!form.sector) return [];
+    return users.filter((u: any) => {
+      const uSName = String(u.sector?.name || u.sector || "")
+        .toLowerCase()
+        .trim();
+      const fSName = String(form.sector).toLowerCase().trim();
+      const uSid = String(u.sector_id || u.sector?.id || "");
+      const fSid = String(form.sector);
+      return uSName === fSName || uSid === fSid;
+    });
+  }, [form.sector, users]);
+
+  const subSectorUsers = useMemo(() => {
+    if (!subForm?.sector) return [];
+    return users.filter((u: any) => {
+      const uSName = String(u.sector?.name || u.sector || "")
+        .toLowerCase()
+        .trim();
+      const fSName = String(subForm.sector).toLowerCase().trim();
+      const uSid = String(u.sector_id || u.sector?.id || "");
+      const fSid = String(subForm.sector);
+      return uSName === fSName || uSid === fSid;
+    });
+  }, [subForm, users]);
 
   const STEPS = [
     "📋 Dados",
@@ -1084,7 +1175,7 @@ function NewTaskModal({
                     set("sector", v);
                     set("responsible", "");
                   }}
-                  opts={sectors.length > 0 ? sectors : SECTORS}
+                  opts={sectors}
                   err={errors.sector}
                 />
               </FormField>
@@ -1280,9 +1371,31 @@ function NewTaskModal({
                       {s.title}
                     </div>
                     <div style={{ fontSize: 11, color: T.sub, marginTop: 2 }}>
-                      {typeof s.sector === "object" ? s.sector.name : s.sector}
+                      {(() => {
+                        const sVal = s.sector;
+                        const found = sectors.find(
+                          (sec: any) =>
+                            String(sec.id) === String(sVal) ||
+                            String(sec.name).toLowerCase().trim() ===
+                              String(sVal).toLowerCase().trim(),
+                        );
+                        return found
+                          ? found.name
+                          : typeof sVal === "object"
+                            ? sVal.name
+                            : sVal;
+                      })()}
                       {s.responsible
-                        ? ` · ${typeof s.responsible === "object" ? s.responsible.name : s.responsible}`
+                        ? ` · ${(() => {
+                            const rVal = s.responsible;
+                            const found = users.find(
+                              (u: any) =>
+                                String(u.id) === String(rVal) ||
+                                String(u.name).toLowerCase().trim() ===
+                                  String(rVal).toLowerCase().trim(),
+                            );
+                            return found ? found.name : rVal;
+                          })()}`
                         : ""}
                     </div>
                   </div>
@@ -1360,7 +1473,7 @@ function NewTaskModal({
                             responsible: "",
                           }))
                         }
-                        opts={sectors.length > 0 ? sectors : SECTORS}
+                        opts={sectors}
                       />
                     </FormField>
                     <FormField label="Responsável">
@@ -1580,6 +1693,8 @@ function TaskModal({
   contracts = [],
   citiesNeighborhoods = {},
   sectors = [],
+  tasks = [],
+  setSelectedTask,
 }: any) {
   const sc = STATUS_COLOR[t.status];
 
@@ -1608,6 +1723,33 @@ function TaskModal({
     description: "",
   });
   const [creatingSubtask, setCreatingSubtask] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const filteredUsers = useMemo(() => {
+    if (!form.sector) return [];
+    return users.filter((u: any) => {
+      const uSName = String(u.sector?.name || u.sector || "")
+        .toLowerCase()
+        .trim();
+      const fSName = String(form.sector).toLowerCase().trim();
+      const uSid = String(u.sector_id || u.sector?.id || "");
+      const fSid = String(form.sector);
+      return uSName === fSName || uSid === fSid;
+    });
+  }, [form.sector, users]);
+
+  const subFilteredUsers = useMemo(() => {
+    if (!newSubtask.sector) return [];
+    return users.filter((u: any) => {
+      const uSName = String(u.sector?.name || u.sector || "")
+        .toLowerCase()
+        .trim();
+      const fSName = String(newSubtask.sector).toLowerCase().trim();
+      const uSid = String(u.sector_id || u.sector?.id || "");
+      const fSid = String(newSubtask.sector);
+      return uSName === fSName || uSid === fSid;
+    });
+  }, [newSubtask.sector, users]);
 
   useEffect(() => {
     setForm({
@@ -1991,7 +2133,10 @@ function TaskModal({
                 {
                   l: "Responsável",
                   f: "responsible_id",
-                  o: users.map((u: any) => ({ value: u.id, label: u.name })),
+                  o: filteredUsers.map((u: any) => ({
+                    value: u.id,
+                    label: u.name,
+                  })),
                 },
                 { l: "Contrato", f: "contract", o: contracts },
                 { l: "Cidade", f: "city", o: Object.keys(citiesNeighborhoods) },
@@ -2019,9 +2164,16 @@ function TaskModal({
                       <select
                         value={form[f] || ""}
                         disabled={disabled}
-                        onChange={(e) =>
-                          setForm({ ...form, [f]: e.target.value })
-                        }
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setForm({ ...form, [f]: v });
+                          if (f === "sector") {
+                            setForm((prev) => ({
+                              ...prev,
+                              responsible_id: "",
+                            }));
+                          }
+                        }}
                         style={{
                           width: "100%",
                           padding: "8px 12px",
@@ -2308,7 +2460,11 @@ function TaskModal({
                     <select
                       value={newSubtask.sector}
                       onChange={(e) =>
-                        setNewSubtask({ ...newSubtask, sector: e.target.value })
+                        setNewSubtask({
+                          ...newSubtask,
+                          sector: e.target.value,
+                          responsible_id: "",
+                        })
                       }
                       style={{
                         width: "100%",
@@ -2349,7 +2505,7 @@ function TaskModal({
                       }}
                     >
                       <option value="">Responsável...</option>
-                      {users.map((u: any) => (
+                      {subFilteredUsers.map((u: any) => (
                         <option key={u.id} value={u.id}>
                           {u.name}
                         </option>
@@ -2828,6 +2984,27 @@ function TaskModal({
 
 // ── APP ────────────────────────────────────────────────────────
 export default function GeoTask() {
+  const [dbSectors, setDbSectors] = useState<any[]>([]); // Array of {id, name}
+
+  const mergedSectors = useMemo(() => {
+    const combined = [...dbSectors];
+    SECTORS.forEach((s) => {
+      if (
+        !combined.some(
+          (ds) =>
+            (ds.name || ds).toLowerCase().trim() === s.toLowerCase().trim(),
+        )
+      ) {
+        combined.push({ id: s, name: s });
+      }
+    });
+    return combined.sort((a, b) => {
+      const nameA = String(a.name || a);
+      const nameB = String(b.name || b);
+      return nameA.localeCompare(nameB);
+    });
+  }, [dbSectors]);
+
   const [dark, setDark] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [page, setPage] = useState("dashboard");
@@ -2846,7 +3023,6 @@ export default function GeoTask() {
 
   // Lookups state
   const [contracts, setContracts] = useState<string[]>([]);
-  const [dbSectors, setDbSectors] = useState<any[]>([]); // Array of {id, name}
 
   const [citiesNeighborhoods, setCitiesNeighborhoods] = useState<
     Record<string, string[]>
@@ -3672,6 +3848,7 @@ export default function GeoTask() {
               users={dbUsers}
               contracts={contracts}
               citiesNeighborhoods={citiesNeighborhoods}
+              sectors={mergedSectors}
             />
           )}
           {page === "kanban" && (
@@ -3685,6 +3862,7 @@ export default function GeoTask() {
               users={dbUsers}
               contracts={contracts}
               citiesNeighborhoods={citiesNeighborhoods}
+              sectors={mergedSectors}
             />
           )}
           {page === "map" && (
@@ -3708,7 +3886,9 @@ export default function GeoTask() {
               </div>
             </div>
           )}
-          {page === "mindmap" && <MindMapPage T={T} tasks={tasks} />}
+          {page === "mindmap" && (
+            <MindMapPage T={T} tasks={tasks} users={dbUsers} />
+          )}
           {page === "cronograma" && (
             <CronogramaPage
               T={T}
@@ -3717,6 +3897,7 @@ export default function GeoTask() {
               users={dbUsers}
               contracts={contracts}
               citiesNeighborhoods={citiesNeighborhoods}
+              sectors={mergedSectors}
             />
           )}
           {page === "templates" && canAccess("templates") && (
@@ -3921,18 +4102,14 @@ export default function GeoTask() {
           T={T}
           task={selectedTask}
           user={user}
-          tasks={tasks}
-          setTasks={setTasks}
           onClose={() => setSelectedTask(null)}
           onUpdate={handleUpdateTask}
           users={dbUsers}
           contracts={contracts}
           citiesNeighborhoods={citiesNeighborhoods}
-          sectors={
-            dbSectors.length > 0
-              ? dbSectors
-              : SECTORS.map((s) => ({ name: s, id: s }))
-          }
+          tasks={tasks}
+          setSelectedTask={setSelectedTask}
+          sectors={mergedSectors}
         />
       )}
       {showNewTask && (
@@ -3944,11 +4121,7 @@ export default function GeoTask() {
           contracts={contracts}
           citiesNeighborhoods={citiesNeighborhoods}
           templates={templates}
-          sectors={
-            dbSectors.length > 0
-              ? dbSectors
-              : SECTORS.map((s) => ({ name: s, id: s }))
-          }
+          sectors={mergedSectors}
         />
       )}
       {showTemplateModal && (
@@ -3960,7 +4133,7 @@ export default function GeoTask() {
             setEditingTemplate(null);
           }}
           onSave={handleSaveTemplate}
-          sectors={dbSectors.length > 0 ? dbSectors : SECTORS}
+          sectors={mergedSectors.map((s) => s.name)}
         />
       )}
     </div>
@@ -3977,6 +4150,7 @@ function DashboardPage({
   users = [],
   contracts = [],
   citiesNeighborhoods = {},
+  sectors = [],
 }: any) {
   const [fSearch, setFSearch] = useState("");
   const [fContract, setFContract] = useState("");
@@ -4112,13 +4286,14 @@ function DashboardPage({
     .sort((a, b) => b.v - a.v);
   const userRank = users
     .map((u) => ({
-      name: u.name.split(" ")[0],
+      name: u.name,
       v: filtered.filter(
         (t) =>
           (typeof t.responsible === "object"
             ? t.responsible?.name
             : t.responsible) === u.name && t.status === "Concluído",
       ).length,
+      sector: u.sector?.name || u.sector || "—",
     }))
     .filter((x) => x.v > 0)
     .sort((a, b) => b.v - a.v);
@@ -4197,6 +4372,8 @@ function DashboardPage({
     },
   };
 
+  const kpi = getKpiData(filtered, users);
+
   return (
     <div>
       {/* Header */}
@@ -4218,18 +4395,25 @@ function DashboardPage({
             Olá, {user.name.split(" ")[0]}! Veja o resumo das atividades.
           </p>
         </div>
-        <span
-          style={{
-            fontSize: 12,
-            color: T.sub,
-            background: T.card,
-            border: `1px solid ${T.border}`,
-            borderRadius: 8,
-            padding: "5px 10px",
-          }}
-        >
-          13 fev 2026
-        </span>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <ExportButtons T={T} filtered={filtered} kpi={kpi} users={users} />
+          <span
+            style={{
+              fontSize: 12,
+              color: T.sub,
+              background: T.card,
+              border: `1px solid ${T.border}`,
+              borderRadius: 8,
+              padding: "5px 10px",
+            }}
+          >
+            {new Date().toLocaleDateString("pt-BR", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            })}
+          </span>
+        </div>
       </div>
 
       {/* ── FILTROS ── */}
@@ -5123,7 +5307,7 @@ function DashboardPage({
           style={{
             display: "grid",
             gridTemplateColumns:
-              "2fr 80px 120px 140px 100px 120px 60px 60px 48px",
+              "2fr 80px 100px 110px 140px 100px 120px 60px 60px 48px",
             padding: "8px 16px",
             borderBottom: `1px solid ${T.border}`,
             gap: 8,
@@ -5133,6 +5317,7 @@ function DashboardPage({
             "Título",
             "Prioridade",
             "Prazo",
+            "Estado",
             "Contrato",
             "Cidade",
             "Bairro",
@@ -5168,14 +5353,13 @@ function DashboardPage({
           </div>
         )}
         {upcoming.map((t, i) => {
-          const dl = daysLeft(t.deadline);
           return (
             <div
               key={t.id}
               style={{
                 display: "grid",
                 gridTemplateColumns:
-                  "2fr 80px 120px 140px 100px 120px 60px 60px 48px",
+                  "2fr 80px 100px 110px 140px 100px 120px 60px 60px 48px",
                 padding: "10px 16px",
                 borderBottom:
                   i < upcoming.length - 1 ? `1px solid ${T.border}` : "none",
@@ -5222,21 +5406,24 @@ function DashboardPage({
               >
                 {t.priority}
               </span>
+              <div style={{ fontSize: 11, color: T.text, fontWeight: 600 }}>
+                {t.deadline}
+              </div>
               <div>
-                <div style={{ fontSize: 11, color: T.text, fontWeight: 600 }}>
-                  {t.deadline}
-                </div>
-                {dl && (
-                  <div
+                {getTaskState(t) && (
+                  <span
                     style={{
-                      fontSize: 10,
+                      fontSize: 9,
                       fontWeight: 700,
-                      color: dl.color,
-                      marginTop: 1,
+                      padding: "2px 6px",
+                      borderRadius: 4,
+                      background: getTaskState(t)!.color + "22",
+                      color: getTaskState(t)!.color,
+                      whiteSpace: "nowrap",
                     }}
                   >
-                    {dl.label}
-                  </div>
+                    {getTaskState(t)!.label}
+                  </span>
                 )}
               </div>
               <div
@@ -5314,6 +5501,7 @@ function KanbanPage({
   users = [],
   contracts = [],
   citiesNeighborhoods = {},
+  sectors = [],
 }: any) {
   const [search, setSearch] = useState("");
   const [fSector, setFSector] = useState<string[]>([]);
@@ -5403,27 +5591,35 @@ function KanbanPage({
             {filtered.length} de {tasks.length} tarefas
           </p>
         </div>
-        {canCreate && (
-          <button
-            onClick={onNew}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "9px 16px",
-              background: "#98af3b",
-              color: "white",
-              border: "none",
-              borderRadius: 8,
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            <Plus size={15} />
-            Nova Tarefa
-          </button>
-        )}
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <ExportButtons
+            T={T}
+            filtered={filtered}
+            kpi={getKpiData(filtered, users)}
+            users={users}
+          />
+          {canCreate && (
+            <button
+              onClick={onNew}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "9px 16px",
+                background: "#98af3b",
+                color: "white",
+                border: "none",
+                borderRadius: 8,
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              <Plus size={15} />
+              Nova Tarefa
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Barra de filtros */}
@@ -5782,9 +5978,22 @@ function KanbanPage({
                             background: T.tag,
                             color: T.tagText,
                             fontWeight: 600,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4,
                           }}
                         >
                           {t.type}
+                          {getTaskState(t) && (
+                            <span
+                              style={{
+                                width: 6,
+                                height: 6,
+                                borderRadius: "50%",
+                                background: getTaskState(t)!.color,
+                              }}
+                            />
+                          )}
                         </span>
                         <span
                           style={{
@@ -5824,6 +6033,22 @@ function KanbanPage({
                           {t.description}
                         </div>
                       )}
+                      {getTaskState(t) && (
+                        <div style={{ marginBottom: 7 }}>
+                          <span
+                            style={{
+                              fontSize: 9,
+                              fontWeight: 700,
+                              padding: "2px 6px",
+                              borderRadius: 4,
+                              background: getTaskState(t)!.color + "22",
+                              color: getTaskState(t)!.color,
+                            }}
+                          >
+                            {getTaskState(t)!.label}
+                          </span>
+                        </div>
+                      )}
                       <div
                         style={{
                           display: "flex",
@@ -5842,9 +6067,7 @@ function KanbanPage({
                           }}
                         >
                           <Building2 size={9} />
-                          {t.sector && typeof t.sector === "object"
-                            ? t.sector.name
-                            : t.sector || ""}
+                          {sectorDisplay(t.sector)}
                         </span>
                         <span
                           style={{
@@ -5990,7 +6213,7 @@ function KanbanPage({
 }
 
 // ── MAPA MENTAL ────────────────────────────────────────────────
-function MindMapPage({ T, tasks = [] }: any) {
+function MindMapPage({ T, tasks = [], users = [] }: any) {
   const [sel, setSel] = useState<any>({
     contractId: null,
     cityId: null,
@@ -6178,33 +6401,41 @@ function MindMapPage({ T, tasks = [] }: any) {
             Clique nos nós para expandir a hierarquia
           </p>
         </div>
-        {sel.contractId != null && (
-          <button
-            onClick={() =>
-              setSel({
-                contractId: null,
-                cityId: null,
-                neighborhoodId: null,
-                taskId: null,
-              })
-            }
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-              padding: "7px 12px",
-              background: T.card,
-              border: `1px solid ${T.border}`,
-              borderRadius: 8,
-              fontSize: 12,
-              color: T.sub,
-              cursor: "pointer",
-            }}
-          >
-            <ArrowLeft size={13} />
-            Resetar
-          </button>
-        )}
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <ExportButtons
+            T={T}
+            filtered={tasks}
+            kpi={getKpiData(tasks, users)}
+            users={users}
+          />
+          {sel.contractId != null && (
+            <button
+              onClick={() =>
+                setSel({
+                  contractId: null,
+                  cityId: null,
+                  neighborhoodId: null,
+                  taskId: null,
+                })
+              }
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 5,
+                padding: "7px 12px",
+                background: T.card,
+                border: `1px solid ${T.border}`,
+                borderRadius: 8,
+                fontSize: 12,
+                color: T.sub,
+                cursor: "pointer",
+              }}
+            >
+              <ArrowLeft size={13} />
+              Resetar
+            </button>
+          )}
+        </div>
       </div>
       <div
         style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}
@@ -6904,6 +7135,7 @@ function CronogramaPage({
   users = [],
   contracts = [],
   citiesNeighborhoods = {},
+  sectors = [],
 }: any) {
   const [search, setSearch] = useState("");
   const [fSector, setFSector] = useState<string[]>([]);
@@ -6984,14 +7216,31 @@ function CronogramaPage({
 
   return (
     <div>
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: T.text }}>
-          Cronograma de Entrega
-        </h1>
-        <p style={{ margin: "4px 0 0", fontSize: 13, color: T.sub }}>
-          Linha do tempo de {filtered.length} tarefa
-          {filtered.length !== 1 && "s"} (Total: {tasks.length})
-        </p>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          marginBottom: 20,
+        }}
+      >
+        <div>
+          <h1
+            style={{ margin: 0, fontSize: 22, fontWeight: 700, color: T.text }}
+          >
+            Cronograma de Entrega
+          </h1>
+          <p style={{ margin: "4px 0 0", fontSize: 13, color: T.sub }}>
+            Linha do tempo de {filtered.length} tarefa
+            {filtered.length !== 1 && "s"} (Total: {tasks.length})
+          </p>
+        </div>
+        <ExportButtons
+          T={T}
+          filtered={filtered}
+          kpi={getKpiData(filtered, users)}
+          users={users}
+        />
       </div>
 
       {/* Filters */}
@@ -7078,7 +7327,9 @@ function CronogramaPage({
                 l: "Setor",
                 v: fSector,
                 s: setFSector,
-                o: SECTORS,
+                o: sectors.map((s: any) =>
+                  typeof s === "object" ? s.name : s,
+                ),
                 isMulti: true,
               },
               {
@@ -7521,7 +7772,10 @@ function TemplatesPage({
                     {tpl.name}
                   </div>
                   <div style={{ fontSize: 11, color: T.sub }}>
-                    {tpl.sector} · {tpl.tasks.length} tarefas
+                    {typeof tpl.sector === "object"
+                      ? tpl.sector?.name
+                      : tpl.sector}{" "}
+                    · {tpl.tasks?.length || 0} tarefas
                   </div>
                 </div>
                 <ChevronRight
@@ -7743,10 +7997,10 @@ function TemplateModal({
     template?.tasks?.length
       ? template.tasks.map((t: any) => ({
           title: t.title || "",
-          sector: t.sector || "",
+          sector: t.sector?.name || t.sector || "",
           subtasks: (t.subtasks || []).map((s: any) => ({
             title: typeof s === "string" ? s : s.title || "",
-            sector: typeof s === "string" ? "" : s.sector || "",
+            sector: s.sector?.name || s.sector || "",
           })),
         }))
       : [{ title: "", sector: "", subtasks: [] }],
@@ -7799,7 +8053,10 @@ function TemplateModal({
     onSave({
       id: template?.id,
       name,
-      sector: tasks[0]?.sector || sectors[0],
+      sector:
+        tasks[0]?.sector?.name ||
+        tasks[0]?.sector ||
+        (typeof sectors[0] === "object" ? sectors[0].name : sectors[0]),
       tasks: tasks.filter((t) => t.title.trim()),
     });
   };

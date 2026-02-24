@@ -312,8 +312,8 @@ async function main() {
       email: adminEmail,
       name: "Vinicios Reis de Araújo",
       password_hash: "997578",
-      role: { connect: { id: adminRole.id } },
-      sector: { connect: { id: tiSector.id } },
+      Role: { connect: { id: adminRole.id } },
+      Sector: { connect: { id: tiSector.id } },
       avatar: "VR",
       active: true,
       must_change_password: false,
@@ -330,15 +330,15 @@ async function main() {
       await prisma.user.upsert({
         where: { email },
         update: {
-          role: { connect: { id: r.id } },
+          Role: { connect: { id: r.id } },
           active: true,
         },
         create: {
           email,
           name: `Usuário ${roleName}`,
           password_hash: "123456", // Default simple password for testing
-          role: { connect: { id: r.id } },
-          sector: { connect: { id: tiSector.id } },
+          Role: { connect: { id: r.id } },
+          Sector: { connect: { id: tiSector.id } },
           avatar: roleName.substring(0, 2).toUpperCase(),
           active: true,
           must_change_password: true, // Force them to change

@@ -27,6 +27,7 @@ model User {
   tasks_responsible    Task[]         @relation("Responsible")
   task_history         TaskHistory[]
   templates            Template[]
+  template_subtasks    TemplateSubtask[]
   Role                 Role           @relation(fields: [role_id], references: [id])
   Sector               Sector         @relation(fields: [sector_id], references: [id])
 }
@@ -110,7 +111,11 @@ model TemplateSubtask {
   title            String
   order_index      Int          @default(0)
   template_task_id Int
+  sector_id        Int?
+  responsible_id   Int?
   template_task    TemplateTask @relation(fields: [template_task_id], references: [id], onDelete: Cascade)
+  Sector           Sector?      @relation(fields: [sector_id], references: [id])
+  responsible      User?        @relation(fields: [responsible_id], references: [id])
 }
 
 model Comment {
@@ -204,7 +209,7 @@ model Role {
   name        String   @unique
   permissions Json?
   created_at  DateTime @default(now())
-  updated_at  DateTime
+  updated_at  DateTime @default(now()) @updatedAt
   User        User[]
 }
 
@@ -212,10 +217,11 @@ model Sector {
   id         Int        @id @default(autoincrement())
   name       String     @unique
   created_at DateTime   @default(now())
-  updated_at DateTime
+  updated_at DateTime   @default(now()) @updatedAt
   Mention    Mention[]
-  Subtask    Subtask[]
-  Task       Task[]
-  Template   Template[]
+  Subtask           Subtask[]
+  Task              Task[]
+  template_subtasks TemplateSubtask[]
+  Template          Template[]
   User       User[]
 }

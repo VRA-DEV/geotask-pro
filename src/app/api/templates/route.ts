@@ -1,41 +1,72 @@
 import prisma from "@/lib/prisma";
-import { Sector } from "@prisma/client";
 import { NextResponse } from "next/server";
 
-const SECTOR_MAP: Record<string, Sector> = {
-  Administrativo: "Administrativo",
-  "Atendimento ao Cliente": "AtendimentoAoCliente",
-  "Atendimento Social": "AtendimentoSocial",
-  Cadastro: "Cadastro",
-  Controladoria: "Controladoria",
-  Coordenação: "Coordenacao",
-  Engenharia: "Engenharia",
-  Financeiro: "Financeiro",
-  Gerência: "Gerencia",
-  Reurb: "Reurb",
-  RH: "RH",
-  TI: "TI",
-  AtendimentoAoCliente: "AtendimentoAoCliente",
-  AtendimentoSocial: "AtendimentoSocial",
-  Coordenacao: "Coordenacao",
-  Gerencia: "Gerencia",
-};
+async function resolveSectorId(s: any): Promise<number | null> {
+  if (!s) return null;
 
-const mapSector = (s: any): Sector => {
-  const str = String(s || "");
-  return (
-    SECTOR_MAP[str] ||
-    (Object.values(Sector).includes(str as Sector)
-      ? (str as Sector)
-      : "Administrativo")
-  );
-};
+  // If already an ID
+  if (typeof s === "number") return s;
+  if (typeof s === "string" && !isNaN(Number(s)) && s.trim() !== "")
+    return Number(s);
 
-// Subtask can be a string (legacy) or { title, sector }
-type SubtaskInput = string | { title: string; sector?: string };
+  // If it's an object { id, name }
+  if (typeof s === "object") {
+    if (s.id && !isNaN(Number(s.id))) return Number(s.id);
+    if (s.name) s = s.name;
+  }
+
+  const str = String(s).trim();
+  // Try case-insensitive matching first
+  const sector = await prisma.sector.findFirst({
+    where: { name: { equals: str, mode: "insensitive" } },
+  });
+  if (sector) return sector.id;
+
+  // Fallback to "Administrativo" if not found
+  const admin = await prisma.sector.findFirst({
+    where: { name: { contains: "Administrativo", mode: "insensitive" } },
+  });
+  return admin?.id || null;
+}
+
+async function resolveResponsibleId(r: any): Promise<number | null> {
+  if (!r) return null;
+
+  // If already an ID
+  if (typeof r === "number") return r;
+  if (typeof r === "string" && !isNaN(Number(r)) && r.trim() !== "")
+    return Number(r);
+
+  // If it's an object { id, name }
+  if (typeof r === "object") {
+    if (r.id && !isNaN(Number(r.id))) return Number(r.id);
+    if (r.name) r = r.name;
+  }
+
+  // Find by name (case-insensitive and trimmed)
+  const u = await prisma.user.findFirst({
+    where: {
+      name: { equals: String(r).trim(), mode: "insensitive" },
+    },
+  });
+  return u?.id || null;
+}
+
+// Subtask can be a string (legacy) or { title, sector, responsible }
+type SubtaskInput =
+  | string
+  | { title: string; sector?: string; responsible?: string };
 
 function subtaskTitle(s: SubtaskInput): string {
   return typeof s === "string" ? s : s.title || "";
+}
+
+function subtaskSector(s: SubtaskInput): string | undefined {
+  return typeof s === "string" ? undefined : s.sector;
+}
+
+function subtaskResponsible(s: SubtaskInput): string | undefined {
+  return typeof s === "string" ? undefined : s.responsible;
 }
 
 // GET /api/templates
@@ -43,11 +74,16 @@ export async function GET() {
   try {
     const templates = await prisma.template.findMany({
       include: {
+        Sector: { select: { id: true, name: true } },
         tasks: {
           orderBy: { order_index: "asc" },
           include: {
             subtasks: {
               orderBy: { order_index: "asc" },
+              include: {
+                Sector: { select: { id: true, name: true } },
+                responsible: { select: { id: true, name: true } },
+              },
             },
           },
         },
@@ -58,17 +94,22 @@ export async function GET() {
     const result = templates.map((tpl) => ({
       id: tpl.id,
       name: tpl.name,
-      sector: { name: tpl.sector },
+      sector: tpl.Sector ? { name: tpl.Sector.name, id: tpl.Sector.id } : null,
       created_by: tpl.created_by_id,
       created_at: tpl.created_at,
       tasks: tpl.tasks.map((t) => ({
         id: t.id,
         title: t.title,
-        sector: { name: tpl.sector },
+        sector: tpl.Sector
+          ? { name: tpl.Sector.name, id: tpl.Sector.id }
+          : null,
         order_index: t.order_index,
         subtasks: t.subtasks.map((s) => ({
           title: s.title,
-          sector: { name: tpl.sector },
+          sector: s.Sector ? { name: s.Sector.name, id: s.Sector.id } : null,
+          responsible: s.responsible
+            ? { name: s.responsible.name, id: s.responsible.id }
+            : null,
         })),
       })),
     }));
@@ -93,27 +134,50 @@ export async function POST(req: Request) {
         { status: 400 },
       );
 
-    const finalSector = mapSector(sector || tasks?.[0]?.sector);
+    const sVal = sector || tasks?.[0]?.sector;
+    const sectorId = await resolveSectorId(sVal);
+
+    if (!sectorId) {
+      return NextResponse.json(
+        { error: "Setor inválido ou não encontrado." },
+        { status: 400 },
+      );
+    }
+
+    // Resolve all data before creation
+    const resolvedTasks = [];
+    if (tasks) {
+      for (let i = 0; i < tasks.length; i++) {
+        const t = tasks[i];
+        const subtasks = [];
+        if (t.subtasks) {
+          const filtered = t.subtasks.filter((s: any) =>
+            subtaskTitle(s).trim(),
+          );
+          for (let j = 0; j < filtered.length; j++) {
+            const s = filtered[j];
+            subtasks.push({
+              title: subtaskTitle(s),
+              order_index: j,
+              sector_id: await resolveSectorId(subtaskSector(s)),
+              responsible_id: await resolveResponsibleId(subtaskResponsible(s)),
+            });
+          }
+        }
+        resolvedTasks.push({
+          title: t.title,
+          order_index: i,
+          subtasks: { create: subtasks },
+        });
+      }
+    }
 
     const template = await prisma.template.create({
       data: {
         name,
-        sector: finalSector,
+        sector_id: sectorId,
         created_by_id: created_by ? Number(created_by) : null,
-        tasks: {
-          create: tasks?.map((t: any, i: number) => ({
-            title: t.title,
-            order_index: i,
-            subtasks: {
-              create: t.subtasks
-                ?.filter((s: any) => subtaskTitle(s).trim())
-                .map((s: any, j: number) => ({
-                  title: subtaskTitle(s),
-                  order_index: j,
-                })),
-            },
-          })),
-        },
+        tasks: { create: resolvedTasks },
       },
     });
 
@@ -140,34 +204,46 @@ export async function PATCH(req: Request) {
         { status: 400 },
       );
 
-    const finalSector = mapSector(sector || tasks?.[0]?.sector);
+    const sVal = sector || tasks?.[0]?.sector;
+    const sectorId = await resolveSectorId(sVal);
 
     const template = await prisma.$transaction(async (tx) => {
+      const updateData: any = { name };
+      if (sectorId) updateData.sector_id = sectorId;
+
       const updated = await tx.template.update({
         where: { id: Number(id) },
-        data: {
-          name,
-          sector: finalSector,
-        },
+        data: updateData,
       });
-
-      await tx.templateTask.deleteMany({ where: { template_id: Number(id) } });
 
       if (tasks && tasks.length > 0) {
         for (let i = 0; i < tasks.length; i++) {
           const t = tasks[i];
+          const resolvedSubtasks = [];
+          if (t.subtasks) {
+            const filtered = t.subtasks.filter((s: any) =>
+              subtaskTitle(s).trim(),
+            );
+            for (let j = 0; j < filtered.length; j++) {
+              const s = filtered[j];
+              resolvedSubtasks.push({
+                title: subtaskTitle(s),
+                order_index: j,
+                sector_id: await resolveSectorId(subtaskSector(s)),
+                responsible_id: await resolveResponsibleId(
+                  subtaskResponsible(s),
+                ),
+              });
+            }
+          }
+
           await tx.templateTask.create({
             data: {
               template_id: updated.id,
               title: t.title,
               order_index: i,
               subtasks: {
-                create: t.subtasks
-                  ?.filter((s: any) => subtaskTitle(s).trim())
-                  .map((s: any, j: number) => ({
-                    title: subtaskTitle(s),
-                    order_index: j,
-                  })),
+                create: resolvedSubtasks,
               },
             },
           });

@@ -1,18 +1,50 @@
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
-async function resolveSectorId(
-  s: string | number | null | undefined,
-): Promise<number | null> {
+async function resolveSectorId(s: any): Promise<number | null> {
   if (!s) return null;
-  if (typeof s === "number") return s;
-  if (!isNaN(Number(s))) return Number(s);
 
-  // Try to find by name
-  const sector = await prisma.sector.findUnique({
-    where: { name: String(s) },
+  // If it's already an ID
+  if (typeof s === "number") return s;
+  if (typeof s === "string" && !isNaN(Number(s)) && s.trim() !== "")
+    return Number(s);
+
+  // If it's an object { id, name }
+  if (typeof s === "object") {
+    if (s.id && !isNaN(Number(s.id))) return Number(s.id);
+    if (s.name) s = s.name;
+  }
+
+  // Try to find by name (case-insensitive and trimmed)
+  const sector = await prisma.sector.findFirst({
+    where: {
+      name: { equals: String(s).trim(), mode: "insensitive" },
+    },
   });
   return sector?.id || null;
+}
+
+async function resolveResponsibleId(r: any): Promise<number | null> {
+  if (!r) return null;
+
+  // If already an ID
+  if (typeof r === "number") return r;
+  if (typeof r === "string" && !isNaN(Number(r)) && r.trim() !== "")
+    return Number(r);
+
+  // If it's an object { id, name }
+  if (typeof r === "object") {
+    if (r.id && !isNaN(Number(r.id))) return Number(r.id);
+    if (r.name) r = r.name;
+  }
+
+  // Find by name (case-insensitive and trimmed)
+  const u = await prisma.user.findFirst({
+    where: {
+      name: { equals: String(r).trim(), mode: "insensitive" },
+    },
+  });
+  return u?.id || null;
 }
 
 async function notifyUser(
@@ -222,15 +254,9 @@ export async function POST(req: Request) {
       if (c) cityId = c.id;
     }
 
-    let resolvedResponsibleId: number | null = null;
-    if (responsible_id && !isNaN(Number(responsible_id))) {
-      resolvedResponsibleId = Number(responsible_id);
-    } else if (body.responsible) {
-      const u = await prisma.user.findFirst({
-        where: { name: body.responsible },
-      });
-      if (u) resolvedResponsibleId = u.id;
-    }
+    const resolvedResponsibleId = await resolveResponsibleId(
+      responsible_id || body.responsible,
+    );
 
     const resolvedSectorId = await resolveSectorId(sector_id || sector);
 
@@ -278,6 +304,10 @@ export async function POST(req: Request) {
                 ? await resolveSectorId(st.sector_id || st.sector)
                 : resolvedSectorId;
 
+            const sRid = await resolveResponsibleId(
+              st.responsible_id || st.responsible,
+            );
+
             return {
               title: st.title,
               status: st.status || "A Fazer",
@@ -291,10 +321,7 @@ export async function POST(req: Request) {
               nucleus: nucleus,
               quadra: quadra || "",
               lote: lote || "",
-              responsible_id:
-                st.responsible_id && !isNaN(Number(st.responsible_id))
-                  ? Number(st.responsible_id)
-                  : null,
+              responsible_id: sRid,
             };
           }),
         ),
