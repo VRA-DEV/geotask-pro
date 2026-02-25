@@ -14,6 +14,10 @@ export async function POST(req: Request) {
 
     const user = await prisma.user.findUnique({
       where: { email },
+      include: {
+        Role: true,
+        Sector: true,
+      },
     });
 
     if (!user) {
@@ -34,13 +38,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Senha incorreta" }, { status: 401 });
     }
 
-    const { password_hash, ...userWithoutPassword } = user;
-
-    // Transform enum strings to objects for monolithic frontend compatibility
+    // Return user without password and with formatted role/sector
     return NextResponse.json({
-      ...userWithoutPassword,
-      role: { name: user.role },
-      sector: { name: user.sector },
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role_id: user.role_id,
+      sector_id: user.sector_id,
+      avatar: user.avatar,
+      active: user.active,
+      must_change_password: user.must_change_password,
+      created_at: user.created_at,
+      role: { name: user.Role.name },
+      sector: { name: user.Sector.name },
     });
   } catch (error) {
     console.error("Login error:", error);
