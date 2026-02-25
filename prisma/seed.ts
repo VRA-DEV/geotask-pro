@@ -418,7 +418,12 @@ async function main() {
   const adminEmail = "admin@admin.com";
   const admin = await prisma.user.upsert({
     where: { email: adminEmail },
-    update: {},
+    update: {
+      Role: { connect: { id: adminRole.id } },
+      Sector: { connect: { id: tiSector!.id } },
+      active: true,
+      must_change_password: false,
+    },
     create: {
       email: adminEmail,
       name: "Vinicios Reis de Araújo",

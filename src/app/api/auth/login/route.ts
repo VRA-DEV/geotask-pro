@@ -49,8 +49,8 @@ export async function POST(req: Request) {
       active: user.active,
       must_change_password: user.must_change_password,
       created_at: user.created_at,
-      role: { name: user.Role.name },
-      sector: { name: user.Sector.name },
+      role: user.Role ? { name: user.Role.name } : { name: "Sem Cargo" },
+      sector: user.Sector ? { name: user.Sector.name } : { name: "Sem Setor" },
     });
   } catch (error) {
     console.error("Login error:", error);
