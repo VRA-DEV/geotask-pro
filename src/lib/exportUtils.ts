@@ -293,12 +293,10 @@ const drawKpiCard = (
   doc.setFillColor(...C.light);
   doc.setDrawColor(...C.border);
   doc.setLineWidth(0.3);
-  // @ts-expect-error: jspdf types or missing property in custom build
   doc.roundedRect(x, y, w, h, 2, 2, "FD");
 
   // Accent left bar
   doc.setFillColor(...accent);
-  // @ts-expect-error: jspdf types or missing property in custom build
   doc.roundedRect(x, y, 2, h, 1, 1, "F");
 
   // Value

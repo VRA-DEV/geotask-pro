@@ -8194,7 +8194,11 @@ function TemplateModal({
       sector:
         tasks[0]?.sector?.name ||
         tasks[0]?.sector ||
-        (typeof sectors[0] === "object" ? sectors[0].name : sectors[0]),
+        (sectors && sectors.length > 0
+          ? typeof (sectors[0] as any) === "object"
+            ? (sectors[0] as any).name
+            : sectors[0]
+          : ""),
       tasks: tasks.filter((t) => t.title.trim()),
     });
   };
