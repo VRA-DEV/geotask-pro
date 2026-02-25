@@ -12,8 +12,8 @@ export const metadata: Metadata = {
   title: "GeoTask - Geogis",
   description: "Gerenciamento de Tarefas e Projetos",
   icons: {
-    icon: "/logoicone.png",
-    apple: "/logoicone.png",
+    icon: [{ url: "/icon.ico", sizes: "46x46", type: "image/x-icon" }],
+    apple: "/icon.ico?v=3",
   },
 };
 
