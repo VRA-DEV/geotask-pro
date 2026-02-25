@@ -11,7 +11,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "GeoTask - Geogis",
   description: "Gerenciamento de Tarefas e Projetos",
-  icons: { icon: "/logoicone.png" },
+  icons: {
+    icon: "/logoicone.png",
+    apple: "/logoicone.png",
+  },
 };
 
 export default function RootLayout({
