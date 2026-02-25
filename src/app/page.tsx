@@ -3628,30 +3628,6 @@ export default function GeoTask() {
           >
             <AlignLeft size={16} color={T.sub} />
           </button>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              background: T.inp,
-              borderRadius: 10,
-              padding: "6px 12px",
-              flex: "0 0 220px",
-            }}
-          >
-            <Search size={13} color={T.sub} />
-            <input
-              placeholder="Buscar tarefas..."
-              style={{
-                background: "none",
-                border: "none",
-                outline: "none",
-                fontSize: 13,
-                color: T.text,
-                width: "100%",
-              }}
-            />
-          </div>
           <div style={{ flex: 1 }} />
           <button
             onClick={() => setDark(!dark)}
