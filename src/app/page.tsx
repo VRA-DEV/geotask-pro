@@ -50,6 +50,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import AIReportModal from "../components/AIReportModal";
 import { exportToExcel, exportToPDF, getKpiData } from "../lib/exportUtils";
 import { ChangePasswordModal } from "./components/ChangePasswordModal";
 import { DatePicker } from "./components/DatePicker";
@@ -4522,6 +4523,7 @@ function DashboardPage({
                 .join(" | ") || "Nenhum"
             }
           />
+          <AIReportModal T={T} />
           <span
             style={{
               fontSize: 12,
