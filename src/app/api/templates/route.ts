@@ -145,11 +145,27 @@ export async function POST(req: Request) {
     }
 
     // Resolve all data before creation
-    const resolvedTasks = [];
+    const resolvedTasks: {
+      title: string;
+      order_index: number;
+      subtasks: {
+        create: {
+          title: string;
+          order_index: number;
+          sector_id: number | null;
+          responsible_id: number | null;
+        }[];
+      };
+    }[] = [];
     if (tasks) {
       for (let i = 0; i < tasks.length; i++) {
         const t = tasks[i];
-        const subtasks = [];
+        const subtasks: {
+          title: string;
+          order_index: number;
+          sector_id: number | null;
+          responsible_id: number | null;
+        }[] = [];
         if (t.subtasks) {
           const filtered = t.subtasks.filter((s: any) =>
             subtaskTitle(s).trim(),
@@ -219,7 +235,12 @@ export async function PATCH(req: Request) {
       if (tasks && tasks.length > 0) {
         for (let i = 0; i < tasks.length; i++) {
           const t = tasks[i];
-          const resolvedSubtasks = [];
+          const resolvedSubtasks: {
+            title: string;
+            order_index: number;
+            sector_id: number | null;
+            responsible_id: number | null;
+          }[] = [];
           if (t.subtasks) {
             const filtered = t.subtasks.filter((s: any) =>
               subtaskTitle(s).trim(),
