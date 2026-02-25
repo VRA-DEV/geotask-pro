@@ -55,10 +55,10 @@ import { ChangePasswordModal } from "./components/ChangePasswordModal";
 import { DatePicker } from "./components/DatePicker";
 import { SettingsPage } from "./components/SettingsPage";
 
-const ExportButtons = ({ T, filtered, kpi, users }: any) => (
+const ExportButtons = ({ T, filtered, kpi, users, user, filterLabel }: any) => (
   <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
     <button
-      onClick={() => exportToExcel(filtered)}
+      onClick={() => exportToExcel(filtered, kpi, user, filterLabel)}
       style={{
         background: "#10b981",
         color: "white",
@@ -79,7 +79,7 @@ const ExportButtons = ({ T, filtered, kpi, users }: any) => (
       <FileText size={13} /> EXCEL
     </button>
     <button
-      onClick={() => exportToPDF(filtered, kpi, users)}
+      onClick={() => exportToPDF(filtered, kpi, users, user, filterLabel)}
       style={{
         background: "#ef4444",
         color: "white",
@@ -3363,10 +3363,9 @@ export default function GeoTask() {
 
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { id: "kanban", label: "Kanban", icon: Layers },
-    { id: "map", label: "Mapa", icon: Map },
+    { id: "kanban", label: "Quadro de Tarefas", icon: Layers },
     { id: "cronograma", label: "Cronograma", icon: Calendar },
-    { id: "mindmap", label: "Mapa Mental", icon: FileText },
+    { id: "mindmap", label: "Mapa de Tarefas", icon: FileText },
     { id: "notifications", label: "Notificações", icon: Bell },
     ...(canAccess("templates")
       ? [{ id: "templates", label: "Templates", icon: FileText }]
@@ -4297,18 +4296,29 @@ function DashboardPage({
     return true;
   });
 
-  const activeFilters = [
+  const totalActiveFilters = [
     fContract,
     fCity,
     fNeighbor,
     fStatus,
     fType,
     fPriority,
-    fSector,
+    fSector.length > 0,
     fUser,
     fDateFrom?.from || fDateFrom?.to,
     fDateTo?.from || fDateTo?.to,
   ].filter(Boolean).length;
+
+  const activeAdvancedFilters = [
+    fContract,
+    fCity,
+    fNeighbor,
+    fType,
+    fUser,
+    fDateFrom?.from || fDateFrom?.to,
+    fDateTo?.from || fDateTo?.to,
+  ].filter(Boolean).length;
+
   const clearAll = () => {
     setFSearch("");
     setFContract("");
@@ -4486,7 +4496,29 @@ function DashboardPage({
           </p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <ExportButtons T={T} filtered={filtered} kpi={kpi} users={users} />
+          <ExportButtons
+            T={T}
+            filtered={filtered}
+            kpi={kpi}
+            users={users}
+            user={user}
+            filterLabel={
+              [
+                fContract && `Contrato: ${fContract}`,
+                fCity && `Cidade: ${fCity}`,
+                fNeighbor && `Bairro: ${fNeighbor}`,
+                fStatus && `Status: ${fStatus}`,
+                fType && `Tipo: ${fType}`,
+                fPriority && `Prioridade: ${fPriority}`,
+                fSector.length > 0 && `Setores: ${fSector.join(", ")}`,
+                fUser && `Responsável: ${fUser}`,
+                (fDateFrom?.from || fDateFrom?.to) && "Filtro de Prazo",
+                (fDateTo?.from || fDateTo?.to) && "Filtro de Criação",
+              ]
+                .filter(Boolean)
+                .join(" | ") || "Nenhum"
+            }
+          />
           <span
             style={{
               fontSize: 12,
@@ -4581,17 +4613,19 @@ function DashboardPage({
               gap: 5,
               padding: "6px 12px",
               background:
-                filtersOpen || activeFilters ? "#98af3b11" : "transparent",
-              border: `1px solid ${filtersOpen || activeFilters ? "#98af3b" : T.border}`,
+                filtersOpen || activeAdvancedFilters
+                  ? "#98af3b11"
+                  : "transparent",
+              border: `1px solid ${filtersOpen || activeAdvancedFilters ? "#98af3b" : T.border}`,
               borderRadius: 8,
               fontSize: 12,
               fontWeight: 600,
-              color: filtersOpen || activeFilters ? "#98af3b" : T.sub,
+              color: filtersOpen || activeAdvancedFilters ? "#98af3b" : T.sub,
               cursor: "pointer",
             }}
           >
             <Filter size={12} /> Mais filtros
-            {activeFilters > 0 && (
+            {activeAdvancedFilters > 0 && (
               <span
                 style={{
                   background: "#98af3b",
@@ -4605,11 +4639,11 @@ function DashboardPage({
                   justifyContent: "center",
                 }}
               >
-                {activeFilters}
+                {activeAdvancedFilters}
               </span>
             )}
           </button>
-          {(fSearch || activeFilters > 0) && (
+          {(fSearch || totalActiveFilters > 0) && (
             <button
               onClick={clearAll}
               style={{
@@ -4697,7 +4731,7 @@ function DashboardPage({
               <DateRangePicker
                 date={fDateFrom}
                 setDate={setFDateFrom}
-                label="Período — De" // Or "Prazo de Entrega" to be consistent? user asked for specific fields. Logic uses fDateFrom for Deadline.
+                label="Prazo de Entrega" // Or "Prazo de Entrega" to be consistent? user asked for specific fields. Logic uses fDateFrom for Deadline.
                 T={T}
               />
             </div>
@@ -4705,7 +4739,7 @@ function DashboardPage({
               <DateRangePicker
                 date={fDateTo}
                 setDate={setFDateTo}
-                label="Período — Até" // Or "Data de Criação"? Logic uses fDateTo for Creation.
+                label="Data de Criação" // Or "Data de Criação"? Logic uses fDateTo for Creation.
                 T={T}
               />
             </div>
@@ -5635,13 +5669,21 @@ function KanbanPage({
     return true;
   });
 
-  const activeFilters = [
+  const totalActiveFilters = [
     fSector.length > 0,
     fContract,
     fCity,
     fNeighbor,
     fPriority,
     fType,
+    fDateFrom?.from || fDateFrom?.to,
+    fDateTo?.from || fDateTo?.to,
+  ].filter(Boolean).length;
+
+  const activeAdvancedFilters = [
+    fPriority,
+    fType,
+    fNeighbor,
     fDateFrom?.from || fDateFrom?.to,
     fDateTo?.from || fDateTo?.to,
   ].filter(Boolean).length;
@@ -5675,7 +5717,7 @@ function KanbanPage({
           <h1
             style={{ margin: 0, fontSize: 22, fontWeight: 700, color: T.text }}
           >
-            Quadro Kanban
+            Quadro de Tarefas
           </h1>
           <p style={{ margin: "4px 0 0", fontSize: 13, color: T.sub }}>
             {filtered.length} de {tasks.length} tarefas
@@ -5794,17 +5836,19 @@ function KanbanPage({
               gap: 5,
               padding: "6px 12px",
               background:
-                filtersOpen || activeFilters ? "#98af3b11" : "transparent",
-              border: `1px solid ${filtersOpen || activeFilters ? "#98af3b" : T.border}`,
+                filtersOpen || activeAdvancedFilters
+                  ? "#98af3b11"
+                  : "transparent",
+              border: `1px solid ${filtersOpen || activeAdvancedFilters ? "#98af3b" : T.border}`,
               borderRadius: 8,
               fontSize: 12,
               fontWeight: 600,
-              color: filtersOpen || activeFilters ? "#98af3b" : T.sub,
+              color: filtersOpen || activeAdvancedFilters ? "#98af3b" : T.sub,
               cursor: "pointer",
             }}
           >
             <Filter size={12} /> Mais filtros{" "}
-            {activeFilters > 0 && (
+            {activeAdvancedFilters > 0 && (
               <span
                 style={{
                   background: "#98af3b",
@@ -5818,11 +5862,11 @@ function KanbanPage({
                   justifyContent: "center",
                 }}
               >
-                {activeFilters}
+                {activeAdvancedFilters}
               </span>
             )}
           </button>
-          {(search || activeFilters > 0) && (
+          {(search || totalActiveFilters > 0) && (
             <button
               onClick={clearAll}
               style={{
@@ -6486,7 +6530,7 @@ function MindMapPage({ T, tasks = [], users = [] }: any) {
           <h1
             style={{ margin: 0, fontSize: 22, fontWeight: 700, color: T.text }}
           >
-            Mapa Mental
+            Mapa de Tarefas
           </h1>
           <p style={{ margin: "4px 0 0", fontSize: 13, color: T.sub }}>
             Clique nos nós para expandir a hierarquia
@@ -7273,7 +7317,7 @@ function CronogramaPage({
     return true;
   });
 
-  const activeFilters = [
+  const totalActiveFilters = [
     fSector.length > 0,
     fContract,
     fCity,
@@ -7283,6 +7327,9 @@ function CronogramaPage({
     fDateFrom?.from || fDateFrom?.to,
     fDateTo?.from || fDateTo?.to,
   ].filter(Boolean).length;
+
+  // In CronogramaPage, all filters except search are in the drawer
+  const activeAdvancedFilters = totalActiveFilters;
 
   const clearAll = () => {
     setSearch("");
@@ -7383,7 +7430,7 @@ function CronogramaPage({
           >
             <Filter size={14} />
             Filtros
-            {activeFilters > 0 && (
+            {activeAdvancedFilters > 0 && (
               <span
                 style={{
                   background: filtersOpen ? "white" : "#98af3b",
@@ -7394,7 +7441,7 @@ function CronogramaPage({
                   marginLeft: 2,
                 }}
               >
-                {activeFilters}
+                {activeAdvancedFilters}
               </span>
             )}
             {filtersOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
