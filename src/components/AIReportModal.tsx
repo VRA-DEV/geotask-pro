@@ -7,6 +7,7 @@ import {
   Check,
   ChevronUp,
   Copy,
+  FileDown,
   FileText,
   Loader2,
   MessageSquare,
@@ -349,6 +350,8 @@ export default function AIReportModal({ T }: AIReportModalProps) {
   const [stats, setStats] = useState<Stats | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [generatedAt, setGeneratedAt] = useState<Date | null>(null);
 
   // Configurações
   const [selectedAnalyses, setSelectedAnalyses] = useState<string[]>([
@@ -391,6 +394,7 @@ export default function AIReportModal({ T }: AIReportModalProps) {
       if (data.report) {
         setReport(data.report);
         setStats(data.stats ?? null);
+        setGeneratedAt(new Date());
       } else {
         setError(data.error || "Erro ao gerar análise.");
       }
@@ -399,6 +403,453 @@ export default function AIReportModal({ T }: AIReportModalProps) {
       setError("Erro na conexão com a API.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ─── Exportar PDF ────────────────────────────────────────────────────────────
+  const exportToPDF = async () => {
+    if (!report || !stats) return;
+    setExportingPdf(true);
+    try {
+      const { jsPDF } = await import("jspdf");
+
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+      const margin = 18;
+      const contentW = pageW - margin * 2;
+      let y = 0;
+
+      // ── Função utilitária: nova página se necessário ─────────────────────
+      const checkPage = (needed: number) => {
+        if (y + needed > pageH - 20) {
+          doc.addPage();
+          y = 20;
+        }
+      };
+
+      // ── 1. CAPA ──────────────────────────────────────────────────────────
+      // Fundo gradiente simulado com retângulos
+      doc.setFillColor(30, 27, 75);
+      doc.rect(0, 0, pageW, 60, "F");
+      doc.setFillColor(49, 46, 129);
+      doc.rect(0, 45, pageW, 15, "F");
+
+      // Título
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(26);
+      doc.setTextColor(255, 255, 255);
+      doc.text("GeoTask IA", margin, 26);
+
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(165, 180, 252);
+      doc.text("Análise Inteligente de Tarefas", margin, 34);
+
+      // Linha decorativa
+      doc.setDrawColor(99, 102, 241);
+      doc.setLineWidth(0.8);
+      doc.line(margin, 40, pageW - margin, 40);
+
+      // Metadados na capa
+      const now = generatedAt || new Date();
+      const dateStr = now.toLocaleDateString("pt-BR", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      });
+      const timeStr = now.toLocaleTimeString("pt-BR", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+
+      doc.setFontSize(9);
+      doc.setTextColor(199, 210, 254);
+      doc.text(`Gerado em: ${dateStr} às ${timeStr}`, margin, 50);
+
+      const analysisLabels = selectedAnalyses
+        .map((a) => ANALYSIS_OPTIONS.find((o) => o.id === a)?.label || a)
+        .join(", ");
+      doc.text(`Período: últimos ${periodDays} dias`, margin, 55);
+
+      y = 68;
+
+      // Filtros aplicados
+      if (analysisLabels) {
+        doc.setFillColor(243, 244, 246);
+        doc.roundedRect(margin, y, contentW, 14, 3, 3, "F");
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8);
+        doc.setTextColor(79, 70, 229);
+        doc.text("ANÁLISES INCLUÍDAS:", margin + 4, y + 5.5);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(55, 65, 81);
+        const wrappedLabel = doc.splitTextToSize(analysisLabels, contentW - 50);
+        doc.text(wrappedLabel[0], margin + 42, y + 5.5);
+        y += 18;
+      }
+
+      if (customMessage.trim()) {
+        doc.setFillColor(254, 249, 195);
+        doc.roundedRect(margin, y, contentW, 14, 3, 3, "F");
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8);
+        doc.setTextColor(146, 64, 14);
+        doc.text("SOLICITAÇÃO ESPECIAL:", margin + 4, y + 5.5);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(55, 65, 81);
+        const wrapped = doc.splitTextToSize(
+          customMessage.trim(),
+          contentW - 52,
+        );
+        doc.text(wrapped[0], margin + 50, y + 5.5);
+        y += 18;
+      }
+
+      y += 4;
+
+      // ── 2. KPI CARDS ──────────────────────────────────────────────────────
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(30, 27, 75);
+      doc.text("📊 Indicadores do Período", margin, y);
+      y += 6;
+
+      const kpis = [
+        { label: "Total", value: stats.total, r: 59, g: 130, b: 246 },
+        { label: "Criadas", value: stats.created, r: 6, g: 182, b: 212 },
+        { label: "Concluídas", value: stats.completed, r: 34, g: 197, b: 94 },
+        { label: "Pendentes", value: stats.pending, r: 234, g: 179, b: 8 },
+        { label: "Atrasadas", value: stats.overdue, r: 239, g: 68, b: 68 },
+      ];
+
+      const cardW = (contentW - 4 * 3) / 5;
+      kpis.forEach((kpi, i) => {
+        const cx = margin + i * (cardW + 3);
+        // Card bg (light tint)
+        doc.setFillColor(kpi.r, kpi.g, kpi.b);
+        doc.roundedRect(cx, y, cardW, 22, 3, 3, "F");
+        // Valor
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(18);
+        doc.setTextColor(255, 255, 255);
+        doc.text(String(kpi.value), cx + cardW / 2, y + 12, {
+          align: "center",
+        });
+        // Label
+        doc.setFontSize(7);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(255, 255, 255);
+        doc.text(kpi.label, cx + cardW / 2, y + 19, { align: "center" });
+      });
+      y += 28;
+
+      // ── 3. GRÁFICOS VIA CANVAS ────────────────────────────────────────────
+      const drawCharts = async (): Promise<string[]> => {
+        const images: string[] = [];
+
+        // Gráfico de Barras — Por Status
+        const statusEntries = Object.entries(stats.byStatus).sort(
+          (a, b) => b[1] - a[1],
+        );
+        if (statusEntries.length > 0) {
+          const canvas = document.createElement("canvas");
+          canvas.width = 520;
+          canvas.height = 220;
+          const ctx = canvas.getContext("2d")!;
+          ctx.fillStyle = "#f8fafc";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+          const BAR_COLORS = [
+            "#6366f1",
+            "#10b981",
+            "#f59e0b",
+            "#ef4444",
+            "#ec4899",
+            "#8b5cf6",
+            "#06b6d4",
+          ];
+          const bMargin = { top: 30, right: 20, bottom: 50, left: 50 };
+          const bW = canvas.width - bMargin.left - bMargin.right;
+          const bH = canvas.height - bMargin.top - bMargin.bottom;
+          const maxVal = Math.max(...statusEntries.map((e) => e[1]));
+          const barW = Math.min(60, bW / statusEntries.length - 12);
+
+          // Título
+          ctx.fillStyle = "#1e1b4b";
+          ctx.font = "bold 14px Arial";
+          ctx.fillText("Tarefas por Status", bMargin.left, 20);
+
+          // Eixo Y (grid lines)
+          ctx.strokeStyle = "#e2e8f0";
+          ctx.lineWidth = 1;
+          for (let i = 0; i <= 4; i++) {
+            const gy = bMargin.top + (bH / 4) * i;
+            ctx.beginPath();
+            ctx.moveTo(bMargin.left, gy);
+            ctx.lineTo(bMargin.left + bW, gy);
+            ctx.stroke();
+            const val = Math.round(maxVal * (1 - i / 4));
+            ctx.fillStyle = "#94a3b8";
+            ctx.font = "10px Arial";
+            ctx.textAlign = "right";
+            ctx.fillText(String(val), bMargin.left - 4, gy + 3);
+          }
+
+          // Barras
+          const spacing = bW / statusEntries.length;
+          statusEntries.forEach(([label, val], idx) => {
+            const barH = maxVal > 0 ? (val / maxVal) * bH : 0;
+            const bx = bMargin.left + idx * spacing + (spacing - barW) / 2;
+            const by = bMargin.top + bH - barH;
+            ctx.fillStyle = BAR_COLORS[idx % BAR_COLORS.length];
+            const radius = 4;
+            ctx.beginPath();
+            ctx.moveTo(bx + radius, by);
+            ctx.lineTo(bx + barW - radius, by);
+            ctx.quadraticCurveTo(bx + barW, by, bx + barW, by + radius);
+            ctx.lineTo(bx + barW, by + barH);
+            ctx.lineTo(bx, by + barH);
+            ctx.lineTo(bx, by + radius);
+            ctx.quadraticCurveTo(bx, by, bx + radius, by);
+            ctx.closePath();
+            ctx.fill();
+            // Valor no topo
+            ctx.fillStyle = "#1e1b4b";
+            ctx.font = "bold 11px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText(String(val), bx + barW / 2, by - 4);
+            // Label embaixo (rotacionado)
+            ctx.save();
+            ctx.translate(bx + barW / 2, bMargin.top + bH + 8);
+            ctx.rotate(-Math.PI / 6);
+            ctx.fillStyle = "#475569";
+            ctx.font = "10px Arial";
+            ctx.textAlign = "right";
+            ctx.fillText(
+              label.length > 12 ? label.slice(0, 12) + "…" : label,
+              0,
+              0,
+            );
+            ctx.restore();
+          });
+
+          images.push(canvas.toDataURL("image/png"));
+        }
+
+        // Gráfico de Pizza — Por Setor
+        const sectorEntries = Object.entries(stats.bySector)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 6);
+        if (sectorEntries.length > 0) {
+          const canvas2 = document.createElement("canvas");
+          canvas2.width = 520;
+          canvas2.height = 220;
+          const ctx2 = canvas2.getContext("2d")!;
+          ctx2.fillStyle = "#f8fafc";
+          ctx2.fillRect(0, 0, canvas2.width, canvas2.height);
+
+          const PIE_COLORS = [
+            "#6366f1",
+            "#10b981",
+            "#f59e0b",
+            "#ef4444",
+            "#ec4899",
+            "#8b5cf6",
+          ];
+          const total = sectorEntries.reduce((s, [, v]) => s + v, 0);
+          const cx2 = 110,
+            cy2 = 120,
+            radius2 = 85;
+
+          ctx2.fillStyle = "#1e1b4b";
+          ctx2.font = "bold 14px Arial";
+          ctx2.fillText("Tarefas por Setor", 10, 20);
+
+          let startAngle = -Math.PI / 2;
+          sectorEntries.forEach(([, val], i) => {
+            const slice = (val / total) * Math.PI * 2;
+            ctx2.beginPath();
+            ctx2.moveTo(cx2, cy2);
+            ctx2.arc(cx2, cy2, radius2, startAngle, startAngle + slice);
+            ctx2.closePath();
+            ctx2.fillStyle = PIE_COLORS[i % PIE_COLORS.length];
+            ctx2.fill();
+            ctx2.strokeStyle = "#fff";
+            ctx2.lineWidth = 2;
+            ctx2.stroke();
+            startAngle += slice;
+          });
+
+          // Legenda
+          let ly = 35;
+          sectorEntries.forEach(([label, val], i) => {
+            const pct = Math.round((val / total) * 100);
+            ctx2.fillStyle = PIE_COLORS[i % PIE_COLORS.length];
+            ctx2.fillRect(230, ly - 9, 12, 12);
+            ctx2.fillStyle = "#1e293b";
+            ctx2.font = "11px Arial";
+            const short = label.length > 18 ? label.slice(0, 18) + "…" : label;
+            ctx2.fillText(`${short} — ${val} (${pct}%)`, 248, ly);
+            ly += 20;
+          });
+
+          images.push(canvas2.toDataURL("image/png"));
+        }
+
+        return images;
+      };
+
+      const chartImages = await drawCharts();
+
+      // Adicionar gráficos ao PDF (lado a lado se couber)
+      if (chartImages.length > 0) {
+        checkPage(75);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(11);
+        doc.setTextColor(30, 27, 75);
+        doc.text("📈 Gráficos", margin, y);
+        y += 5;
+
+        const chartH = 55;
+        const chartW = chartImages.length === 2 ? (contentW - 4) / 2 : contentW;
+        chartImages.forEach((img, i) => {
+          const cx = margin + i * (chartW + 4);
+          doc.setFillColor(248, 250, 252);
+          doc.roundedRect(cx, y, chartW, chartH, 2, 2, "F");
+          doc.addImage(img, "PNG", cx + 1, y + 1, chartW - 2, chartH - 2);
+        });
+        y += chartH + 8;
+      }
+
+      // ── 4. RELATÓRIO DA IA ────────────────────────────────────────────────
+      checkPage(20);
+      doc.setFillColor(30, 27, 75);
+      doc.rect(margin, y, contentW, 8, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(255, 255, 255);
+      doc.text("✨  Análise da GeoTask IA", margin + 4, y + 5.5);
+      y += 12;
+
+      // Renderizar o markdown como texto formatado
+      const lines = report.split("\n");
+      for (const line of lines) {
+        if (line.trim() === "" || line.startsWith("---")) {
+          y += 2;
+          continue;
+        }
+
+        if (line.startsWith("# ")) {
+          checkPage(12);
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(13);
+          doc.setTextColor(30, 27, 75);
+          const txt = line.replace(/^#+\s/, "").replace(/\*\*|\*|`/g, "");
+          const wrapped = doc.splitTextToSize(txt, contentW);
+          doc.text(wrapped, margin, y);
+          y += wrapped.length * 6 + 3;
+        } else if (line.startsWith("## ")) {
+          checkPage(11);
+          doc.setFillColor(237, 233, 254);
+          doc.roundedRect(margin, y - 4, contentW, 9, 2, 2, "F");
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(10);
+          doc.setTextColor(79, 70, 229);
+          const txt = line.replace(/^#+\s/, "").replace(/\*\*|\*|`/g, "");
+          const wrapped = doc.splitTextToSize(txt, contentW - 4);
+          doc.text(wrapped, margin + 3, y + 1);
+          y += wrapped.length * 5.5 + 4;
+        } else if (line.startsWith("### ")) {
+          checkPage(9);
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(9);
+          doc.setTextColor(30, 27, 75);
+          const txt = line.replace(/^#+\s/, "").replace(/\*\*|\*|`/g, "");
+          const wrapped = doc.splitTextToSize(txt, contentW);
+          doc.text(wrapped, margin, y);
+          y += wrapped.length * 5 + 2;
+        } else if (line.match(/^[-*] /) || line.match(/^\d+\. /)) {
+          checkPage(6);
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(9);
+          doc.setTextColor(30, 41, 59);
+          const txt = line
+            .replace(/^[-*]\s/, "• ")
+            .replace(/^\d+\.\s/, (m) => m)
+            .replace(/\*\*(.*?)\*\*/g, "$1")
+            .replace(/\*|`/g, "");
+          const wrapped = doc.splitTextToSize(txt, contentW - 6);
+          doc.text(wrapped, margin + 4, y);
+          y += wrapped.length * 4.8 + 1;
+        } else if (line.startsWith("|")) {
+          // Tabela — usar autoTable na próxima iteração (acumula linhas)
+          // Simplificado: renderizar como texto
+          const cells = line.split("|").filter((c) => c.trim());
+          if (cells.length > 0 && !line.match(/^\|[-| :]+\|$/)) {
+            checkPage(7);
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(8);
+            doc.setTextColor(30, 41, 59);
+            const cellW = contentW / cells.length;
+            cells.forEach((cell, ci) => {
+              const txt = cell.trim().replace(/\*\*|\*/g, "");
+              doc.text(
+                doc.splitTextToSize(txt, cellW - 2)[0],
+                margin + ci * cellW,
+                y,
+              );
+            });
+            y += 5.5;
+          }
+        } else {
+          checkPage(6);
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(9);
+          doc.setTextColor(30, 41, 59);
+          // Bold inline: **text** → negrito simulado
+          const cleanLine = line
+            .replace(/\*\*(.*?)\*\*/g, "$1")
+            .replace(/\*|`/g, "");
+          const wrapped = doc.splitTextToSize(cleanLine, contentW);
+          doc.text(wrapped, margin, y);
+          y += wrapped.length * 4.8 + 1;
+        }
+      }
+
+      // ── 5. RODAPÉ EM TODAS AS PÁGINAS ─────────────────────────────────────
+      const totalPages = (
+        doc as unknown as { internal: { getNumberOfPages: () => number } }
+      ).internal.getNumberOfPages();
+      for (let p = 1; p <= totalPages; p++) {
+        doc.setPage(p);
+        doc.setFillColor(30, 27, 75);
+        doc.rect(0, pageH - 10, pageW, 10, "F");
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7);
+        doc.setTextColor(165, 180, 252);
+        doc.text(
+          `GeoTask IA  •  Gerado em ${dateStr} às ${timeStr}  •  Período: ${periodDays} dias`,
+          margin,
+          pageH - 3.5,
+        );
+        doc.text(`Página ${p}/${totalPages}`, pageW - margin, pageH - 3.5, {
+          align: "right",
+        });
+      }
+
+      // Salvar
+      const filename = `GeoTask_IA_${now.toLocaleDateString("pt-BR").replace(/\//g, "-")}.pdf`;
+      doc.save(filename);
+    } catch (err) {
+      console.error("Erro ao gerar PDF:", err);
+      alert("Erro ao gerar o PDF. Tente novamente.");
+    } finally {
+      setExportingPdf(false);
     }
   };
 
@@ -971,6 +1422,35 @@ export default function AIReportModal({ T }: AIReportModalProps) {
               >
                 <ChevronUp size={13} />
                 Configurar
+              </button>
+              <button
+                id="ai-pdf-btn"
+                onClick={exportToPDF}
+                disabled={exportingPdf}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  background: exportingPdf
+                    ? "rgba(239,68,68,0.05)"
+                    : "rgba(239,68,68,0.1)",
+                  color: "#ef4444",
+                  border: "1px solid rgba(239,68,68,0.3)",
+                  borderRadius: 8,
+                  padding: "7px 14px",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: exportingPdf ? "not-allowed" : "pointer",
+                  opacity: exportingPdf ? 0.6 : 1,
+                  transition: "all 0.2s",
+                }}
+              >
+                {exportingPdf ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : (
+                  <FileDown size={13} />
+                )}
+                {exportingPdf ? "Gerando PDF..." : "Exportar PDF"}
               </button>
               <button
                 id="ai-copy-btn"
