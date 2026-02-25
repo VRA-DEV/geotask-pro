@@ -272,18 +272,47 @@ const CITIES_NEIGHBORHOODS: Record<string, string[]> = {
 async function main() {
   console.log("🌱 Starting seed...");
 
+  console.log("🧹 Cleaning database...");
+  // Delete in reverse order of relationships
+  await prisma.notification.deleteMany();
+  await prisma.taskHistory.deleteMany();
+  await prisma.taskPause.deleteMany();
+  await prisma.mention.deleteMany();
+  await prisma.comment.deleteMany();
+  await prisma.subtask.deleteMany();
+  await prisma.task.deleteMany();
+  await prisma.templateSubtask.deleteMany();
+  await prisma.templateTask.deleteMany();
+  await prisma.template.deleteMany();
+  await prisma.user.deleteMany();
+  await prisma.sector.deleteMany();
+  await prisma.role.deleteMany();
+  await prisma.neighborhood.deleteMany();
+  await prisma.city.deleteMany();
+  await prisma.contract.deleteMany();
+  // Sectors and Roles are upserted later, but we can clean them if we want a total reset
+  // await prisma.sector.deleteMany();
+  // await prisma.role.deleteMany();
+
   // 1. Create Admin User
   // 1. Create Default Roles & Sectors
   const roles = ["Admin", "Gerente", "Gestor", "Coordenador", "Liderado"];
   const sectors = [
-    "TI",
     "Administrativo",
-    "Financeiro",
-    "Operacional",
-    "Comercial",
+    "Atendimento ao Cliente",
+    "Atendimento Social",
+    "Cadastro",
     "Controladoria",
+    "Coordenação",
+    "Engenharia",
+    "Financeiro",
+    "Gerência",
+    "Reurb",
+    "RH",
+    "TI",
   ];
 
+  console.log("🎭 Seeding Roles...");
   for (const r of roles) {
     await prisma.role.upsert({
       where: { name: r },
@@ -292,6 +321,7 @@ async function main() {
     });
   }
 
+  console.log("🏢 Seeding Sectors...");
   for (const s of sectors) {
     await prisma.sector.upsert({
       where: { name: s },
@@ -301,140 +331,36 @@ async function main() {
   }
 
   const adminRole = await prisma.role.findUnique({ where: { name: "Admin" } });
-  const gerenteRole = await prisma.role.findUnique({
-    where: { name: "Gerente" },
-  });
-  const coordenadorRole = await prisma.role.findUnique({
-    where: { name: "Coordenador" },
-  });
-  const gestorRole = await prisma.role.findUnique({
-    where: { name: "Gestor" },
-  });
-  const lideradoRole = await prisma.role.findUnique({
-    where: { name: "Liderado" },
-  });
-
-  const tiSector = await prisma.sector.findUnique({ where: { name: "TI" } });
-  const controladoriaSector = await prisma.sector.findUnique({
+  const controlSector = await prisma.sector.findUnique({
     where: { name: "Controladoria" },
   });
-  const financeiroSector = await prisma.sector.findUnique({
-    where: { name: "Financeiro" },
-  });
-  const administrativoSector = await prisma.sector.findUnique({
-    where: { name: "Administrativo" },
-  });
 
-  if (!adminRole || !controladoriaSector)
+  if (!adminRole || !controlSector)
     throw new Error("Failed to seed roles/sectors");
-
-  // 1. Specific users for Controladoria
-  const controlUsers = [
-    {
-      name: "Admin Controladoria",
-      role: adminRole,
-      email: "admin.control@geotask.com",
-    },
-    {
-      name: "Gerente Controladoria",
-      role: gerenteRole,
-      email: "gerente.control@geotask.com",
-    },
-    {
-      name: "Coord Controladoria",
-      role: coordenadorRole,
-      email: "coord.control@geotask.com",
-    },
-  ];
-
-  for (const u of controlUsers) {
-    if (u.role) {
-      await prisma.user.upsert({
-        where: { email: u.email },
-        update: {
-          Role: { connect: { id: u.role.id } },
-          Sector: { connect: { id: controladoriaSector.id } },
-        },
-        create: {
-          email: u.email,
-          name: u.name,
-          password_hash: "123456",
-          Role: { connect: { id: u.role.id } },
-          Sector: { connect: { id: controladoriaSector.id } },
-          avatar: u.name.substring(0, 2).toUpperCase(),
-        },
-      });
-    }
-  }
-
-  // 2. Gestor and Liderado in different sectors
-  const crossSectorUsers = [
-    {
-      name: "Gestor Financeiro",
-      role: gestorRole,
-      sector: financeiroSector,
-      email: "gestor.fin@geotask.com",
-    },
-    {
-      name: "Liderado Financeiro",
-      role: lideradoRole,
-      sector: financeiroSector,
-      email: "liderado.fin@geotask.com",
-    },
-    {
-      name: "Gestor Admin",
-      role: gestorRole,
-      sector: administrativoSector,
-      email: "gestor.adm@geotask.com",
-    },
-    {
-      name: "Liderado Admin",
-      role: lideradoRole,
-      sector: administrativoSector,
-      email: "liderado.adm@geotask.com",
-    },
-  ];
-
-  for (const u of crossSectorUsers) {
-    if (u.role && u.sector) {
-      await prisma.user.upsert({
-        where: { email: u.email },
-        update: {
-          Role: { connect: { id: u.role.id } },
-          Sector: { connect: { id: u.sector.id } },
-        },
-        create: {
-          email: u.email,
-          name: u.name,
-          password_hash: "123456",
-          Role: { connect: { id: u.role.id } },
-          Sector: { connect: { id: u.sector.id } },
-          avatar: u.name.substring(0, 2).toUpperCase(),
-        },
-      });
-    }
-  }
 
   const adminEmail = "admin@admin.com";
   const admin = await prisma.user.upsert({
     where: { email: adminEmail },
     update: {
+      name: "Vinicios Araújo",
+      password_hash: "997578",
       Role: { connect: { id: adminRole.id } },
-      Sector: { connect: { id: tiSector!.id } },
+      Sector: { connect: { id: controlSector.id } },
       active: true,
       must_change_password: false,
     },
     create: {
       email: adminEmail,
-      name: "Vinicios Reis de Araújo",
+      name: "Vinicios Araújo",
       password_hash: "997578",
       Role: { connect: { id: adminRole.id } },
-      Sector: { connect: { id: tiSector!.id } },
-      avatar: "VR",
+      Sector: { connect: { id: controlSector.id } },
+      avatar: "VA",
       active: true,
       must_change_password: false,
     },
   });
+  console.log("👤 Main Admin user seeded:", admin.name);
   console.log("👤 Default Admin user seeded:", admin.name);
 
   // 2. Contracts
