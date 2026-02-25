@@ -272,7 +272,7 @@ const CITIES_NEIGHBORHOODS: Record<string, string[]> = {
 async function main() {
   console.log("🌱 Starting seed...");
 
-  console.log("🧹 Cleaning database...");
+  console.log("🧹 Cleaning tasks and lookups (Preserving Users)...");
   // Delete in reverse order of relationships
   await prisma.notification.deleteMany();
   await prisma.taskHistory.deleteMany();
@@ -284,18 +284,13 @@ async function main() {
   await prisma.templateSubtask.deleteMany();
   await prisma.templateTask.deleteMany();
   await prisma.template.deleteMany();
-  await prisma.user.deleteMany();
-  await prisma.sector.deleteMany();
-  await prisma.role.deleteMany();
+  // Cities and Contracts are usually lookups, we clear and repopulate them
   await prisma.neighborhood.deleteMany();
   await prisma.city.deleteMany();
   await prisma.contract.deleteMany();
-  // Sectors and Roles are upserted later, but we can clean them if we want a total reset
-  // await prisma.sector.deleteMany();
-  // await prisma.role.deleteMany();
 
-  // 1. Create Admin User
-  // 1. Create Default Roles & Sectors
+  // 1. Create Admin User (Using Upsert to preserve)
+  // 1. Create Default Roles & Sectors (Using Upsert to preserve)
   const roles = ["Admin", "Gerente", "Gestor", "Coordenador", "Liderado"];
   const sectors = [
     "Administrativo",

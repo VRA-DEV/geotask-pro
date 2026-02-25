@@ -70,8 +70,7 @@ export default function LoginPage() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background:
-          "linear-gradient(135deg, #f0f4e8 0%, #e8f0dc 50%, #f5f8f0 100%)",
+        background: "FCFFF0",
         fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
         position: "relative",
         overflow: "hidden",
