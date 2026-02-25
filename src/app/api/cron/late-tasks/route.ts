@@ -24,7 +24,7 @@ export async function GET(req: Request) {
       },
       include: {
         responsible: true,
-        sector: true,
+        Sector: true,
       },
     });
 
@@ -59,11 +59,11 @@ export async function GET(req: Request) {
         }
 
         // Notify Sector Manager (Gestor do Setor)
-        if (task.sector) {
+        if (task.Sector) {
           const managers = await prisma.user.findMany({
             where: {
-              sector_id: task.sector.id,
-              role: { name: { in: ["Gestor", "Gerente"] } },
+              sector_id: task.Sector.id,
+              Role: { name: { in: ["Gestor", "Gerente"] } },
               NOT: { id: task.responsible_id || 0 },
             },
           });
@@ -73,8 +73,8 @@ export async function GET(req: Request) {
               data: {
                 user_id: m.id,
                 type: "task_late",
-                title: `Tarefa Atrasada: ${task.sector.name}`,
-                message: `A tarefa "${task.title}", designada à "${task.responsible?.name || "Ninguém"}" do setor "${task.sector.name}", está atrasada.`,
+                title: `Tarefa Atrasada: ${task.Sector.name}`,
+                message: `A tarefa "${task.title}", designada à "${task.responsible?.name || "Ninguém"}" do setor "${task.Sector.name}", está atrasada.`,
                 task_id: task.id,
               },
             });
