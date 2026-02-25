@@ -4431,14 +4431,17 @@ function DashboardPage({
       concluidas: number;
     }[] = [];
     const now = TODAY;
-    for (let i = 12; i >= 0; i--) {
+    for (let i = 3; i >= -3; i--) {
       const weekStart = new Date(now);
       weekStart.setDate(now.getDate() - i * 7 - now.getDay());
       weekStart.setHours(0, 0, 0, 0);
       const weekEnd = new Date(weekStart);
       weekEnd.setDate(weekStart.getDate() + 6);
       weekEnd.setHours(23, 59, 59, 999);
-      const label = `${String(weekStart.getDate()).padStart(2, "0")}/${String(weekStart.getMonth() + 1).padStart(2, "0")}`;
+
+      const weekNum = 4 - i;
+      const label = `${weekNum}ª sem: ${String(weekStart.getDate()).padStart(2, "0")}-${String(weekEnd.getDate()).padStart(2, "0")}/${String(weekEnd.getMonth() + 1).padStart(2, "0")}`;
+
       const novas = filtered.filter((t) => {
         if (!t.created_at) return false;
         const d = new Date(t.created_at);
@@ -5321,7 +5324,7 @@ function DashboardPage({
         >
           <div>
             <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>
-              Visão Semanal — Trimestre
+              Visão Semanal
             </div>
             <div style={{ fontSize: 11, color: T.sub, marginTop: 2 }}>
               Novas tarefas, a entregar e atrasadas por semana
@@ -5329,7 +5332,7 @@ function DashboardPage({
           </div>
           <div style={{ display: "flex", gap: 12 }}>
             {[
-              ["Novas", "#98af3b"],
+              ["Novas", "#3b43af"],
               ["A Entregar", "#f59e0b"],
               ["Atrasadas", "#ef4444"],
               ["Concluídas", "#10b981"],
@@ -5374,7 +5377,7 @@ function DashboardPage({
             <Bar
               dataKey="novas"
               name="Novas"
-              fill="#98af3b"
+              fill="#3b43af"
               radius={[4, 4, 0, 0]}
             />
             <Bar
