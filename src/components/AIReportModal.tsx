@@ -47,6 +47,7 @@ interface AIReportModalProps {
     bgBody: string;
     [key: string]: string;
   };
+  user?: { name?: string; role?: { name?: string } } | null;
 }
 
 // ─── Opções de análise disponíveis ───────────────────────────────────────────
@@ -343,7 +344,7 @@ function StatCard({
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 
-export default function AIReportModal({ T }: AIReportModalProps) {
+export default function AIReportModal({ T, user }: AIReportModalProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [report, setReport] = useState<string | null>(null);
@@ -406,443 +407,323 @@ export default function AIReportModal({ T }: AIReportModalProps) {
     }
   };
 
-  // ─── Exportar PDF ────────────────────────────────────────────────────────────
+  // ─── Exportar PDF (premium) ──────────────────────────────────────────────────────────
   const exportToPDF = async () => {
     if (!report || !stats) return;
     setExportingPdf(true);
     try {
       const { jsPDF } = await import("jspdf");
 
-      const doc = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4",
-      });
-      const pageW = doc.internal.pageSize.getWidth();
-      const pageH = doc.internal.pageSize.getHeight();
-      const margin = 18;
-      const contentW = pageW - margin * 2;
-      let y = 0;
+      // Landscape A4 — mesmo padrao do exportUtils
+      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const PW = 297, PH = 210, ML = 12, MR = 12;
+      const CW = PW - ML - MR;
+      const HEADER_H = 28;
+      const FOOTER_H = 10;
 
-      // ── Função utilitária: nova página se necessário ─────────────────────
-      const checkPage = (needed: number) => {
-        if (y + needed > pageH - 20) {
-          doc.addPage();
-          y = 20;
-        }
-      };
+      const PRIMARY:  [number,number,number] = [152, 175, 59];
+      const DARK:     [number,number,number] = [30,  41,  59];
+      const SLATE5:   [number,number,number] = [100, 116, 139];
+      const BORDER_C: [number,number,number] = [226, 232, 240];
+      const LIGHT:    [number,number,number] = [248, 250, 252];
 
-      // ── 1. CAPA ──────────────────────────────────────────────────────────
-      // Fundo gradiente simulado com retângulos
-      doc.setFillColor(30, 27, 75);
-      doc.rect(0, 0, pageW, 60, "F");
-      doc.setFillColor(49, 46, 129);
-      doc.rect(0, 45, pageW, 15, "F");
+      const KPI_COL: [number,number,number][] = [
+        [59, 130, 246], [6, 182, 212], [34, 197, 94], [234, 179, 8], [239, 68, 68],
+      ];
+      const CHART_COL: [number,number,number][] = [
+        [152,175,59],[59,130,246],[245,158,11],[239,68,68],[139,92,246],[16,185,129],[236,72,153],
+      ];
 
-      // Título
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(26);
-      doc.setTextColor(255, 255, 255);
-      doc.text("GeoTask IA", margin, 26);
-
-      doc.setFontSize(11);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(165, 180, 252);
-      doc.text("Análise Inteligente de Tarefas", margin, 34);
-
-      // Linha decorativa
-      doc.setDrawColor(99, 102, 241);
-      doc.setLineWidth(0.8);
-      doc.line(margin, 40, pageW - margin, 40);
-
-      // Metadados na capa
       const now = generatedAt || new Date();
-      const dateStr = now.toLocaleDateString("pt-BR", {
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-      });
-      const timeStr = now.toLocaleTimeString("pt-BR", {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-
-      doc.setFontSize(9);
-      doc.setTextColor(199, 210, 254);
-      doc.text(`Gerado em: ${dateStr} às ${timeStr}`, margin, 50);
-
+      const dateStr = now.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
+      const timeStr = now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
       const analysisLabels = selectedAnalyses
         .map((a) => ANALYSIS_OPTIONS.find((o) => o.id === a)?.label || a)
         .join(", ");
-      doc.text(`Período: últimos ${periodDays} dias`, margin, 55);
+      const userName = user?.name || "Nao identificado";
 
-      y = 68;
+      // Rodape com quem, quando e como filtrou (sem emojis — jsPDF nao suporta unicode extra)
+      const footerLine = [
+        `Gerado em: ${dateStr} as ${timeStr}`,
+        `Por: ${userName}`,
+        `Periodo: ultimos ${periodDays} dias`,
+        analysisLabels ? `Analises: ${analysisLabels}` : "",
+        customMessage.trim()
+          ? `Solicitacao: ${customMessage.trim().slice(0, 60)}${customMessage.length > 60 ? "..." : ""}`
+          : "",
+      ].filter(Boolean).join("   |   ");
 
-      // Filtros aplicados
-      if (analysisLabels) {
-        doc.setFillColor(243, 244, 246);
-        doc.roundedRect(margin, y, contentW, 14, 3, 3, "F");
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(8);
-        doc.setTextColor(79, 70, 229);
-        doc.text("ANÁLISES INCLUÍDAS:", margin + 4, y + 5.5);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(55, 65, 81);
-        const wrappedLabel = doc.splitTextToSize(analysisLabels, contentW - 50);
-        doc.text(wrappedLabel[0], margin + 42, y + 5.5);
-        y += 18;
-      }
-
-      if (customMessage.trim()) {
-        doc.setFillColor(254, 249, 195);
-        doc.roundedRect(margin, y, contentW, 14, 3, 3, "F");
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(8);
-        doc.setTextColor(146, 64, 14);
-        doc.text("SOLICITAÇÃO ESPECIAL:", margin + 4, y + 5.5);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(55, 65, 81);
-        const wrapped = doc.splitTextToSize(
-          customMessage.trim(),
-          contentW - 52,
-        );
-        doc.text(wrapped[0], margin + 50, y + 5.5);
-        y += 18;
-      }
-
-      y += 4;
-
-      // ── 2. KPI CARDS ──────────────────────────────────────────────────────
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(11);
-      doc.setTextColor(30, 27, 75);
-      doc.text("📊 Indicadores do Período", margin, y);
-      y += 6;
-
-      const kpis = [
-        { label: "Total", value: stats.total, r: 59, g: 130, b: 246 },
-        { label: "Criadas", value: stats.created, r: 6, g: 182, b: 212 },
-        { label: "Concluídas", value: stats.completed, r: 34, g: 197, b: 94 },
-        { label: "Pendentes", value: stats.pending, r: 234, g: 179, b: 8 },
-        { label: "Atrasadas", value: stats.overdue, r: 239, g: 68, b: 68 },
-      ];
-
-      const cardW = (contentW - 4 * 3) / 5;
-      kpis.forEach((kpi, i) => {
-        const cx = margin + i * (cardW + 3);
-        // Card bg (light tint)
-        doc.setFillColor(kpi.r, kpi.g, kpi.b);
-        doc.roundedRect(cx, y, cardW, 22, 3, 3, "F");
-        // Valor
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(18);
-        doc.setTextColor(255, 255, 255);
-        doc.text(String(kpi.value), cx + cardW / 2, y + 12, {
-          align: "center",
+      // Carregar logo
+      let logo: string | null = null;
+      try {
+        const res = await fetch("/logo.png");
+        const blob = await res.blob();
+        logo = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
         });
-        // Label
-        doc.setFontSize(7);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(255, 255, 255);
-        doc.text(kpi.label, cx + cardW / 2, y + 19, { align: "center" });
-      });
-      y += 28;
+      } catch { /* sem logo */ }
 
-      // ── 3. GRÁFICOS VIA CANVAS ────────────────────────────────────────────
-      const drawCharts = async (): Promise<string[]> => {
-        const images: string[] = [];
-
-        // Gráfico de Barras — Por Status
-        const statusEntries = Object.entries(stats.byStatus).sort(
-          (a, b) => b[1] - a[1],
-        );
-        if (statusEntries.length > 0) {
-          const canvas = document.createElement("canvas");
-          canvas.width = 520;
-          canvas.height = 220;
-          const ctx = canvas.getContext("2d")!;
-          ctx.fillStyle = "#f8fafc";
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-          const BAR_COLORS = [
-            "#6366f1",
-            "#10b981",
-            "#f59e0b",
-            "#ef4444",
-            "#ec4899",
-            "#8b5cf6",
-            "#06b6d4",
-          ];
-          const bMargin = { top: 30, right: 20, bottom: 50, left: 50 };
-          const bW = canvas.width - bMargin.left - bMargin.right;
-          const bH = canvas.height - bMargin.top - bMargin.bottom;
-          const maxVal = Math.max(...statusEntries.map((e) => e[1]));
-          const barW = Math.min(60, bW / statusEntries.length - 12);
-
-          // Título
-          ctx.fillStyle = "#1e1b4b";
-          ctx.font = "bold 14px Arial";
-          ctx.fillText("Tarefas por Status", bMargin.left, 20);
-
-          // Eixo Y (grid lines)
-          ctx.strokeStyle = "#e2e8f0";
-          ctx.lineWidth = 1;
-          for (let i = 0; i <= 4; i++) {
-            const gy = bMargin.top + (bH / 4) * i;
-            ctx.beginPath();
-            ctx.moveTo(bMargin.left, gy);
-            ctx.lineTo(bMargin.left + bW, gy);
-            ctx.stroke();
-            const val = Math.round(maxVal * (1 - i / 4));
-            ctx.fillStyle = "#94a3b8";
-            ctx.font = "10px Arial";
-            ctx.textAlign = "right";
-            ctx.fillText(String(val), bMargin.left - 4, gy + 3);
+      // Funcao de cabecalho identica ao exportUtils.drawHeader
+      let pageCount = 0;
+      const drawPageHeader = (title: string): number => {
+        pageCount++;
+        doc.setFillColor(255, 255, 255);
+        doc.rect(0, 0, PW, HEADER_H, "F");
+        if (logo) {
+          try { doc.addImage(logo, "PNG", ML, 4, 55, 14); }
+          catch {
+            doc.setFont("helvetica", "bold"); doc.setFontSize(12);
+            doc.setTextColor(...DARK); doc.text("GEOGIS", ML, 17);
           }
-
-          // Barras
-          const spacing = bW / statusEntries.length;
-          statusEntries.forEach(([label, val], idx) => {
-            const barH = maxVal > 0 ? (val / maxVal) * bH : 0;
-            const bx = bMargin.left + idx * spacing + (spacing - barW) / 2;
-            const by = bMargin.top + bH - barH;
-            ctx.fillStyle = BAR_COLORS[idx % BAR_COLORS.length];
-            const radius = 4;
-            ctx.beginPath();
-            ctx.moveTo(bx + radius, by);
-            ctx.lineTo(bx + barW - radius, by);
-            ctx.quadraticCurveTo(bx + barW, by, bx + barW, by + radius);
-            ctx.lineTo(bx + barW, by + barH);
-            ctx.lineTo(bx, by + barH);
-            ctx.lineTo(bx, by + radius);
-            ctx.quadraticCurveTo(bx, by, bx + radius, by);
-            ctx.closePath();
-            ctx.fill();
-            // Valor no topo
-            ctx.fillStyle = "#1e1b4b";
-            ctx.font = "bold 11px Arial";
-            ctx.textAlign = "center";
-            ctx.fillText(String(val), bx + barW / 2, by - 4);
-            // Label embaixo (rotacionado)
-            ctx.save();
-            ctx.translate(bx + barW / 2, bMargin.top + bH + 8);
-            ctx.rotate(-Math.PI / 6);
-            ctx.fillStyle = "#475569";
-            ctx.font = "10px Arial";
-            ctx.textAlign = "right";
-            ctx.fillText(
-              label.length > 12 ? label.slice(0, 12) + "…" : label,
-              0,
-              0,
-            );
-            ctx.restore();
-          });
-
-          images.push(canvas.toDataURL("image/png"));
+        } else {
+          doc.setFont("helvetica", "bold"); doc.setFontSize(12);
+          doc.setTextColor(...DARK); doc.text("GEOGIS", ML, 17);
         }
-
-        // Gráfico de Pizza — Por Setor
-        const sectorEntries = Object.entries(stats.bySector)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 6);
-        if (sectorEntries.length > 0) {
-          const canvas2 = document.createElement("canvas");
-          canvas2.width = 520;
-          canvas2.height = 220;
-          const ctx2 = canvas2.getContext("2d")!;
-          ctx2.fillStyle = "#f8fafc";
-          ctx2.fillRect(0, 0, canvas2.width, canvas2.height);
-
-          const PIE_COLORS = [
-            "#6366f1",
-            "#10b981",
-            "#f59e0b",
-            "#ef4444",
-            "#ec4899",
-            "#8b5cf6",
-          ];
-          const total = sectorEntries.reduce((s, [, v]) => s + v, 0);
-          const cx2 = 110,
-            cy2 = 120,
-            radius2 = 85;
-
-          ctx2.fillStyle = "#1e1b4b";
-          ctx2.font = "bold 14px Arial";
-          ctx2.fillText("Tarefas por Setor", 10, 20);
-
-          let startAngle = -Math.PI / 2;
-          sectorEntries.forEach(([, val], i) => {
-            const slice = (val / total) * Math.PI * 2;
-            ctx2.beginPath();
-            ctx2.moveTo(cx2, cy2);
-            ctx2.arc(cx2, cy2, radius2, startAngle, startAngle + slice);
-            ctx2.closePath();
-            ctx2.fillStyle = PIE_COLORS[i % PIE_COLORS.length];
-            ctx2.fill();
-            ctx2.strokeStyle = "#fff";
-            ctx2.lineWidth = 2;
-            ctx2.stroke();
-            startAngle += slice;
-          });
-
-          // Legenda
-          let ly = 35;
-          sectorEntries.forEach(([label, val], i) => {
-            const pct = Math.round((val / total) * 100);
-            ctx2.fillStyle = PIE_COLORS[i % PIE_COLORS.length];
-            ctx2.fillRect(230, ly - 9, 12, 12);
-            ctx2.fillStyle = "#1e293b";
-            ctx2.font = "11px Arial";
-            const short = label.length > 18 ? label.slice(0, 18) + "…" : label;
-            ctx2.fillText(`${short} — ${val} (${pct}%)`, 248, ly);
-            ly += 20;
-          });
-
-          images.push(canvas2.toDataURL("image/png"));
-        }
-
-        return images;
+        doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(...DARK);
+        doc.text(title, PW / 2, 12, { align: "center" });
+        doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...SLATE5);
+        doc.text("Relatorio de Analise Inteligente de Tarefas", PW / 2, 18, { align: "center" });
+        const infoX = PW - MR;
+        doc.setFont("helvetica", "bold"); doc.setFontSize(7); doc.setTextColor(...DARK);
+        doc.text("Geogis Geotecnologia", infoX, 8, { align: "right" });
+        doc.setFont("helvetica", "normal"); doc.setTextColor(...SLATE5);
+        doc.text("CNPJ: 14.116.593/0001-60", infoX, 13, { align: "right" });
+        doc.text("R. Das Acacias, 227 - Sao Francisco, Cuiaba - MT", infoX, 18, { align: "right" });
+        doc.text("Transformar e Desenvolver Territorios", infoX, 23, { align: "right" });
+        doc.setDrawColor(...PRIMARY); doc.setLineWidth(0.8);
+        doc.line(0, HEADER_H, PW, HEADER_H);
+        // Rodape em cada pagina
+        const fy = PH - 4;
+        doc.setDrawColor(...BORDER_C); doc.setLineWidth(0.2);
+        doc.line(ML, fy - 2.5, PW - MR, fy - 2.5);
+        doc.setFont("helvetica", "normal"); doc.setFontSize(6.5); doc.setTextColor(...SLATE5);
+        doc.text(doc.splitTextToSize(footerLine, CW - 20)[0], ML, fy);
+        doc.text(`Pag. ${pageCount}`, PW - MR, fy, { align: "right" });
+        return HEADER_H + 4;
       };
 
-      const chartImages = await drawCharts();
+      // Limpa markdown e remove emojis (jsPDF nao renderiza unicode extra-plano)
+      const cleanMd = (s: string) =>
+        s.replace(/^#+\s+/, "")
+          .replace(/\*\*(.*?)\*\*/g, "$1")
+          .replace(/\*(.*?)\*/g, "$1")
+          .replace(/`([^`]+)`/g, "$1")
+          .replace(/[\u{1F300}-\u{1FFFF}]|[\u{2600}-\u{27BF}]/gu, "")
+          .trim();
 
-      // Adicionar gráficos ao PDF (lado a lado se couber)
-      if (chartImages.length > 0) {
-        checkPage(75);
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(11);
-        doc.setTextColor(30, 27, 75);
-        doc.text("📈 Gráficos", margin, y);
-        y += 5;
+      // ── PAGINA 1: KPIs + Graficos ──────────────────────────────────────────
+      let y = drawPageHeader("GEOTASK IA  |  Analise Inteligente");
 
-        const chartH = 55;
-        const chartW = chartImages.length === 2 ? (contentW - 4) / 2 : contentW;
-        chartImages.forEach((img, i) => {
-          const cx = margin + i * (chartW + 4);
-          doc.setFillColor(248, 250, 252);
-          doc.roundedRect(cx, y, chartW, chartH, 2, 2, "F");
-          doc.addImage(img, "PNG", cx + 1, y + 1, chartW - 2, chartH - 2);
-        });
-        y += chartH + 8;
-      }
+      // Titulo KPIs
+      doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...DARK);
+      doc.text("INDICADORES DO PERIODO", ML, y);
+      doc.setDrawColor(...PRIMARY); doc.setLineWidth(0.5);
+      doc.line(ML, y + 1.5, ML + 60, y + 1.5);
+      y += 5;
 
-      // ── 4. RELATÓRIO DA IA ────────────────────────────────────────────────
-      checkPage(20);
-      doc.setFillColor(30, 27, 75);
-      doc.rect(margin, y, contentW, 8, "F");
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-      doc.setTextColor(255, 255, 255);
-      doc.text("✨  Análise da GeoTask IA", margin + 4, y + 5.5);
-      y += 12;
+      // KPI cards: fundo claro, borda colorida, numero colorido (SEM fill solido)
+      const KPIS = [
+        { label: "TOTAL",      value: stats.total,     sub: "no sistema",              col: KPI_COL[0] },
+        { label: "CRIADAS",    value: stats.created,   sub: `ult. ${periodDays} dias`, col: KPI_COL[1] },
+        { label: "CONCLUIDAS", value: stats.completed, sub: `ult. ${periodDays} dias`, col: KPI_COL[2] },
+        { label: "PENDENTES",  value: stats.pending,   sub: "em aberto",               col: KPI_COL[3] },
+        { label: "ATRASADAS",  value: stats.overdue,   sub: "prazo vencido",           col: KPI_COL[4] },
+      ];
+      const CARD_W = (CW - 4 * 4) / 5;
+      const CARD_H = 24;
 
-      // Renderizar o markdown como texto formatado
-      const lines = report.split("\n");
-      for (const line of lines) {
-        if (line.trim() === "" || line.startsWith("---")) {
-          y += 2;
-          continue;
+      KPIS.forEach((kpi, i) => {
+        const cx = ML + i * (CARD_W + 4);
+        doc.setFillColor(...LIGHT);
+        doc.setDrawColor(kpi.col[0], kpi.col[1], kpi.col[2]);
+        doc.setLineWidth(0.8);
+        doc.roundedRect(cx, y, CARD_W, CARD_H, 2, 2, "FD");
+        // Tira superior colorida (2 mm)
+        doc.setFillColor(kpi.col[0], kpi.col[1], kpi.col[2]);
+        doc.roundedRect(cx, y, CARD_W, 2, 1, 1, "F");
+        doc.setFont("helvetica", "bold"); doc.setFontSize(6.5); doc.setTextColor(...SLATE5);
+        doc.text(kpi.label, cx + CARD_W / 2, y + 8, { align: "center" });
+        doc.setFont("helvetica", "bold"); doc.setFontSize(18);
+        doc.setTextColor(kpi.col[0], kpi.col[1], kpi.col[2]);
+        doc.text(String(kpi.value), cx + CARD_W / 2, y + 18, { align: "center" });
+        doc.setFont("helvetica", "normal"); doc.setFontSize(6); doc.setTextColor(...SLATE5);
+        doc.text(kpi.sub, cx + CARD_W / 2, y + CARD_H - 2, { align: "center" });
+      });
+      y += CARD_H + 6;
+
+      // Titulo graficos
+      doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...DARK);
+      doc.text("GRAFICOS", ML, y);
+      doc.setDrawColor(...PRIMARY); doc.setLineWidth(0.5);
+      doc.line(ML, y + 1.5, ML + 28, y + 1.5);
+      y += 5;
+
+      const CHART_AREA_H = PH - y - FOOTER_H - 6;
+      const CHART_W = (CW - 6) / 2;
+
+      // Canvas 3x para alta resolucao
+      const SC = 3;
+      const CVW = Math.round(CHART_W * SC * 3.7795);
+      const CVH = Math.round(CHART_AREA_H * SC * 3.7795);
+
+      const makeBarChart = (entries: [string, number][], title: string): string => {
+        const cv = document.createElement("canvas");
+        cv.width = CVW; cv.height = CVH;
+        const ctx = cv.getContext("2d")!;
+        ctx.fillStyle = "#f8fafc"; ctx.fillRect(0, 0, CVW, CVH);
+        const pad = { top: 60, right: 40, bottom: 28, left: 90 };
+        const aW = CVW - pad.left - pad.right;
+        const aH = CVH - pad.top - pad.bottom;
+        const maxV = Math.max(...entries.map(e => e[1]), 1);
+        const barH = Math.max(16, Math.min(44, (aH / entries.length) - 10));
+        const gap  = (aH - barH * entries.length) / (entries.length + 1);
+
+        ctx.fillStyle = "#1e293b"; ctx.font = `bold ${16 * SC}px Arial`;
+        ctx.fillText(title, pad.left, 44);
+
+        ctx.strokeStyle = "#e2e8f0"; ctx.lineWidth = SC;
+        for (let g = 0; g <= 4; g++) {
+          const gx = pad.left + (g / 4) * aW;
+          ctx.beginPath(); ctx.moveTo(gx, pad.top); ctx.lineTo(gx, pad.top + aH); ctx.stroke();
+          ctx.fillStyle = "#94a3b8"; ctx.font = `${9 * SC}px Arial`; ctx.textAlign = "center";
+          ctx.fillText(String(Math.round((g / 4) * maxV)), gx, pad.top + aH + 22);
         }
 
-        if (line.startsWith("# ")) {
-          checkPage(12);
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(13);
-          doc.setTextColor(30, 27, 75);
-          const txt = line.replace(/^#+\s/, "").replace(/\*\*|\*|`/g, "");
-          const wrapped = doc.splitTextToSize(txt, contentW);
-          doc.text(wrapped, margin, y);
-          y += wrapped.length * 6 + 3;
-        } else if (line.startsWith("## ")) {
-          checkPage(11);
-          doc.setFillColor(237, 233, 254);
-          doc.roundedRect(margin, y - 4, contentW, 9, 2, 2, "F");
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(10);
-          doc.setTextColor(79, 70, 229);
-          const txt = line.replace(/^#+\s/, "").replace(/\*\*|\*|`/g, "");
-          const wrapped = doc.splitTextToSize(txt, contentW - 4);
-          doc.text(wrapped, margin + 3, y + 1);
-          y += wrapped.length * 5.5 + 4;
-        } else if (line.startsWith("### ")) {
-          checkPage(9);
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(9);
-          doc.setTextColor(30, 27, 75);
-          const txt = line.replace(/^#+\s/, "").replace(/\*\*|\*|`/g, "");
-          const wrapped = doc.splitTextToSize(txt, contentW);
-          doc.text(wrapped, margin, y);
-          y += wrapped.length * 5 + 2;
-        } else if (line.match(/^[-*] /) || line.match(/^\d+\. /)) {
-          checkPage(6);
-          doc.setFont("helvetica", "normal");
-          doc.setFontSize(9);
-          doc.setTextColor(30, 41, 59);
-          const txt = line
-            .replace(/^[-*]\s/, "• ")
-            .replace(/^\d+\.\s/, (m) => m)
-            .replace(/\*\*(.*?)\*\*/g, "$1")
-            .replace(/\*|`/g, "");
-          const wrapped = doc.splitTextToSize(txt, contentW - 6);
-          doc.text(wrapped, margin + 4, y);
-          y += wrapped.length * 4.8 + 1;
-        } else if (line.startsWith("|")) {
-          // Tabela — usar autoTable na próxima iteração (acumula linhas)
-          // Simplificado: renderizar como texto
-          const cells = line.split("|").filter((c) => c.trim());
-          if (cells.length > 0 && !line.match(/^\|[-| :]+\|$/)) {
-            checkPage(7);
-            doc.setFont("helvetica", "normal");
-            doc.setFontSize(8);
-            doc.setTextColor(30, 41, 59);
-            const cellW = contentW / cells.length;
+        entries.forEach(([label, val], idx) => {
+          const bw = Math.max(4, (val / maxV) * aW);
+          const by = pad.top + gap + idx * (barH + gap);
+          const col = CHART_COL[idx % CHART_COL.length];
+          ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
+          const r = 5;
+          ctx.beginPath();
+          ctx.moveTo(pad.left + r, by); ctx.lineTo(pad.left + bw - r, by);
+          ctx.quadraticCurveTo(pad.left + bw, by, pad.left + bw, by + r);
+          ctx.lineTo(pad.left + bw, by + barH - r);
+          ctx.quadraticCurveTo(pad.left + bw, by + barH, pad.left + bw - r, by + barH);
+          ctx.lineTo(pad.left + r, by + barH);
+          ctx.quadraticCurveTo(pad.left, by + barH, pad.left, by + barH - r);
+          ctx.lineTo(pad.left, by + r); ctx.quadraticCurveTo(pad.left, by, pad.left + r, by);
+          ctx.closePath(); ctx.fill();
+          ctx.fillStyle = "#e2e8f0"; ctx.fillRect(pad.left + bw, by, aW - bw, barH);
+          ctx.fillStyle = "#475569"; ctx.font = `${10 * SC}px Arial`; ctx.textAlign = "right";
+          ctx.fillText(label.length > 14 ? label.slice(0, 14) + "..." : label, pad.left - 8, by + barH / 2 + 5);
+          ctx.fillStyle = "#1e293b"; ctx.font = `bold ${11 * SC}px Arial`; ctx.textAlign = "left";
+          ctx.fillText(String(val), pad.left + bw + 8, by + barH / 2 + 5);
+        });
+        return cv.toDataURL("image/png");
+      };
+
+      const makePieChart = (entries: [string, number][], title: string): string => {
+        const cv = document.createElement("canvas");
+        cv.width = CVW; cv.height = CVH;
+        const ctx = cv.getContext("2d")!;
+        ctx.fillStyle = "#f8fafc"; ctx.fillRect(0, 0, CVW, CVH);
+        ctx.fillStyle = "#1e293b"; ctx.font = `bold ${16 * SC}px Arial`;
+        ctx.fillText(title, 20, 44);
+        const total = entries.reduce((s, [, v]) => s + v, 0);
+        if (total === 0) return cv.toDataURL("image/png");
+        const cx = CVW * 0.3, cy = CVH * 0.56, radius = Math.min(CVW, CVH) * 0.3;
+        let startAngle = -Math.PI / 2;
+        entries.forEach(([, val], i) => {
+          const slice = (val / total) * Math.PI * 2;
+          const col = CHART_COL[i % CHART_COL.length];
+          ctx.beginPath(); ctx.moveTo(cx, cy);
+          ctx.arc(cx, cy, radius, startAngle, startAngle + slice); ctx.closePath();
+          ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`; ctx.fill();
+          ctx.strokeStyle = "#fff"; ctx.lineWidth = 4; ctx.stroke();
+          startAngle += slice;
+        });
+        let ly = 55; const legX = CVW * 0.58;
+        entries.forEach(([label, val], i) => {
+          const pct = Math.round((val / total) * 100);
+          const col = CHART_COL[i % CHART_COL.length];
+          ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
+          ctx.fillRect(legX, ly - 13 * SC, 12 * SC, 12 * SC);
+          ctx.fillStyle = "#1e293b"; ctx.font = `${10 * SC}px Arial`; ctx.textAlign = "left";
+          const short = label.length > 18 ? label.slice(0, 18) + "..." : label;
+          ctx.fillText(`${short} - ${val} (${pct}%)`, legX + 16 * SC, ly);
+          ly += 18 * SC;
+        });
+        return cv.toDataURL("image/png");
+      };
+
+      const statusEntries = Object.entries(stats.byStatus).sort((a, b) => b[1] - a[1]);
+      const sectorEntries = Object.entries(stats.bySector).sort((a, b) => b[1] - a[1]).slice(0, 7);
+
+      if (statusEntries.length > 0) {
+        const imgBar = makeBarChart(statusEntries as [string,number][], "Tarefas por Status");
+        doc.setFillColor(...LIGHT); doc.setDrawColor(...BORDER_C); doc.setLineWidth(0.2);
+        doc.roundedRect(ML, y, CHART_W, CHART_AREA_H, 2, 2, "FD");
+        doc.addImage(imgBar, "PNG", ML + 1, y + 1, CHART_W - 2, CHART_AREA_H - 2);
+      }
+      if (sectorEntries.length > 0) {
+        const imgPie = makePieChart(sectorEntries as [string,number][], "Tarefas por Setor");
+        const cx2 = ML + CHART_W + 6;
+        doc.setFillColor(...LIGHT); doc.setDrawColor(...BORDER_C); doc.setLineWidth(0.2);
+        doc.roundedRect(cx2, y, CHART_W, CHART_AREA_H, 2, 2, "FD");
+        doc.addImage(imgPie, "PNG", cx2 + 1, y + 1, CHART_W - 2, CHART_AREA_H - 2);
+      }
+
+      // ── PAGINAS 2+: Relatorio da IA ──────────────────────────────────────
+      doc.addPage();
+      y = drawPageHeader("ANALISE GEOTASK IA");
+      const BOTTOM = PH - FOOTER_H - 8;
+
+      const newPage = (h: number) => {
+        if (y + h > BOTTOM) {
+          doc.addPage();
+          y = drawPageHeader("ANALISE GEOTASK IA (cont.)");
+        }
+      };
+
+      for (const raw of report.split("\n")) {
+        if (raw.trim() === "" || raw.startsWith("---")) { y += 2; continue; }
+        if (raw.startsWith("# ")) {
+          newPage(14);
+          doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.setTextColor(...DARK);
+          const w = doc.splitTextToSize(cleanMd(raw), CW);
+          doc.text(w, ML, y); y += w.length * 6.5 + 3;
+        } else if (raw.startsWith("## ")) {
+          newPage(12);
+          doc.setFillColor(237, 244, 220); doc.setDrawColor(...PRIMARY); doc.setLineWidth(0.3);
+          doc.roundedRect(ML, y - 4.5, CW, 9, 1, 1, "FD");
+          doc.setFont("helvetica", "bold"); doc.setFontSize(9.5); doc.setTextColor(...DARK);
+          const w = doc.splitTextToSize(cleanMd(raw), CW - 6);
+          doc.text(w, ML + 3, y + 1); y += w.length * 5.5 + 4;
+        } else if (raw.startsWith("### ")) {
+          newPage(9);
+          doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(...DARK);
+          const w = doc.splitTextToSize(cleanMd(raw), CW);
+          doc.text(w, ML, y); y += w.length * 5 + 2;
+        } else if (raw.match(/^[-*] /) || raw.match(/^\d+\. /)) {
+          newPage(6);
+          doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(...DARK);
+          const txt = "- " + cleanMd(raw.replace(/^[-*]\s/, "").replace(/^\d+\.\s/, ""));
+          const w = doc.splitTextToSize(txt, CW - 8);
+          doc.text(w, ML + 5, y); y += w.length * 4.8 + 1;
+        } else if (raw.startsWith("|")) {
+          const cells = raw.split("|").filter((c) => c.trim());
+          if (cells.length > 0 && !raw.match(/^\|[-| :]+\|$/)) {
+            newPage(7);
+            doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(...DARK);
+            const cellW = CW / cells.length;
             cells.forEach((cell, ci) => {
-              const txt = cell.trim().replace(/\*\*|\*/g, "");
-              doc.text(
-                doc.splitTextToSize(txt, cellW - 2)[0],
-                margin + ci * cellW,
-                y,
-              );
+              doc.text(doc.splitTextToSize(cell.trim().replace(/\*\*/g, ""), cellW - 2)[0], ML + ci * cellW, y);
             });
             y += 5.5;
           }
         } else {
-          checkPage(6);
-          doc.setFont("helvetica", "normal");
-          doc.setFontSize(9);
-          doc.setTextColor(30, 41, 59);
-          // Bold inline: **text** → negrito simulado
-          const cleanLine = line
-            .replace(/\*\*(.*?)\*\*/g, "$1")
-            .replace(/\*|`/g, "");
-          const wrapped = doc.splitTextToSize(cleanLine, contentW);
-          doc.text(wrapped, margin, y);
-          y += wrapped.length * 4.8 + 1;
+          newPage(6);
+          const txt = cleanMd(raw);
+          if (!txt) { y += 1; continue; }
+          doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(...DARK);
+          const w = doc.splitTextToSize(txt, CW);
+          doc.text(w, ML, y); y += w.length * 4.8 + 1;
         }
       }
 
-      // ── 5. RODAPÉ EM TODAS AS PÁGINAS ─────────────────────────────────────
-      const totalPages = (
-        doc as unknown as { internal: { getNumberOfPages: () => number } }
-      ).internal.getNumberOfPages();
-      for (let p = 1; p <= totalPages; p++) {
-        doc.setPage(p);
-        doc.setFillColor(30, 27, 75);
-        doc.rect(0, pageH - 10, pageW, 10, "F");
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(7);
-        doc.setTextColor(165, 180, 252);
-        doc.text(
-          `GeoTask IA  •  Gerado em ${dateStr} às ${timeStr}  •  Período: ${periodDays} dias`,
-          margin,
-          pageH - 3.5,
-        );
-        doc.text(`Página ${p}/${totalPages}`, pageW - margin, pageH - 3.5, {
-          align: "right",
-        });
-      }
-
-      // Salvar
       const filename = `GeoTask_IA_${now.toLocaleDateString("pt-BR").replace(/\//g, "-")}.pdf`;
       doc.save(filename);
     } catch (err) {

@@ -4470,7 +4470,7 @@ function DashboardPage({
                 .join(" | ") || "Nenhum"
             }
           />
-          <AIReportModal T={T} />
+          <AIReportModal T={T} user={user} />
           <span
             style={{
               fontSize: 12,
