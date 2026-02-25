@@ -1830,6 +1830,12 @@ function TaskModal({
           ...prev,
           subtasks: [...(prev.subtasks || []), newChild],
         }));
+
+        // Notifica o dashboard para re-sincronizar a lista de tarefas
+        // sem isso a subtarefa some ao fechar o modal
+        if (onUpdate) {
+          await onUpdate(t.id, "refresh", {});
+        }
       } else {
         alert("Erro ao criar subtarefa");
       }
@@ -3277,8 +3283,12 @@ export default function GeoTask() {
   // Atualizar tarefa (status, etc)
   const handleUpdateTask = async (id, action, data = {}) => {
     try {
-      // Otimização otimista (opcional, mas arriscado se falhar)
-      // Por enquanto, loading state ou refresh
+      // Ação especial de refresh: só sincroniza o estado, sem chamar a API
+      // Usada após criar subtarefas para que o dashboard atualize sem fechar o modal
+      if (action === "refresh") {
+        await fetchTasks();
+        return;
+      }
 
       const res = await fetch("/api/tasks", {
         method: "PATCH",
@@ -3865,45 +3875,6 @@ export default function GeoTask() {
                 )}
               </div>
             )}
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: 11, color: T.sub }}>Perfil:</span>
-            <select
-              value={user.role?.name || ""}
-              onChange={(e) => {
-                const roleName = e.target.value;
-                const u = dbUsers.find((u) => u.role?.name === roleName);
-                if (u) {
-                  setUser(u);
-                  localStorage.setItem("geotask_user", JSON.stringify(u));
-                } else {
-                  // Fallback for simulation without breaking DB constraints
-                  setUser({
-                    ...user,
-                    role: { name: roleName },
-                    name: `Visualizando como ${roleName}`,
-                    // Don't change ID or we break foreign keys on creation
-                  });
-                }
-                setPage("dashboard");
-              }}
-              style={{
-                fontSize: 12,
-                padding: "4px 8px",
-                borderRadius: 8,
-                border: `1px solid ${T.border}`,
-                background: T.inp,
-                color: T.text,
-                cursor: "pointer",
-                outline: "none",
-              }}
-            >
-              {["Admin", "Coordenador", "Gerente", "Gestor", "Liderado"].map(
-                (r) => (
-                  <option key={r}>{r}</option>
-                ),
-              )}
-            </select>
           </div>
         </div>
         <div style={{ flex: 1, overflow: "auto", padding: 24 }}>
