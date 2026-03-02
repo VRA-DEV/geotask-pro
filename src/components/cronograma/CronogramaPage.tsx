@@ -19,17 +19,13 @@ const ExportButtons = ({ filtered, kpi, users, user, filterLabel }: any) => (
   <div className="flex items-center gap-2">
     <button
       onClick={() => exportToExcel(filtered, kpi, user, filterLabel)}
-      className="flex items-center gap-1 rounded-lg border-none bg-emerald-500 px-3 py-1.5 text-[11px] font-semibold text-white transition-[filter] duration-100 cursor-pointer"
-      onMouseEnter={(e) => (e.currentTarget.style.filter = "brightness(0.9)")}
-      onMouseLeave={(e) => (e.currentTarget.style.filter = "none")}
+      className="flex items-center gap-1 rounded-lg border-none bg-emerald-500 px-3 py-1.5 text-[11px] font-semibold text-white transition-[filter] duration-100 cursor-pointer hover:brightness-90"
     >
       <FileText size={13} /> EXCEL
     </button>
     <button
       onClick={() => exportToPDF(filtered, kpi, users, user, filterLabel)}
-      className="flex items-center gap-1 rounded-lg border-none bg-red-500 px-3 py-1.5 text-[11px] font-semibold text-white transition-[filter] duration-100 cursor-pointer"
-      onMouseEnter={(e) => (e.currentTarget.style.filter = "brightness(0.9)")}
-      onMouseLeave={(e) => (e.currentTarget.style.filter = "none")}
+      className="flex items-center gap-1 rounded-lg border-none bg-red-500 px-3 py-1.5 text-[11px] font-semibold text-white transition-[filter] duration-100 cursor-pointer hover:brightness-90"
     >
       <FileText size={13} /> PDF
     </button>
@@ -38,13 +34,11 @@ const ExportButtons = ({ filtered, kpi, users, user, filterLabel }: any) => (
 
 // ── MultiSelect (inline) ─────────────────────────────────────────
 function MultiSelect({
-  T,
   val = [],
   onChange,
   opts,
   placeholder = "",
 }: {
-  T: any;
   val: string[];
   onChange: (v: string[]) => void;
   opts: string[];
@@ -78,12 +72,11 @@ function MultiSelect({
     <div ref={containerRef} className="relative">
       <div
         onClick={() => setOpen(!open)}
-        className="flex min-w-[140px] max-w-[200px] cursor-pointer items-center justify-between rounded-lg px-2.5 py-1.5 text-xs"
-        style={{
-          border: `1px solid ${val.length > 0 ? "#98af3b" : T.border}`,
-          background: T.card,
-          color: val.length > 0 ? "#98af3b" : T.sub,
-        }}
+        className={`flex min-w-[140px] max-w-[200px] cursor-pointer items-center justify-between rounded-lg px-2.5 py-1.5 text-xs border ${
+          val.length > 0
+            ? "border-primary text-primary"
+            : "border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400"
+        } bg-white dark:bg-gray-800`}
       >
         <span className="truncate">
           {val.length === 0
@@ -96,13 +89,7 @@ function MultiSelect({
       </div>
 
       {open && (
-        <div
-          className="absolute top-full left-0 z-[9999] mt-1 min-w-[180px] max-h-[300px] overflow-y-auto rounded-lg p-1.5 shadow-[0_10px_30px_rgba(0,0,0,0.15)]"
-          style={{
-            background: T.card,
-            border: `1px solid ${T.border}`,
-          }}
-        >
+        <div className="absolute top-full left-0 z-[9999] mt-1 min-w-[180px] max-h-[300px] overflow-y-auto rounded-lg p-1.5 shadow-[0_10px_30px_rgba(0,0,0,0.15)] bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700">
           {opts.map((o: any, i: number) => {
             const label = typeof o === "object" ? o.name || o.label : o;
             const value = typeof o === "object" ? o.id || o.value : o;
@@ -116,28 +103,16 @@ function MultiSelect({
               <div
                 key={key}
                 onClick={() => toggle(value)}
-                className="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-xs"
-                style={{
-                  color: T.text,
-                  background: selected ? "#98af3b11" : "transparent",
-                }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = selected
-                    ? "#98af3b22"
-                    : T.sb)
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.background = selected
-                    ? "#98af3b11"
-                    : "transparent")
-                }
+                className={`flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-slate-900 dark:text-gray-50 hover:bg-slate-100 dark:hover:bg-gray-700 ${
+                  selected ? "bg-primary/[0.07]" : "bg-transparent"
+                }`}
               >
                 <div
-                  className="flex h-3.5 w-3.5 items-center justify-center rounded-sm"
-                  style={{
-                    border: `1px solid ${selected ? "#98af3b" : T.sub}`,
-                    background: selected ? "#98af3b" : "transparent",
-                  }}
+                  className={`flex h-3.5 w-3.5 items-center justify-center rounded-sm border ${
+                    selected
+                      ? "border-primary bg-primary"
+                      : "border-slate-500 dark:border-gray-400 bg-transparent"
+                  }`}
                 >
                   {selected && <Check size={10} color="white" />}
                 </div>
@@ -164,12 +139,11 @@ function FilterSelect({
     <select
       value={val}
       onChange={(e) => onChange(e.target.value)}
-      className="max-w-[170px] cursor-pointer rounded-lg px-2.5 py-1.5 text-xs outline-none"
-      style={{
-        border: `1px solid ${val ? "#98af3b" : T.border}`,
-        background: T.card,
-        color: val ? "#98af3b" : T.sub,
-      }}
+      className={`max-w-[170px] cursor-pointer rounded-lg px-2.5 py-1.5 text-xs outline-none border ${
+        val
+          ? "border-primary text-primary"
+          : "border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400"
+      } bg-white dark:bg-gray-800`}
     >
       <option value="">{placeholder || label}</option>
       {opts.map((o: any, i: number) => {
@@ -284,7 +258,6 @@ export default function CronogramaPage({
     fDateTo?.from || fDateTo?.to,
   ].filter(Boolean).length;
 
-  // In CronogramaPage, all filters except search are in the drawer
   const activeAdvancedFilters = totalActiveFilters;
 
   const clearAll = () => {
@@ -330,40 +303,32 @@ export default function CronogramaPage({
       {/* Filters */}
       <div className="mb-5">
         <div className="mb-2.5 flex gap-2.5">
-          <div
-            className="flex flex-1 items-center gap-2.5 rounded-lg px-3"
-            style={{
-              background: T.inp,
-              border: `1px solid ${T.border}`,
-            }}
-          >
-            <Search size={16} color={T.sub} />
+          <div className="flex flex-1 items-center gap-2.5 rounded-lg px-3 bg-slate-100 dark:bg-gray-700 border border-slate-200 dark:border-gray-700">
+            <Search size={16} className="text-slate-500 dark:text-gray-400" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar tarefa..."
-              className="w-full border-none bg-transparent py-2.5 text-[13px] outline-none"
-              style={{ color: T.text }}
+              className="w-full border-none bg-transparent py-2.5 text-[13px] outline-none text-slate-900 dark:text-gray-50"
             />
           </div>
           <button
             onClick={() => setFiltersOpen(!filtersOpen)}
-            className="flex cursor-pointer items-center gap-1.5 rounded-lg px-4 text-[13px] font-semibold"
-            style={{
-              background: filtersOpen ? "#98af3b" : T.card,
-              border: `1px solid ${filtersOpen ? "#98af3b" : T.border}`,
-              color: filtersOpen ? "white" : T.text,
-            }}
+            className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-4 text-[13px] font-semibold border ${
+              filtersOpen
+                ? "bg-primary border-primary text-white"
+                : "bg-white dark:bg-gray-800 border-slate-200 dark:border-gray-700 text-slate-900 dark:text-gray-50"
+            }`}
           >
             <Filter size={14} />
             Filtros
             {activeAdvancedFilters > 0 && (
               <span
-                className="ml-0.5 rounded-[10px] px-[5px] py-px text-[10px]"
-                style={{
-                  background: filtersOpen ? "white" : "#98af3b",
-                  color: filtersOpen ? "#98af3b" : "white",
-                }}
+                className={`ml-0.5 rounded-[10px] px-[5px] py-px text-[10px] ${
+                  filtersOpen
+                    ? "bg-white text-primary"
+                    : "bg-primary text-white"
+                }`}
               >
                 {activeAdvancedFilters}
               </span>
@@ -373,13 +338,7 @@ export default function CronogramaPage({
         </div>
 
         {filtersOpen && (
-          <div
-            className="grid grid-cols-4 gap-3 rounded-xl p-4"
-            style={{
-              background: T.card,
-              border: `1px solid ${T.border}`,
-            }}
-          >
+          <div className="grid grid-cols-4 gap-3 rounded-xl p-4 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700">
             {[
               {
                 l: "Setor",
@@ -456,7 +415,6 @@ export default function CronogramaPage({
                     </label>
                     {f.isMulti ? (
                       <MultiSelect
-                        T={T}
                         val={f.v}
                         onChange={f.s}
                         opts={f.o}
@@ -467,12 +425,11 @@ export default function CronogramaPage({
                         value={f.v}
                         onChange={(e) => f.s(e.target.value)}
                         disabled={f.disabled}
-                        className="w-full rounded-lg p-2 text-[13px]"
-                        style={{
-                          border: `1px solid ${T.border}`,
-                          background: f.disabled ? T.col : T.inp,
-                          color: f.disabled ? T.sub : T.text,
-                        }}
+                        className={`w-full rounded-lg p-2 text-[13px] border ${
+                          f.disabled
+                            ? "border-slate-200 dark:border-gray-700 bg-slate-50 dark:bg-gray-900 text-slate-500 dark:text-gray-400"
+                            : "border-slate-200 dark:border-gray-700 bg-slate-100 dark:bg-gray-700 text-slate-900 dark:text-gray-50"
+                        }`}
                       >
                         <option value="">Todos</option>
                         {f.o?.map((opt: any) => (
@@ -498,18 +455,9 @@ export default function CronogramaPage({
         )}
       </div>
 
-      <div
-        className="mb-4 flex flex-wrap gap-4 rounded-[10px] px-3.5 py-2.5"
-        style={{
-          background: T.card,
-          border: `1px solid ${T.border}`,
-        }}
-      >
+      <div className="mb-4 flex flex-wrap gap-4 rounded-[10px] px-3.5 py-2.5 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700">
         {evts.map((e) => (
-          <div
-            key={e.k}
-            className="flex items-center gap-[5px]"
-          >
+          <div key={e.k} className="flex items-center gap-[5px]">
             <div
               className="h-[9px] w-[9px] rounded-full"
               style={{ background: e.c }}
@@ -518,19 +466,10 @@ export default function CronogramaPage({
           </div>
         ))}
       </div>
-      <div
-        className="overflow-hidden rounded-[14px]"
-        style={{
-          background: T.card,
-          border: `1px solid ${T.border}`,
-        }}
-      >
+      <div className="overflow-hidden rounded-[14px] bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700">
         <div
-          className="grid px-4 py-2.5"
-          style={{
-            gridTemplateColumns: "200px 1fr",
-            borderBottom: `1px solid ${T.border}`,
-          }}
+          className="grid px-4 py-2.5 border-b border-slate-200 dark:border-gray-700"
+          style={{ gridTemplateColumns: "200px 1fr" }}
         >
           <span className="text-[11px] font-bold text-slate-500 dark:text-gray-400">
             TAREFA
@@ -543,22 +482,14 @@ export default function CronogramaPage({
           <div
             key={t.id}
             onClick={() => onSelect(t)}
-            className="grid cursor-pointer items-center px-4 py-3"
-            style={{
-              gridTemplateColumns: "200px 1fr",
-              borderBottom:
-                i < tasks.length - 1 ? `1px solid ${T.border}` : "none",
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = T.hover)}
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.background = "transparent")
-            }
+            className="grid cursor-pointer items-center px-4 py-3 border-b border-slate-200 dark:border-gray-700 last:border-b-0 hover:bg-slate-50 dark:hover:bg-gray-700/50"
+            style={{ gridTemplateColumns: "200px 1fr" }}
           >
             <div className="pr-3">
-              <div className="truncate text-[13px] font-medium" style={{ color: T.text }}>
+              <div className="truncate text-[13px] font-medium text-slate-900 dark:text-gray-50">
                 {t.title}
               </div>
-              <div className="mt-px text-[11px]" style={{ color: T.sub }}>
+              <div className="mt-px text-[11px] text-slate-500 dark:text-gray-400">
                 {t.responsible && typeof t.responsible === "object"
                   ? t.responsible.name
                   : t.responsible || "Não atribuído"}
@@ -570,15 +501,9 @@ export default function CronogramaPage({
                 if (!val) return null;
                 const prev = evts.slice(0, ei).find((pe) => t[pe.k]);
                 return (
-                  <div
-                    key={ev.k}
-                    className="flex shrink-0 items-center"
-                  >
+                  <div key={ev.k} className="flex shrink-0 items-center">
                     {prev && (
-                      <div
-                        className="h-px w-7"
-                        style={{ background: T.border }}
-                      />
+                      <div className="h-px w-7 bg-slate-200 dark:bg-gray-700" />
                     )}
                     <div className="flex flex-col items-center">
                       <div
@@ -591,7 +516,7 @@ export default function CronogramaPage({
                       >
                         {val}
                       </span>
-                      <span className="whitespace-nowrap text-[9px]" style={{ color: T.sub }}>
+                      <span className="whitespace-nowrap text-[9px] text-slate-500 dark:text-gray-400">
                         {ev.l}
                       </span>
                     </div>
@@ -602,10 +527,7 @@ export default function CronogramaPage({
               {/* Histórico de Pausas */}
               {t.pauses && t.pauses.length > 0 && (
                 <>
-                  <div
-                    className="mx-3 h-6 w-px shrink-0"
-                    style={{ background: T.border }}
-                  />
+                  <div className="mx-3 h-6 w-px shrink-0 bg-slate-200 dark:bg-gray-700" />
                   <div className="flex flex-col gap-1">
                     <div className="text-[10px] font-bold uppercase text-red-500">
                       Histórico de Pausas
@@ -614,11 +536,7 @@ export default function CronogramaPage({
                       {t.pauses.map((p: any, pi: number) => (
                         <div
                           key={pi}
-                          className="whitespace-nowrap rounded px-1.5 py-0.5 text-[10px]"
-                          style={{
-                            color: T.sub,
-                            background: T.inp,
-                          }}
+                          className="whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] text-slate-500 dark:text-gray-400 bg-slate-100 dark:bg-gray-700"
                         >
                           {new Date(p.started_at).toLocaleDateString("pt-BR", {
                             day: "2-digit",

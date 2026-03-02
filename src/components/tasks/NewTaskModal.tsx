@@ -236,8 +236,7 @@ export default function NewTaskModal({
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 font-sans"
-      style={{ background: "rgba(0,0,0,0.65)" }}
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 font-sans bg-black/65"
     >
       <div
         onClick={(e) => e.stopPropagation()}

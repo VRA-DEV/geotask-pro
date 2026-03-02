@@ -15,11 +15,35 @@
 :root {
   --background: var(--color-slate-50);
   --foreground: var(--color-slate-700);
+  --t-bg: #f8fafc;
+  --t-card: #ffffff;
+  --t-text: #0f172a;
+  --t-sub: #64748b;
+  --t-border: #e2e8f0;
+  --t-inp: #f1f5f9;
+  --t-hover: #f1f5f9;
+  --t-col: #f1f5f9;
+  --t-tag: #e2e8f0;
+  --t-tag-text: #374151;
+  --t-mm-bg: #f1f5f9;
+  --t-section: #ffffff;
 }
 
 .dark {
   --background: var(--color-slate-700);
   --foreground: var(--color-slate-50);
+  --t-bg: #030712;
+  --t-card: #1f2937;
+  --t-text: #f9fafb;
+  --t-sub: #9ca3af;
+  --t-border: #374151;
+  --t-inp: #374151;
+  --t-hover: rgba(255,255,255,0.05);
+  --t-col: #111827;
+  --t-tag: #374151;
+  --t-tag-text: #d1d5db;
+  --t-mm-bg: #0f172a;
+  --t-section: #ffffff;
 }
 
 body {

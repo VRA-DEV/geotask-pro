@@ -310,7 +310,7 @@ export default function GeoTask() {
               Interface do Mapa em desenvolvimento.
             </div>
           )}
-          {page === "mindmap" && <MindMapPage T={T} tasks={visibleTasks} users={dbUsers} />}
+          {page === "mindmap" && <MindMapPage tasks={visibleTasks} users={dbUsers} />}
           {page === "cronograma" && (
             <CronogramaPage T={T} tasks={visibleTasks} onSelect={setSelectedTask}
               users={dbUsers} contracts={contracts} citiesNeighborhoods={citiesNeighborhoods} sectors={mergedSectors} />

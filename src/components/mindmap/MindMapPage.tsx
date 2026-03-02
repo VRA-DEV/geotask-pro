@@ -28,7 +28,7 @@ const ExportButtons = ({ filtered, kpi, users, user, filterLabel }: any) => (
   </div>
 );
 
-export default function MindMapPage({ T, tasks = [], users = [] }: any) {
+export default function MindMapPage({ tasks = [], users = [] }: any) {
   const [sel, setSel] = useState<any>({
     contractId: null,
     cityId: null,
@@ -144,16 +144,15 @@ export default function MindMapPage({ T, tasks = [], users = [] }: any) {
   }, [sel]);
 
   const LC = ["#98af3b", "#0ea5e9", "#8b5cf6", "#f59e0b", "#10b981"];
-  const CW = 190,
-    CG = 56;
+
   const Node = ({ id, label, sub, color, selected, onClick }: any) => (
     <div
       ref={(el) => setRef(id, el)}
       onClick={onClick}
       className="rounded-xl px-3 py-2.5 cursor-pointer transition-all duration-[180ms] select-none"
       style={{
-        background: selected ? color : T.card,
-        border: `2px solid ${selected ? color : T.border}`,
+        background: selected ? color : "var(--t-card)",
+        border: `2px solid ${selected ? color : "var(--t-border)"}`,
         boxShadow: selected ? `0 0 0 4px ${color}28` : "none",
       }}
       onMouseEnter={(e) => {
@@ -164,26 +163,21 @@ export default function MindMapPage({ T, tasks = [], users = [] }: any) {
       }}
       onMouseLeave={(e) => {
         if (!selected) {
-          e.currentTarget.style.borderColor = T.border;
+          e.currentTarget.style.borderColor = "var(--t-border)";
           e.currentTarget.style.boxShadow = "none";
         }
       }}
     >
       <div
-        className="text-xs font-bold leading-[1.4]"
-        style={{
-          color: selected ? "white" : T.text,
-          marginBottom: sub ? 3 : 0,
-        }}
+        className={`text-xs font-bold leading-[1.4] ${sub ? "mb-[3px]" : ""}`}
+        style={{ color: selected ? "white" : "var(--t-text)" }}
       >
         {label}
       </div>
       {sub && (
         <div
           className="text-[10px]"
-          style={{
-            color: selected ? "rgba(255,255,255,0.7)" : T.sub,
-          }}
+          style={{ color: selected ? "rgba(255,255,255,0.7)" : "var(--t-sub)" }}
         >
           {sub}
         </div>
@@ -195,16 +189,10 @@ export default function MindMapPage({ T, tasks = [], users = [] }: any) {
     <div>
       <div className="flex justify-between items-start mb-3">
         <div>
-          <h1
-            className="m-0 text-[22px] font-bold"
-            style={{ color: T.text }}
-          >
+          <h1 className="m-0 text-[22px] font-bold text-slate-900 dark:text-gray-50">
             Mapa de Tarefas
           </h1>
-          <p
-            className="mt-1 mb-0 text-[13px]"
-            style={{ color: T.sub }}
-          >
+          <p className="mt-1 mb-0 text-[13px] text-slate-500 dark:text-gray-400">
             Clique nos nos para expandir a hierarquia
           </p>
         </div>
@@ -224,12 +212,7 @@ export default function MindMapPage({ T, tasks = [], users = [] }: any) {
                   taskId: null,
                 })
               }
-              className="flex items-center gap-[5px] px-3 py-[7px] rounded-lg text-xs cursor-pointer"
-              style={{
-                background: T.card,
-                border: `1px solid ${T.border}`,
-                color: T.sub,
-              }}
+              className="flex items-center gap-[5px] px-3 py-[7px] rounded-lg text-xs cursor-pointer bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400"
             >
               <ArrowLeft size={13} />
               Resetar
@@ -247,8 +230,7 @@ export default function MindMapPage({ T, tasks = [], users = [] }: any) {
         ].map(([l, c]) => (
           <div
             key={l}
-            className="flex items-center gap-[5px] text-[11px]"
-            style={{ color: T.sub }}
+            className="flex items-center gap-[5px] text-[11px] text-slate-500 dark:text-gray-400"
           >
             <div
               className="w-2 h-2 rounded-full"
@@ -260,18 +242,15 @@ export default function MindMapPage({ T, tasks = [], users = [] }: any) {
       </div>
       <div
         ref={containerRef}
-        className="relative overflow-x-auto overflow-y-auto max-h-[calc(100vh-260px)] min-h-[300px] rounded-2xl p-7 px-5"
+        className="relative overflow-x-auto overflow-y-auto max-h-[calc(100vh-260px)] min-h-[300px] rounded-2xl p-7 px-5 border"
         style={{
-          background: T.mmBg,
-          border: `1px solid ${T.border}`,
+          background: "var(--t-mm-bg)",
+          borderColor: "var(--t-border)",
         }}
       >
         <svg
           className="absolute top-0 left-0 pointer-events-none z-0"
-          style={{
-            width: svgDim.w,
-            height: svgDim.h,
-          }}
+          style={{ width: svgDim.w, height: svgDim.h }}
         >
           {lines.map((l, i) => {
             const mx = (l.x1 + l.x2) / 2;
@@ -280,7 +259,7 @@ export default function MindMapPage({ T, tasks = [], users = [] }: any) {
                 key={i}
                 d={`M${l.x1},${l.y1} C${mx},${l.y1} ${mx},${l.y2} ${l.x2},${l.y2}`}
                 fill="none"
-                stroke={l.active ? "#98af3b" : T.border}
+                stroke={l.active ? "#98af3b" : "var(--t-border)"}
                 strokeWidth={l.active ? 2 : 1.5}
                 strokeDasharray={l.active ? undefined : "5,4"}
                 opacity={l.active ? 0.85 : 0.5}
@@ -288,22 +267,10 @@ export default function MindMapPage({ T, tasks = [], users = [] }: any) {
             );
           })}
         </svg>
-        <div
-          className="relative z-[1] inline-flex items-start min-w-full"
-          style={{ gap: CG }}
-        >
-          <div
-            className="flex flex-col gap-2 shrink-0"
-            style={{ width: CW }}
-          >
-            <div
-              className="text-[10px] font-extrabold mb-1 uppercase tracking-[0.06em] flex items-center gap-[5px]"
-              style={{ color: LC[0] }}
-            >
-              <div
-                className="w-[7px] h-[7px] rounded-full"
-                style={{ background: LC[0] }}
-              />
+        <div className="relative z-[1] inline-flex items-start min-w-full gap-[56px]">
+          <div className="flex flex-col gap-2 shrink-0 w-[190px]">
+            <div className="text-[10px] font-extrabold mb-1 uppercase tracking-[0.06em] flex items-center gap-[5px]" style={{ color: LC[0] }}>
+              <div className="w-[7px] h-[7px] rounded-full" style={{ background: LC[0] }} />
               Contratos
             </div>
             {CONTRACTS_MM.map((c) => (
@@ -326,18 +293,9 @@ export default function MindMapPage({ T, tasks = [], users = [] }: any) {
             ))}
           </div>
           {sel.contractId != null && (
-            <div
-              className="flex flex-col gap-2 shrink-0"
-              style={{ width: CW }}
-            >
-              <div
-                className="text-[10px] font-extrabold mb-1 uppercase tracking-[0.06em] flex items-center gap-[5px]"
-                style={{ color: LC[1] }}
-              >
-                <div
-                  className="w-[7px] h-[7px] rounded-full"
-                  style={{ background: LC[1] }}
-                />
+            <div className="flex flex-col gap-2 shrink-0 w-[190px]">
+              <div className="text-[10px] font-extrabold mb-1 uppercase tracking-[0.06em] flex items-center gap-[5px]" style={{ color: LC[1] }}>
+                <div className="w-[7px] h-[7px] rounded-full" style={{ background: LC[1] }} />
                 Cidades
               </div>
               {cities.map((c: any) => (
@@ -361,18 +319,9 @@ export default function MindMapPage({ T, tasks = [], users = [] }: any) {
             </div>
           )}
           {sel.cityId != null && (
-            <div
-              className="flex flex-col gap-2 shrink-0"
-              style={{ width: CW }}
-            >
-              <div
-                className="text-[10px] font-extrabold mb-1 uppercase tracking-[0.06em] flex items-center gap-[5px]"
-                style={{ color: LC[2] }}
-              >
-                <div
-                  className="w-[7px] h-[7px] rounded-full"
-                  style={{ background: LC[2] }}
-                />
+            <div className="flex flex-col gap-2 shrink-0 w-[190px]">
+              <div className="text-[10px] font-extrabold mb-1 uppercase tracking-[0.06em] flex items-center gap-[5px]" style={{ color: LC[2] }}>
+                <div className="w-[7px] h-[7px] rounded-full" style={{ background: LC[2] }} />
                 Bairros
               </div>
               {neighborhoods.map((n: any) => (
@@ -395,25 +344,13 @@ export default function MindMapPage({ T, tasks = [], users = [] }: any) {
             </div>
           )}
           {sel.neighborhoodId != null && (
-            <div
-              className="flex flex-col gap-2 shrink-0"
-              style={{ width: CW + 20 }}
-            >
-              <div
-                className="text-[10px] font-extrabold mb-1 uppercase tracking-[0.06em] flex items-center gap-[5px]"
-                style={{ color: LC[3] }}
-              >
-                <div
-                  className="w-[7px] h-[7px] rounded-full"
-                  style={{ background: LC[3] }}
-                />
+            <div className="flex flex-col gap-2 shrink-0 w-[210px]">
+              <div className="text-[10px] font-extrabold mb-1 uppercase tracking-[0.06em] flex items-center gap-[5px]" style={{ color: LC[3] }}>
+                <div className="w-[7px] h-[7px] rounded-full" style={{ background: LC[3] }} />
                 Tarefas
               </div>
               {taskList.length === 0 && (
-                <div
-                  className="text-xs text-center p-5"
-                  style={{ color: T.sub }}
-                >
+                <div className="text-xs text-center p-5 text-slate-500 dark:text-gray-400">
                   Sem tarefas
                 </div>
               )}
@@ -426,8 +363,8 @@ export default function MindMapPage({ T, tasks = [], users = [] }: any) {
                     ref={(el) => setRef(`task-${t.id}`, el)}
                     className="rounded-xl px-3 py-2.5 transition-all duration-[180ms]"
                     style={{
-                      background: isSel ? LC[3] : T.card,
-                      border: `2px solid ${isSel ? LC[3] : T.border}`,
+                      background: isSel ? LC[3] : "var(--t-card)",
+                      border: `2px solid ${isSel ? LC[3] : "var(--t-border)"}`,
                     }}
                   >
                     <div
@@ -441,9 +378,7 @@ export default function MindMapPage({ T, tasks = [], users = [] }: any) {
                     >
                       <div
                         className="text-xs font-bold leading-[1.4] mb-[5px]"
-                        style={{
-                          color: isSel ? "white" : T.text,
-                        }}
+                        style={{ color: isSel ? "white" : "var(--t-text)" }}
                       >
                         {t.title}
                       </div>
@@ -464,9 +399,7 @@ export default function MindMapPage({ T, tasks = [], users = [] }: any) {
                       }}
                       className="w-full px-2 py-[5px] rounded-[7px] text-[11px] font-bold cursor-pointer flex items-center justify-center gap-[5px]"
                       style={{
-                        background: isSel
-                          ? "rgba(255,255,255,0.2)"
-                          : "#98af3b11",
+                        background: isSel ? "rgba(255,255,255,0.2)" : "#98af3b11",
                         border: `1px solid ${isSel ? "rgba(255,255,255,0.3)" : "#98af3b33"}`,
                         color: isSel ? "white" : "#98af3b",
                       }}
@@ -480,25 +413,13 @@ export default function MindMapPage({ T, tasks = [], users = [] }: any) {
             </div>
           )}
           {sel.taskId != null && (
-            <div
-              className="flex flex-col gap-2 shrink-0"
-              style={{ width: CW }}
-            >
-              <div
-                className="text-[10px] font-extrabold mb-1 uppercase tracking-[0.06em] flex items-center gap-[5px]"
-                style={{ color: LC[4] }}
-              >
-                <div
-                  className="w-[7px] h-[7px] rounded-full"
-                  style={{ background: LC[4] }}
-                />
+            <div className="flex flex-col gap-2 shrink-0 w-[190px]">
+              <div className="text-[10px] font-extrabold mb-1 uppercase tracking-[0.06em] flex items-center gap-[5px]" style={{ color: LC[4] }}>
+                <div className="w-[7px] h-[7px] rounded-full" style={{ background: LC[4] }} />
                 Subtarefas
               </div>
               {subtasks.length === 0 && (
-                <div
-                  className="text-xs text-center p-5"
-                  style={{ color: T.sub }}
-                >
+                <div className="text-xs text-center p-5 text-slate-500 dark:text-gray-400">
                   Sem subtarefas
                 </div>
               )}
@@ -508,18 +429,16 @@ export default function MindMapPage({ T, tasks = [], users = [] }: any) {
                   ref={(el) => setRef(`sub-${s.id}`, el)}
                   className="rounded-xl px-3 py-2.5"
                   style={{
-                    background: s.done ? LC[4] : T.card,
-                    border: `2px solid ${s.done ? LC[4] : T.border}`,
+                    background: s.done ? LC[4] : "var(--t-card)",
+                    border: `2px solid ${s.done ? LC[4] : "var(--t-border)"}`,
                   }}
                 >
                   <div className="flex items-start gap-2 mb-2">
                     <div
                       className="w-4 h-4 rounded flex items-center justify-center shrink-0 mt-px"
                       style={{
-                        background: s.done
-                          ? "rgba(255,255,255,0.3)"
-                          : "transparent",
-                        border: s.done ? "none" : `2px solid ${T.border}`,
+                        background: s.done ? "rgba(255,255,255,0.3)" : "transparent",
+                        border: s.done ? "none" : "2px solid var(--t-border)",
                       }}
                     >
                       {s.done && <Check size={9} color="white" />}
@@ -527,17 +446,13 @@ export default function MindMapPage({ T, tasks = [], users = [] }: any) {
                     <div>
                       <div
                         className="text-xs font-semibold"
-                        style={{
-                          color: s.done ? "white" : T.text,
-                        }}
+                        style={{ color: s.done ? "white" : "var(--t-text)" }}
                       >
                         {s.title}
                       </div>
                       <div
                         className="text-[10px] mt-0.5"
-                        style={{
-                          color: s.done ? "rgba(255,255,255,0.65)" : T.sub,
-                        }}
+                        style={{ color: s.done ? "rgba(255,255,255,0.65)" : "var(--t-sub)" }}
                       >
                         {s.done ? "Concluida" : "Pendente"}
                       </div>
@@ -547,9 +462,7 @@ export default function MindMapPage({ T, tasks = [], users = [] }: any) {
                     onClick={() => setDetail(task)}
                     className="w-full px-2 py-1 rounded-[7px] text-[11px] font-bold cursor-pointer flex items-center justify-center gap-[5px]"
                     style={{
-                      background: s.done
-                        ? "rgba(255,255,255,0.18)"
-                        : "#10b98111",
+                      background: s.done ? "rgba(255,255,255,0.18)" : "#10b98111",
                       border: `1px solid ${s.done ? "rgba(255,255,255,0.3)" : "#10b98133"}`,
                       color: s.done ? "white" : "#10b981",
                     }}
@@ -564,10 +477,7 @@ export default function MindMapPage({ T, tasks = [], users = [] }: any) {
         </div>
       </div>
       {sel.contractId == null && (
-        <div
-          className="text-center p-5 text-[13px]"
-          style={{ color: T.sub }}
-        >
+        <div className="text-center p-5 text-[13px] text-slate-500 dark:text-gray-400">
           Clique em um contrato para comecar a expandir o mapa
         </div>
       )}
@@ -578,11 +488,7 @@ export default function MindMapPage({ T, tasks = [], users = [] }: any) {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-[500px] rounded-[20px] p-6 max-h-[90vh] overflow-y-auto"
-            style={{
-              background: T.card,
-              border: `1px solid ${T.border}`,
-            }}
+            className="w-full max-w-[500px] rounded-[20px] p-6 max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700"
           >
             <div className="flex justify-between items-start mb-4">
               <div>
@@ -595,19 +501,15 @@ export default function MindMapPage({ T, tasks = [], users = [] }: any) {
                 >
                   {detail.status}
                 </span>
-                <h2
-                  className="mt-1.5 mb-0 text-lg font-bold"
-                  style={{ color: T.text }}
-                >
+                <h2 className="mt-1.5 mb-0 text-lg font-bold text-slate-900 dark:text-gray-50">
                   {detail.title}
                 </h2>
               </div>
               <button
                 onClick={() => setDetail(null)}
-                className="border-none rounded-lg p-1.5 cursor-pointer"
-                style={{ background: T.inp }}
+                className="border-none rounded-lg p-1.5 cursor-pointer bg-slate-100 dark:bg-gray-700"
               >
-                <X size={16} color={T.sub} />
+                <X size={16} className="text-slate-500 dark:text-gray-400" />
               </button>
             </div>
             <div className="grid grid-cols-2 gap-2 mb-4">
@@ -621,19 +523,12 @@ export default function MindMapPage({ T, tasks = [], users = [] }: any) {
               ].map(([k, v]) => (
                 <div
                   key={k}
-                  className="rounded-lg px-3 py-2"
-                  style={{ background: T.inp }}
+                  className="rounded-lg px-3 py-2 bg-slate-100 dark:bg-gray-700"
                 >
-                  <div
-                    className="text-[10px] font-semibold mb-0.5"
-                    style={{ color: T.sub }}
-                  >
+                  <div className="text-[10px] font-semibold mb-0.5 text-slate-500 dark:text-gray-400">
                     {k.toUpperCase()}
                   </div>
-                  <div
-                    className="text-[13px] font-semibold"
-                    style={{ color: T.text }}
-                  >
+                  <div className="text-[13px] font-semibold text-slate-900 dark:text-gray-50">
                     {v}
                   </div>
                 </div>
@@ -641,41 +536,31 @@ export default function MindMapPage({ T, tasks = [], users = [] }: any) {
             </div>
             {detail.subtasks?.length > 0 && (
               <div>
-                <div
-                  className="text-[11px] font-bold mb-2"
-                  style={{ color: T.sub }}
-                >
+                <div className="text-[11px] font-bold mb-2 text-slate-500 dark:text-gray-400">
                   SUBTAREFAS
                 </div>
                 {detail.subtasks.map((s: any) => (
                   <div
                     key={s.id}
-                    className="flex items-center gap-2 px-2.5 py-[7px] rounded-lg mb-[5px]"
-                    style={{ background: T.inp }}
+                    className="flex items-center gap-2 px-2.5 py-[7px] rounded-lg mb-[5px] bg-slate-100 dark:bg-gray-700"
                   >
                     <div
                       className="w-4 h-4 rounded flex items-center justify-center shrink-0"
                       style={{
                         background: s.done ? "#10b981" : "transparent",
-                        border: s.done ? "none" : `1px solid ${T.border}`,
+                        border: s.done ? "none" : "1px solid var(--t-border)",
                       }}
                     >
                       {s.done && <Check size={10} color="white" />}
                     </div>
                     <span
-                      className="text-[13px]"
-                      style={{
-                        color: s.done ? T.sub : T.text,
-                        textDecoration: s.done ? "line-through" : "none",
-                      }}
+                      className={`text-[13px] ${s.done ? "text-slate-500 dark:text-gray-400 line-through" : "text-slate-900 dark:text-gray-50"}`}
                     >
                       {s.title}
                     </span>
                     <span
                       className="ml-auto text-[10px] font-semibold"
-                      style={{
-                        color: s.done ? "#10b981" : "#f59e0b",
-                      }}
+                      style={{ color: s.done ? "#10b981" : "#f59e0b" }}
                     >
                       {s.done ? "Concluida" : "Pendente"}
                     </span>
