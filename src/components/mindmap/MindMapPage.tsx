@@ -3,6 +3,59 @@
 import { ArrowLeft, Check, Eye, FileText, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { exportToExcel, exportToPDF, getKpiData } from "@/lib/exportUtils";
+import type { Task, User, Subtask } from "@/types";
+import type { ExportKPIs } from "@/lib/exportUtils";
+
+// ── Local mind-map hierarchy types ────────────────────────────────────
+
+interface MindMapNeighborhood {
+  id: number;
+  name: string;
+  tasks: Task[];
+}
+
+interface MindMapCity {
+  id: number;
+  name: string;
+  neighborhoods: MindMapNeighborhood[];
+}
+
+interface MindMapContract {
+  id: number;
+  name: string;
+  cities: MindMapCity[];
+}
+
+interface MindMapSelection {
+  contractId: number | null;
+  cityId: number | null;
+  neighborhoodId: number | null;
+  taskId: number | null;
+}
+
+// ── Component prop interfaces ─────────────────────────────────────────
+
+interface ExportButtonsProps {
+  filtered: Task[];
+  kpi: ExportKPIs;
+  users: User[];
+  user?: User | null;
+  filterLabel?: string;
+}
+
+interface NodeProps {
+  id: string;
+  label: string;
+  sub?: string;
+  color: string;
+  selected: boolean;
+  onClick: () => void;
+}
+
+interface MindMapPageProps {
+  tasks?: Task[];
+  users?: User[];
+}
 
 const STATUS_COLOR: Record<string, string> = {
   "A Fazer": "#6366f1",
@@ -11,7 +64,7 @@ const STATUS_COLOR: Record<string, string> = {
   "Concluído": "#10b981",
 };
 
-const ExportButtons = ({ filtered, kpi, users, user, filterLabel }: any) => (
+const ExportButtons = ({ filtered, kpi, users, user, filterLabel }: ExportButtonsProps) => (
   <div className="flex items-center gap-2">
     <button
       onClick={() => exportToExcel(filtered, kpi, user, filterLabel)}
@@ -28,14 +81,14 @@ const ExportButtons = ({ filtered, kpi, users, user, filterLabel }: any) => (
   </div>
 );
 
-export default function MindMapPage({ tasks = [], users = [] }: any) {
-  const [sel, setSel] = useState<any>({
+export default function MindMapPage({ tasks = [], users = [] }: MindMapPageProps) {
+  const [sel, setSel] = useState<MindMapSelection>({
     contractId: null,
     cityId: null,
     neighborhoodId: null,
     taskId: null,
   });
-  const [detail, setDetail] = useState<any>(null);
+  const [detail, setDetail] = useState<Task | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const nodeRefs = useRef<Record<string, HTMLElement>>({});
   const [lines, setLines] = useState<
@@ -45,31 +98,33 @@ export default function MindMapPage({ tasks = [], users = [] }: any) {
 
   // Build hierarchy from real tasks
   const CONTRACTS_MM = (() => {
-    const contractMap: Record<string, any> = {};
+    const contractMap: Record<string, MindMapContract> = {};
     let cid = 0,
       cityId = 0,
       neighId = 0;
-    tasks.forEach((t: any) => {
+    tasks.forEach((t: Task) => {
       if (!t.contract) return;
       if (t.parent_id) return; // skip subtasks — they show under their parent
-      if (!contractMap[t.contract]) {
-        contractMap[t.contract] = { id: ++cid, name: t.contract, cities: [] };
+      const contractName = typeof t.contract === "object" ? t.contract?.name || "" : String(t.contract);
+      const cityName = typeof t.city === "object" ? t.city?.name || "Sem cidade" : String(t.city || "Sem cidade");
+      if (!contractMap[contractName]) {
+        contractMap[contractName] = { id: ++cid, name: contractName, cities: [] };
       }
-      const cObj = contractMap[t.contract];
+      const cObj = contractMap[contractName];
       let cityObj = cObj.cities.find(
-        (c: any) => c.name === (t.city || "Sem cidade"),
+        (c: MindMapCity) => c.name === cityName,
       );
       if (!cityObj) {
         cityObj = {
           id: ++cityId,
-          name: t.city || "Sem cidade",
+          name: cityName,
           neighborhoods: [],
         };
         cObj.cities.push(cityObj);
       }
       const neighName = t.nucleus || "Sem bairro";
       let neighObj = cityObj.neighborhoods.find(
-        (n: any) => n.name === neighName,
+        (n: MindMapNeighborhood) => n.name === neighName,
       );
       if (!neighObj) {
         neighObj = { id: ++neighId, name: neighName, tasks: [] };
@@ -80,15 +135,15 @@ export default function MindMapPage({ tasks = [], users = [] }: any) {
     return Object.values(contractMap);
   })();
 
-  const contract = CONTRACTS_MM.find((c: any) => c.id === sel.contractId);
+  const contract = CONTRACTS_MM.find((c: MindMapContract) => c.id === sel.contractId);
   const cities = contract?.cities || [];
-  const city = cities.find((c: any) => c.id === sel.cityId);
+  const city = cities.find((c: MindMapCity) => c.id === sel.cityId);
   const neighborhoods = city?.neighborhoods || [];
-  const neighborhood = neighborhoods.find((n: any) => n.id === sel.neighborhoodId);
+  const neighborhood = neighborhoods.find((n: MindMapNeighborhood) => n.id === sel.neighborhoodId);
   const taskList = neighborhood?.tasks || [];
-  const task = taskList.find((t: any) => t.id === sel.taskId);
+  const task = taskList.find((t: Task) => t.id === sel.taskId);
   const subtasks = task?.subtasks || [];
-  const setRef = (key: any, el: any) => {
+  const setRef = (key: string, el: HTMLElement | null) => {
     if (el) nodeRefs.current[key] = el;
   };
 
@@ -105,7 +160,7 @@ export default function MindMapPage({ tasks = [], users = [] }: any) {
       y2: number;
       active: boolean;
     }[] = [];
-    const ge = (key: any) => {
+    const ge = (key: string) => {
       const el = nodeRefs.current[key];
       if (!el) return null;
       const r = el.getBoundingClientRect();
@@ -115,26 +170,26 @@ export default function MindMapPage({ tasks = [], users = [] }: any) {
         my: r.top + r.height / 2 - cRect.top + st,
       };
     };
-    const cn = (fk: any, tk: any, a: any) => {
+    const cn = (fk: string, tk: string, a: boolean) => {
       const f = ge(fk),
         t2 = ge(tk);
       if (f && t2)
         nl.push({ x1: f.rx, y1: f.my, x2: t2.lx, y2: t2.my, active: a });
     };
     if (sel.contractId != null)
-      cities.forEach((c: any) =>
+      cities.forEach((c: MindMapCity) =>
         cn(`contract-${sel.contractId}`, `city-${c.id}`, c.id === sel.cityId),
       );
     if (sel.cityId != null)
-      neighborhoods.forEach((n: any) =>
+      neighborhoods.forEach((n: MindMapNeighborhood) =>
         cn(`city-${sel.cityId}`, `neigh-${n.id}`, n.id === sel.neighborhoodId),
       );
     if (sel.neighborhoodId != null)
-      taskList.forEach((t: any) =>
+      taskList.forEach((t: Task) =>
         cn(`neigh-${sel.neighborhoodId}`, `task-${t.id}`, t.id === sel.taskId),
       );
     if (sel.taskId != null)
-      subtasks.forEach((s: any) => cn(`task-${sel.taskId}`, `sub-${s.id}`, true));
+      subtasks.forEach((s: Subtask) => cn(`task-${sel.taskId}`, `sub-${s.id}`, true));
     setSvgDim({ w: cont.scrollWidth, h: cont.scrollHeight });
     setLines(nl);
   };
@@ -145,7 +200,7 @@ export default function MindMapPage({ tasks = [], users = [] }: any) {
 
   const LC = ["#98af3b", "#0ea5e9", "#8b5cf6", "#f59e0b", "#10b981"];
 
-  const Node = ({ id, label, sub, color, selected, onClick }: any) => (
+  const Node = ({ id, label, sub, color, selected, onClick }: NodeProps) => (
     <div
       ref={(el) => setRef(id, el)}
       onClick={onClick}
@@ -298,7 +353,7 @@ export default function MindMapPage({ tasks = [], users = [] }: any) {
                 <div className="w-[7px] h-[7px] rounded-full" style={{ background: LC[1] }} />
                 Cidades
               </div>
-              {cities.map((c: any) => (
+              {cities.map((c: MindMapCity) => (
                 <Node
                   key={c.id}
                   id={`city-${c.id}`}
@@ -307,7 +362,7 @@ export default function MindMapPage({ tasks = [], users = [] }: any) {
                   color={LC[1]}
                   selected={sel.cityId === c.id}
                   onClick={() =>
-                    setSel((s: any) => ({
+                    setSel((s: MindMapSelection) => ({
                       ...s,
                       cityId: c.id === s.cityId ? null : c.id,
                       neighborhoodId: null,
@@ -324,7 +379,7 @@ export default function MindMapPage({ tasks = [], users = [] }: any) {
                 <div className="w-[7px] h-[7px] rounded-full" style={{ background: LC[2] }} />
                 Bairros
               </div>
-              {neighborhoods.map((n: any) => (
+              {neighborhoods.map((n: MindMapNeighborhood) => (
                 <Node
                   key={n.id}
                   id={`neigh-${n.id}`}
@@ -333,7 +388,7 @@ export default function MindMapPage({ tasks = [], users = [] }: any) {
                   color={LC[2]}
                   selected={sel.neighborhoodId === n.id}
                   onClick={() =>
-                    setSel((s: any) => ({
+                    setSel((s: MindMapSelection) => ({
                       ...s,
                       neighborhoodId: n.id === s.neighborhoodId ? null : n.id,
                       taskId: null,
@@ -354,7 +409,7 @@ export default function MindMapPage({ tasks = [], users = [] }: any) {
                   Sem tarefas
                 </div>
               )}
-              {taskList.map((t: any) => {
+              {taskList.map((t: Task) => {
                 const sc = STATUS_COLOR[t.status],
                   isSel = sel.taskId === t.id;
                 return (
@@ -369,7 +424,7 @@ export default function MindMapPage({ tasks = [], users = [] }: any) {
                   >
                     <div
                       onClick={() =>
-                        setSel((s: any) => ({
+                        setSel((s: MindMapSelection) => ({
                           ...s,
                           taskId: t.id === s.taskId ? null : t.id,
                         }))
@@ -423,7 +478,7 @@ export default function MindMapPage({ tasks = [], users = [] }: any) {
                   Sem subtarefas
                 </div>
               )}
-              {subtasks.map((s: any) => (
+              {subtasks.map((s: Subtask) => (
                 <div
                   key={s.id}
                   ref={(el) => setRef(`sub-${s.id}`, el)}
@@ -459,7 +514,7 @@ export default function MindMapPage({ tasks = [], users = [] }: any) {
                     </div>
                   </div>
                   <button
-                    onClick={() => setDetail(task)}
+                    onClick={() => setDetail(task ?? null)}
                     className="w-full px-2 py-1 rounded-[7px] text-[11px] font-bold cursor-pointer flex items-center justify-center gap-[5px]"
                     style={{
                       background: s.done ? "rgba(255,255,255,0.18)" : "#10b98111",
@@ -522,24 +577,24 @@ export default function MindMapPage({ tasks = [], users = [] }: any) {
                 ["Prazo", detail.deadline || "\u2014"],
               ].map(([k, v]) => (
                 <div
-                  key={k}
+                  key={k as string}
                   className="rounded-lg px-3 py-2 bg-slate-100 dark:bg-gray-700"
                 >
                   <div className="text-[10px] font-semibold mb-0.5 text-slate-500 dark:text-gray-400">
-                    {k.toUpperCase()}
+                    {(k as string).toUpperCase()}
                   </div>
                   <div className="text-[13px] font-semibold text-slate-900 dark:text-gray-50">
-                    {v}
+                    {v as React.ReactNode}
                   </div>
                 </div>
               ))}
             </div>
-            {detail.subtasks?.length > 0 && (
+            {detail.subtasks?.length && detail.subtasks.length > 0 && (
               <div>
                 <div className="text-[11px] font-bold mb-2 text-slate-500 dark:text-gray-400">
                   SUBTAREFAS
                 </div>
-                {detail.subtasks.map((s: any) => (
+                {detail.subtasks.map((s: Subtask) => (
                   <div
                     key={s.id}
                     className="flex items-center gap-2 px-2.5 py-[7px] rounded-lg mb-[5px] bg-slate-100 dark:bg-gray-700"

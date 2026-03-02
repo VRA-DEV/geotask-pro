@@ -6,7 +6,7 @@
 // ── Base entities ─────────────────────────────────────────────────────
 
 export interface Role {
-  id: number;
+  id?: number;
   name: string;
   permissions?: Record<string, string> | null;
   created_at?: string;
@@ -14,7 +14,7 @@ export interface Role {
 }
 
 export interface Sector {
-  id: number | string;
+  id?: number | string;
   name: string;
   created_at?: string;
   updated_at?: string;
@@ -105,6 +105,14 @@ export interface Task {
   children?: Task[];
   subtasks?: Subtask[];
   comments?: Comment[];
+  /** Pause history from enriched API responses */
+  pauses?: { started_at: string; ended_at?: string }[];
+  /** Pre-formatted date aliases used by some views */
+  created?: string;
+  assigned?: string;
+  started?: string;
+  paused?: string;
+  completed?: string;
 }
 
 // ── Notification ──────────────────────────────────────────────────────

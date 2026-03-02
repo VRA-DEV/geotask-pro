@@ -17,6 +17,38 @@ import {
   parseDateStr,
   sectorDisplay,
 } from "@/lib/helpers";
+import type { Task, User, Sector, Subtask, ThemeColors, CitiesNeighborhoods } from "@/types";
+
+interface TaskDetailModalProps {
+  T: ThemeColors;
+  task: Task;
+  user: User;
+  onClose: () => void;
+  onUpdate: (id: number, action: string, data: Record<string, unknown>) => Promise<void>;
+  users?: User[];
+  contracts?: string[];
+  citiesNeighborhoods?: CitiesNeighborhoods;
+  sectors?: (Sector | string)[];
+  tasks?: Task[];
+  setSelectedTask: (t: Task) => void;
+}
+
+interface HistoryEntry {
+  id: number;
+  field: string;
+  old_value: string | null;
+  new_value: string | null;
+  created_at: string;
+  user?: { name: string } | null;
+}
+
+interface CommentEntry {
+  id: number;
+  content: string;
+  user_name: string;
+  user_avatar?: string;
+  created_at: string;
+}
 
 export default function TaskDetailModal({
   T,
@@ -30,13 +62,13 @@ export default function TaskDetailModal({
   sectors = [],
   tasks = [],
   setSelectedTask,
-}: any) {
+}: TaskDetailModalProps) {
   const sc = STATUS_COLOR[t.status];
 
   const [tab, setTab] = useState("dados");
   const [form, setForm] = useState({
     ...t,
-    sector: t.sector?.name || t.sector || "",
+    sector: (typeof t.sector === "object" ? t.sector?.name : t.sector) || "",
   });
   const [saving, setSaving] = useState(false);
 
@@ -53,7 +85,7 @@ export default function TaskDetailModal({
   // Subtasks State
   const [newSubtask, setNewSubtask] = useState({
     title: "",
-    sector: t.sector?.name || t.sector || "",
+    sector: (typeof t.sector === "object" ? t.sector?.name : t.sector) || "",
     responsible_id: "",
     description: "",
   });
@@ -62,7 +94,7 @@ export default function TaskDetailModal({
 
   const filteredUsers = useMemo(() => {
     if (!form.sector) return [];
-    return users.filter((u: any) => {
+    return users.filter((u: User) => {
       const uSName = String(u.sector?.name || u.sector || "")
         .toLowerCase()
         .trim();
@@ -75,7 +107,7 @@ export default function TaskDetailModal({
 
   const subFilteredUsers = useMemo(() => {
     if (!newSubtask.sector) return [];
-    return users.filter((u: any) => {
+    return users.filter((u: User) => {
       const uSName = String(u.sector?.name || u.sector || "")
         .toLowerCase()
         .trim();
@@ -89,7 +121,7 @@ export default function TaskDetailModal({
   useEffect(() => {
     setForm({
       ...t,
-      sector: t.sector?.name || t.sector || "",
+      sector: (typeof t.sector === "object" ? t.sector?.name : t.sector) || "",
     });
   }, [t]);
 
@@ -142,24 +174,23 @@ export default function TaskDetailModal({
         const data = await res.json();
         setNewSubtask({
           title: "",
-          sector: t.sector?.name || t.sector || "",
+          sector: (typeof t.sector === "object" ? t.sector?.name : t.sector) || "",
           responsible_id: "",
           description: "",
         });
 
-        const newChild = {
+        const newChild: Subtask = {
           id: data.id,
           title: newSubtask.title,
-          status: "A Fazer",
-          priority: t.priority || "Média",
-          type: t.type || "Vistoria",
-          deadline: t.deadline,
-          sector: newSubtask.sector,
+          done: false,
+          task_id: t.id,
+          sector_id: Number(newSubtask.sector) || null,
+          responsible_id: Number(newSubtask.responsible_id) || null,
           responsible: newSubtask.responsible_id
-            ? users.find((u: any) => u.id === Number(newSubtask.responsible_id))
+            ? users.find((u: User) => u.id === Number(newSubtask.responsible_id)) ?? null
             : null,
         };
-        setForm((prev: any) => ({
+        setForm((prev) => ({
           ...prev,
           subtasks: [...(prev.subtasks || []), newChild],
         }));
@@ -198,7 +229,7 @@ export default function TaskDetailModal({
   // Permission Logic
   const canEdit = (field: string) => {
     // Admin, Gestor, Coordenador, Gerente can edit everything
-    if (["Admin", "Gestor", "Coordenador", "Gerente"].includes(user.role?.name))
+    if (["Admin", "Gestor", "Coordenador", "Gerente"].includes(user.role?.name || ""))
       return true;
 
     // Liderado/Others restrictions
@@ -220,19 +251,19 @@ export default function TaskDetailModal({
         const sectorQ = query.slice(1);
         const activeSectors = sectors.length > 0 ? sectors : SECTORS;
         const matches = activeSectors
-          .filter((s: any) => {
+          .filter((s: Sector | string) => {
             const name = typeof s === "string" ? s : s.name || "";
             return name.toLowerCase().startsWith(sectorQ);
           })
           .slice(0, 5);
         setMentionSuggestions(
-          matches.map((s: any) => `#${typeof s === "string" ? s : s.name}`),
+          matches.map((s: Sector | string) => `#${typeof s === "string" ? s : s.name}`),
         );
       } else {
         const matches = users
           .filter((u: any) => u.name.toLowerCase().startsWith(query))
           .slice(0, 5);
-        setMentionSuggestions(matches.map((u: any) => u.name));
+        setMentionSuggestions(matches.map((u: User) => u.name));
       }
     } else {
       setMentionSuggestions([]);
@@ -379,14 +410,14 @@ export default function TaskDetailModal({
                 {
                   l: "Setor",
                   f: "sector",
-                  o: sectors.map((s: any) =>
+                  o: sectors.map((s: Sector | string) =>
                     typeof s === "object" ? s.name : s,
                   ),
                 },
                 {
                   l: "Responsável",
                   f: "responsible_id",
-                  o: filteredUsers.map((u: any) => ({
+                  o: filteredUsers.map((u: User) => ({
                     value: u.id,
                     label: u.name,
                   })),
@@ -398,6 +429,7 @@ export default function TaskDetailModal({
                 { l: "Lote", f: "lote" },
                 { l: "Prazo", f: "deadline", type: "date-picker" },
               ].map(({ l, f, o, type }) => {
+                const formRec = form as unknown as Record<string, string | null | undefined>;
                 const disabled = !canEdit(
                   f === "responsible_id" ? "responsible" : f,
                 );
@@ -408,15 +440,15 @@ export default function TaskDetailModal({
                     </div>
                     {o ? (
                       <select
-                        value={form[f] || ""}
+                        value={(form as Record<string, unknown>)[f] as string || ""}
                         disabled={disabled}
                         onChange={(e) => {
                           const v = e.target.value;
-                          setForm({ ...form, [f]: v });
+                          setForm((prev) => ({ ...prev, [f]: v }));
                           if (f === "sector") {
-                            setForm((prev: any) => ({
+                            setForm((prev) => ({
                               ...prev,
-                              responsible_id: "",
+                              responsible_id: null,
                             }));
                           }
                         }}
@@ -427,7 +459,7 @@ export default function TaskDetailModal({
                         }`}
                       >
                         <option value="">Selecione...</option>
-                        {o.map((opt: any) => {
+                        {o.map((opt: string | { value: string | number; label: string }) => {
                           const val =
                             typeof opt === "object" && opt !== null
                               ? opt.value
@@ -448,7 +480,7 @@ export default function TaskDetailModal({
                         {type === "date-picker" ? (
                           <DatePicker
                             T={T}
-                            date={parseDateStr(form[f])}
+                            date={parseDateStr(formRec[f] ?? undefined)}
                             setDate={(d) =>
                               setForm({
                                 ...form,
@@ -461,7 +493,7 @@ export default function TaskDetailModal({
                         ) : (
                           <input
                             type={type || "text"}
-                            value={form[f] || ""}
+                            value={formRec[f] || ""}
                             disabled={disabled}
                             onChange={(e) =>
                               setForm({ ...form, [f]: e.target.value })
@@ -502,7 +534,7 @@ export default function TaskDetailModal({
                     Nenhuma subtarefa.
                   </div>
                 )}
-                {(form.subtasks || []).map((child: any) => (
+                {(form.subtasks || []).map((child: Subtask & Partial<Task>) => (
                   <div
                     key={child.id}
                     className="p-2.5 border border-slate-200 dark:border-gray-700 rounded-lg mb-2 bg-white dark:bg-gray-800 flex justify-between items-center"
@@ -560,13 +592,13 @@ export default function TaskDetailModal({
                       onClick={() => {
                         // Switch selected task to subtask
                         const fullTask = tasks.find(
-                          (tk: any) => tk.id === child.id,
+                          (tk: Task) => tk.id === child.id,
                         );
                         if (fullTask) {
                           setSelectedTask(fullTask);
                         } else {
                           // If not in main list (unlikely), use child as is
-                          setSelectedTask(child);
+                          setSelectedTask(child as unknown as Task);
                         }
                       }}
                     >
@@ -614,7 +646,7 @@ export default function TaskDetailModal({
                       className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-gray-700 bg-slate-100 dark:bg-gray-700 text-slate-900 dark:text-gray-50 text-[13px]"
                     >
                       <option value="">Setor *</option>
-                      {sectors.map((s: any) => {
+                      {sectors.map((s: Sector | string) => {
                         const name = typeof s === "object" ? s.name : s;
                         return (
                           <option key={name} value={name}>
@@ -634,7 +666,7 @@ export default function TaskDetailModal({
                       className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-gray-700 bg-slate-100 dark:bg-gray-700 text-slate-900 dark:text-gray-50 text-[13px]"
                     >
                       <option value="">Responsável...</option>
-                      {subFilteredUsers.map((u: any) => (
+                      {subFilteredUsers.map((u: User) => (
                         <option key={u.id} value={u.id}>
                           {u.name}
                         </option>
@@ -675,7 +707,7 @@ export default function TaskDetailModal({
           {tab === "comentarios" && (
             <div>
               <div className="flex flex-col gap-3 mb-5">
-                {comments.map((c: any) => (
+                {comments.map((c: CommentEntry) => (
                   <div
                     key={c.id}
                     className="bg-slate-100 dark:bg-gray-900 rounded-[10px] p-3"
@@ -750,7 +782,7 @@ export default function TaskDetailModal({
                   { label: "Conclusão", date: t.completed },
                 ]
                   .filter((e) => e.date)
-                  .map((evt: any, idx) => (
+                  .map((evt: { label: string; date: string | null | undefined }, idx: number) => (
                     <div
                       key={idx}
                       className="z-[1] flex flex-col items-center gap-1.5"
@@ -779,7 +811,7 @@ export default function TaskDetailModal({
                   Nenhum histórico registrado.
                 </div>
               )}
-              {history.map((h: any) => (
+              {history.map((h: HistoryEntry) => (
                 <div
                   key={h.id}
                   className="flex gap-2.5 pb-3 border-b border-dashed border-slate-200 dark:border-gray-700"
@@ -812,7 +844,7 @@ export default function TaskDetailModal({
         </div>
 
         {["Admin", "Gestor", "Liderado", "Gerente", "Coordenador"].includes(
-          user.role?.name,
+          user.role?.name || "",
         ) && (
           <div className="mt-5 border-t border-slate-200 dark:border-gray-700 pt-4 flex gap-2.5 justify-end flex-wrap">
             {t.status === "A Fazer" &&

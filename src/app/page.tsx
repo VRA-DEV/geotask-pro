@@ -200,8 +200,8 @@ export default function GeoTask() {
     return true;
   };
 
-  const canCreate = user &&
-    ["Admin", "Gerente", "Gestor", "Coordenador"].includes(user.role?.name || "");
+  const canCreate = !!(user &&
+    ["Admin", "Gerente", "Gestor", "Coordenador"].includes(user.role?.name || ""));
 
   // ── Task visibility (role-based filtering) ──────────────────────────
   const isLiderado = user?.role?.name === "Liderado";

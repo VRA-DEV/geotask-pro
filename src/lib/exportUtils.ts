@@ -1,4 +1,5 @@
 import type jsPDF from "jspdf";
+import type { Task } from "@/types";
 
 // Lazy-loaded to avoid 1MB+ upfront bundle cost
 const getJsPDF = () => import("jspdf").then((m) => m.default);
@@ -15,33 +16,24 @@ const COMPANY = {
 };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-export interface ExportTask {
-  id: number;
-  title: string;
-  type: string;
-  priority: string;
-  deadline: string | null;
-  status: string;
-  responsible?: { name: string; sector?: { name: string } } | string | null;
-  sector?: { name: string } | string | null;
-  contract?: string;
-  city?: string;
-  nucleus?: string;
-  quadra?: string;
-  lote?: string;
-  created?: string;
-  assigned?: string;
-  started?: string;
-  paused?: string;
-  completed?: string;
-  completed_at?: string;
-  created_at?: string;
+// ExportTask extends Task so any Task[] can be passed directly without casts.
+// Extra optional fields support pre-flattened / enriched data from views.
+export interface ExportTask extends Omit<Task, "subtasks" | "children"> {
+  /** Pre-computed time (alias for time_spent) */
   time?: number;
-  subtasks?: ExportTask[];
-  pauses?: { started_at: string; ended_at?: string }[];
+  /** Flat boolean for subtask done state */
   done?: boolean;
-  description?: string;
+  /** Subtasks in export context carry full task-like data */
+  subtasks?: ExportTask[];
+  children?: ExportTask[];
 }
+
+/**
+ * Helper: safely cast Task[] to ExportTask[] for the export functions.
+ * At runtime the shapes are compatible; the cast resolves the subtasks mismatch.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const asExport = (tasks: any[]): ExportTask[] => tasks as ExportTask[];
 
 export interface ExportKPIs {
   concludedCount: number;
@@ -105,7 +97,7 @@ export const getName = (obj: unknown): string => {
   return "—";
 };
 
-export const getTaskState = (task: Partial<ExportTask>) => {
+export const getTaskState = (task: Partial<Task>) => {
   if (!task.deadline) return null;
   const deadlineDate = parseDateStr(task.deadline);
   if (!deadlineDate) return null;
@@ -123,7 +115,7 @@ export const getTaskState = (task: Partial<ExportTask>) => {
   }
 };
 
-export const getKpiData = (filtered: ExportTask[], users: unknown[]) => {
+export const getKpiData = (filtered: Task[], users: unknown[]) => {
   const concluded = filtered.filter((t) => t.status === "Concluído");
   const high = filtered.filter((t) => t.priority === "Alta").length;
   const mid = filtered.filter((t) => t.priority === "Média").length;
@@ -136,7 +128,7 @@ export const getKpiData = (filtered: ExportTask[], users: unknown[]) => {
   );
   const avgTime = concludedForAvg.length
     ? Math.round(
-        concludedForAvg.reduce((a, t) => a + (t.time || 0), 0) /
+        concludedForAvg.reduce((a, t) => a + (t.time_spent || 0), 0) /
           concludedForAvg.length,
       )
     : 0;
@@ -369,7 +361,7 @@ const drawBarChart = (
 // ─── Draw temporal line chart ─────────────────────────────────────────────────
 const drawLineChart = (
   doc: jsPDF,
-  tasks: ExportTask[],
+  tasks: Task[],
   x: number,
   y: number,
   w: number,
@@ -505,7 +497,7 @@ const drawLineChart = (
 // ─── Draw Timeline (Cronograma) ──────────────────────────────────────────────
 const drawTimeline = (
   doc: jsPDF,
-  tasks: ExportTask[],
+  tasks: Task[],
   x: number,
   y: number,
   w: number,
@@ -573,7 +565,7 @@ const drawTimeline = (
     let lastDotX = 0;
     const dotSpacing = 24;
     events.forEach((ev, ei) => {
-      const val = t[ev.k as keyof ExportTask] as string | undefined;
+      const val = t[ev.k as keyof Task] as string | undefined;
       if (!val) return;
 
       const dotX = x + LABEL_W + 8 + ei * dotSpacing;
@@ -614,7 +606,7 @@ const drawTimeline = (
 
 // ─── EXCEL EXPORT ─────────────────────────────────────────────────────────────
 export const exportToExcel = async (
-  tasks: ExportTask[],
+  tasks: Task[],
   kpi?: ExportKPIs,
   currentUser?: { name?: string } | null,
   filterLabel?: string,
@@ -674,8 +666,8 @@ export const exportToExcel = async (
       "Estado Atual": state ? state.label : "Sem Prazo",
       Setor: getName(t.sector),
       Responsável: getName(t.responsible),
-      Contrato: t.contract || "—",
-      Cidade: t.city || "—",
+      Contrato: getName(t.contract),
+      Cidade: getName(t.city),
       "Bairro/Núcleo": t.nucleus || "—",
       Quadra: t.quadra || "—",
       Lote: t.lote || "—",
@@ -683,7 +675,7 @@ export const exportToExcel = async (
       "Data Início": t.started || "—",
       Prazo: t.deadline || "—",
       "Data Conclusão": t.completed || "—",
-      "Tempo Execução": fmt(t.time || 0),
+      "Tempo Execução": fmt(t.time_spent || 0),
       Pausas: t.pauses?.length || 0,
       Subtarefas: t.subtasks?.length || 0,
     };
@@ -717,26 +709,28 @@ export const exportToExcel = async (
   // ── Sheet 3: Subtarefas ──
   const subtaskRows: Record<string, unknown>[] = [];
   tasks.forEach((t) => {
-    (t.subtasks || []).forEach((s) => {
-      const subState = getTaskState(s as Partial<ExportTask>);
+    (t.subtasks || []).forEach((sub) => {
+      // Runtime subtasks may carry full task-like data; cast for safe access
+      const s = sub as unknown as Record<string, unknown>;
+      const subState = getTaskState(s as Partial<Task>);
       subtaskRows.push({
-        ID: s.id,
+        ID: sub.id,
         "Tarefa Pai (Título)": t.title,
         "Tarefa Pai (ID)": t.id,
-        Título: s.title,
-        Status: s.status || (s.done ? "Concluído" : "A Fazer"),
+        Título: sub.title,
+        Status: s.status || (sub.done ? "Concluído" : "A Fazer"),
         "Estado Atual": subState ? subState.label : "Sem Prazo",
         Setor:
           getName(s.sector) !== "—" ? getName(s.sector) : getName(t.sector),
-        Responsável: getName(s.responsible),
-        Prazo: s.deadline || t.deadline || "—",
-        Contrato: s.contract || t.contract || "—",
-        Cidade: s.city || t.city || "—",
-        "Bairro/Núcleo": s.nucleus || t.nucleus || "—",
-        Quadra: s.quadra || t.quadra || "—",
-        Lote: s.lote || t.lote || "—",
-        "Tempo Execução": fmt(s.time || 0),
-        Concluída: s.done ? "Sim" : "Não",
+        Responsável: getName(sub.responsible),
+        Prazo: (s.deadline as string) || t.deadline || "—",
+        Contrato: getName(s.contract) !== "—" ? getName(s.contract) : getName(t.contract),
+        Cidade: getName(s.city) !== "—" ? getName(s.city) : getName(t.city),
+        "Bairro/Núcleo": (s.nucleus as string) || t.nucleus || "—",
+        Quadra: (s.quadra as string) || t.quadra || "—",
+        Lote: (s.lote as string) || t.lote || "—",
+        "Tempo Execução": fmt((s.time_spent as number) || 0),
+        Concluída: sub.done ? "Sim" : "Não",
       });
     });
   });
@@ -811,7 +805,7 @@ export const exportToExcel = async (
 
 // ─── PDF EXPORT ───────────────────────────────────────────────────────────────
 export const exportToPDF = async (
-  tasks: ExportTask[],
+  tasks: Task[],
   kpi: ExportKPIs,
   users: unknown[] = [],
   currentUser?: { name?: string } | null,
@@ -1097,22 +1091,23 @@ export const exportToPDF = async (
         getTaskState(t)?.label || "Sem Prazo",
         getName(t.responsible),
         t.deadline || "—",
-        t.contract || "—",
+        getName(t.contract),
         `${t.subtasks?.length || 0}`,
-        fmt(t.time || 0),
+        fmt(t.time_spent || 0),
       ]);
-      (t.subtasks || []).forEach((s) => {
+      (t.subtasks || []).forEach((sub) => {
+        const sr = sub as unknown as Record<string, unknown>;
         tableData.push([
-          s.id,
-          `  ↳ ${s.title.length > 37 ? s.title.slice(0, 37) + "…" : s.title}`,
-          s.priority || t.priority || "—",
-          s.status || (s.done ? "Concluído" : "A Fazer"),
-          getTaskState(s as Partial<ExportTask>)?.label || "—",
-          getName(s.responsible) !== "—" ? getName(s.responsible) : "—",
-          s.deadline || "—",
-          s.contract || t.contract || "—",
+          sub.id,
+          `  ↳ ${sub.title.length > 37 ? sub.title.slice(0, 37) + "…" : sub.title}`,
+          (sr.priority as string) || t.priority || "—",
+          (sr.status as string) || (sub.done ? "Concluído" : "A Fazer"),
+          getTaskState(sr as Partial<Task>)?.label || "—",
+          getName(sub.responsible) !== "—" ? getName(sub.responsible) : "—",
+          (sr.deadline as string) || "—",
+          getName(sr.contract) !== "—" ? getName(sr.contract) : getName(t.contract),
           "—",
-          fmt(s.time || 0),
+          fmt((sr.time_spent as number) || 0),
         ]);
       });
     });
@@ -1195,36 +1190,37 @@ export const exportToPDF = async (
       state?.label || "Sem Prazo",
       getName(t.sector),
       getName(t.responsible),
-      t.contract || "—",
-      t.city || "—",
+      getName(t.contract),
+      getName(t.city),
       t.nucleus || "—",
       t.quadra || "—",
       t.lote || "—",
       t.created || "—",
       t.deadline || "—",
       t.completed || "—",
-      fmt(t.time || 0),
+      fmt(t.time_spent || 0),
     ]);
-    (t.subtasks || []).forEach((s) => {
-      const ss = getTaskState(s as Partial<ExportTask>);
+    (t.subtasks || []).forEach((sub) => {
+      const sr = sub as unknown as Record<string, unknown>;
+      const ss = getTaskState(sr as Partial<Task>);
       detailData.push([
-        s.id,
-        `  ↳ ${s.title.length > 35 ? s.title.slice(0, 35) + "…" : s.title}`,
-        s.type || t.type || "—",
-        s.priority || t.priority || "—",
-        s.status || (s.done ? "Concluído" : "A Fazer"),
+        sub.id,
+        `  ↳ ${sub.title.length > 35 ? sub.title.slice(0, 35) + "…" : sub.title}`,
+        (sr.type as string) || t.type || "—",
+        (sr.priority as string) || t.priority || "—",
+        (sr.status as string) || (sub.done ? "Concluído" : "A Fazer"),
         ss?.label || "—",
-        getName(s.sector) !== "—" ? getName(s.sector) : getName(t.sector),
-        getName(s.responsible),
-        t.contract || "—",
-        t.city || "—",
+        getName(sr.sector) !== "—" ? getName(sr.sector) : getName(t.sector),
+        getName(sub.responsible),
+        getName(t.contract),
+        getName(t.city),
         t.nucleus || "—",
         t.quadra || "—",
         t.lote || "—",
         "—",
-        s.deadline || "—",
+        (sr.deadline as string) || "—",
         "—",
-        fmt(s.time || 0),
+        fmt((sr.time_spent as number) || 0),
       ]);
     });
   });

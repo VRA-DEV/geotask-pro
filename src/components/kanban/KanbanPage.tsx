@@ -25,8 +25,65 @@ import {
   SECTORS,
 } from "@/lib/constants";
 import { fmtTime, getTaskState, sectorDisplay, parseDate } from "@/lib/helpers";
+import type {
+  User as UserType,
+  Subtask,
+  Sector,
+  ThemeColors,
+  CitiesNeighborhoods,
+  Task,
+  Contract,
+  City,
+  Neighborhood,
+} from "@/types";
+
+// ── KanbanTask: extends shared Task with runtime alias ──
+interface KanbanTask extends Task {
+  /** Alias – API sometimes returns pre-computed time instead of time_spent */
+  time?: number;
+}
+
+// ── Inline helper component props ──────────────────────────────────
+
+interface FilterSelectProps {
+  val: string;
+  onChange: (v: string) => void;
+  opts: FilterOption[];
+  placeholder?: string;
+  label?: string;
+}
+
+interface DateRangePickerProps {
+  date: DateRange | undefined;
+  setDate: (d: DateRange | undefined) => void;
+  label: string;
+  T: ThemeColors;
+}
+
+interface ExportButtonsProps {
+  filtered: KanbanTask[];
+  kpi: ReturnType<typeof getKpiData>;
+  users: UserType[];
+  user?: UserType | null;
+  filterLabel?: string;
+}
+
+interface KanbanPageProps {
+  T: ThemeColors;
+  tasks: KanbanTask[];
+  user: UserType | null;
+  onSelect: (task: KanbanTask) => void;
+  canCreate: boolean;
+  onNew: () => void;
+  users?: UserType[];
+  contracts?: string[];
+  citiesNeighborhoods?: CitiesNeighborhoods;
+  sectors?: Sector[];
+}
 
 // ── Inline helper components ────────────────────────────────────
+
+type FilterOption = string | { id?: string | number; name?: string; label?: string; value?: string | number };
 
 function MultiSelect({
   val = [],
@@ -36,7 +93,7 @@ function MultiSelect({
 }: {
   val: string[];
   onChange: (v: string[]) => void;
-  opts: string[];
+  opts: FilterOption[];
   placeholder?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -87,13 +144,13 @@ function MultiSelect({
 
       {open && (
         <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg shadow-[0_10px_30px_rgba(0,0,0,0.15)] z-[9999] p-1.5 min-w-[180px] max-h-[300px] overflow-y-auto">
-          {opts.map((o: any, i: number) => {
+          {opts.map((o: FilterOption, i: number) => {
             const label = typeof o === "object" ? o.name || o.label : o;
-            const value = typeof o === "object" ? o.id || o.value : o;
+            const value = String(typeof o === "object" ? o.id || o.value || "" : o);
             const selected = val.includes(value);
             const key =
               typeof o === "object"
-                ? o.id || o.name || `mopt-${i}`
+                ? String(o.id || o.name || `mopt-${i}`)
                 : `mopt-${o}-${i}`;
 
             return (
@@ -129,7 +186,7 @@ function FilterSelect({
   opts,
   placeholder = "",
   label = "",
-}: any) {
+}: FilterSelectProps) {
   return (
     <select
       value={val}
@@ -141,12 +198,12 @@ function FilterSelect({
       }`}
     >
       <option value="">{placeholder || label}</option>
-      {opts.map((o: any, i: number) => {
+      {opts.map((o: FilterOption, i: number) => {
         const label = typeof o === "object" ? o.name || o.label : o;
-        const value = typeof o === "object" ? o.id || o.value : o;
+        const value = String(typeof o === "object" ? o.id || o.value || "" : o);
         const key =
           typeof o === "object"
-            ? o.id || o.name || `fopt-${i}`
+            ? String(o.id || o.name || `fopt-${i}`)
             : `fopt-${o}-${i}`;
         return (
           <option key={key} value={value}>
@@ -158,7 +215,7 @@ function FilterSelect({
   );
 }
 
-function DateRangePicker({ date, setDate, label, T }: any) {
+function DateRangePicker({ date, setDate, label, T }: DateRangePickerProps) {
   return (
     <div className="flex flex-col gap-1">
       <label className="text-[11px] font-bold text-slate-500 dark:text-gray-400">
@@ -177,7 +234,7 @@ function DateRangePicker({ date, setDate, label, T }: any) {
           <DatePicker
             T={T}
             date={date?.to}
-            setDate={(d) => setDate({ ...date, to: d })}
+            setDate={(d) => setDate({ from: date?.from, to: d })}
             label=""
           />
         </div>
@@ -186,7 +243,7 @@ function DateRangePicker({ date, setDate, label, T }: any) {
   );
 }
 
-const ExportButtons = ({ filtered, kpi, users, user, filterLabel }: any) => (
+const ExportButtons = ({ filtered, kpi, users, user, filterLabel }: ExportButtonsProps) => (
   <div className="flex gap-2 items-center">
     <button
       onClick={() => exportToExcel(filtered, kpi, user, filterLabel)}
@@ -215,7 +272,7 @@ export default function KanbanPage({
   contracts = [],
   citiesNeighborhoods = {},
   sectors = [],
-}: any) {
+}: KanbanPageProps) {
   const [search, setSearch] = useState("");
   const [fSector, setFSector] = useState<string[]>([]);
   const [fContract, setFContract] = useState("");
@@ -231,7 +288,7 @@ export default function KanbanPage({
 
   const cols = ["A Fazer", "Em Andamento", "Pausado", "Concluído"];
 
-  const filtered = tasks.filter((t: any) => {
+  const filtered = tasks.filter((t: KanbanTask) => {
     if (search && !t.title.toLowerCase().includes(search.toLowerCase()))
       return false;
     const sectorVal =
@@ -239,8 +296,10 @@ export default function KanbanPage({
         ? t.sector?.name
         : t.sector || "";
     if (fSector.length > 0 && !fSector.includes(sectorVal)) return false;
-    if (fContract && t.contract !== fContract) return false;
-    if (fCity && t.city !== fCity) return false;
+    const contractVal = t.contract && typeof t.contract === "object" ? t.contract.name : t.contract || "";
+    if (fContract && contractVal !== fContract) return false;
+    const cityVal = t.city && typeof t.city === "object" ? t.city.name : t.city || "";
+    if (fCity && cityVal !== fCity) return false;
     if (fNeighbor && t.nucleus !== fNeighbor) return false;
     if (fPriority && t.priority !== fPriority) return false;
     if (fType && t.type !== fType) return false;
@@ -251,7 +310,7 @@ export default function KanbanPage({
       if (fDateFrom.to && td > fDateFrom.to) return false;
     }
     if (fDateTo?.from || fDateTo?.to) {
-      const tc = new Date(t.created_at);
+      const tc = new Date(t.created_at || "");
       if (fDateTo.from && tc < fDateTo.from) return false;
       if (fDateTo.to && tc > fDateTo.to) return false;
     }
@@ -342,7 +401,7 @@ export default function KanbanPage({
           />
           <FilterSelect
             val={fContract}
-            onChange={(v: any) => {
+            onChange={(v: string) => {
               setFContract(v);
               setFCity("");
               setFNeighbor("");
@@ -352,7 +411,7 @@ export default function KanbanPage({
           />
           <FilterSelect
             val={fCity}
-            onChange={(v: any) => {
+            onChange={(v: string) => {
               setFCity(v);
               setFNeighbor("");
             }}
@@ -403,7 +462,7 @@ export default function KanbanPage({
                 <option value="">
                   {fCity ? "Todos bairros" : "Selecione cidade primeiro"}
                 </option>
-                {cityNeighborhoods.map((n: any) => (
+                {cityNeighborhoods.map((n: string) => (
                   <option key={n}>{n}</option>
                 ))}
               </select>
@@ -454,7 +513,7 @@ export default function KanbanPage({
       {/* Colunas */}
       <div className="flex gap-3.5 overflow-x-auto pb-2">
         {cols.map((col) => {
-          const colTasks = filtered.filter((t: any) => t.status === col);
+          const colTasks = filtered.filter((t: KanbanTask) => t.status === col);
           return (
             <div key={col} className="shrink-0 w-[272px]">
               <div className="flex items-center gap-2 mb-2.5">
@@ -470,9 +529,9 @@ export default function KanbanPage({
                 </span>
               </div>
               <div className="bg-slate-100 dark:bg-gray-900 rounded-xl p-2 min-h-[200px] flex flex-col gap-2">
-                {colTasks.map((t: any) => {
+                {colTasks.map((t: KanbanTask) => {
                   const prog = t.subtasks?.length
-                    ? (t.subtasks.filter((s: any) => s.done).length /
+                    ? (t.subtasks.filter((s: Subtask) => s.done).length /
                         t.subtasks.length) *
                       100
                     : 0;
@@ -488,7 +547,7 @@ export default function KanbanPage({
                           <span>
                             de:{" "}
                             <b>
-                              {tasks.find((p: any) => p.id === t.parent_id)
+                              {tasks.find((p: KanbanTask) => p.id === t.parent_id)
                                 ?.title || "..."}
                             </b>
                           </span>
@@ -509,8 +568,8 @@ export default function KanbanPage({
                         <span
                           className="text-[10px] px-[7px] py-0.5 rounded-md font-bold"
                           style={{
-                            background: PRIO_COLOR[t.priority] + "22",
-                            color: PRIO_COLOR[t.priority],
+                            background: PRIO_COLOR[t.priority || ""] + "22",
+                            color: PRIO_COLOR[t.priority || ""],
                           }}
                         >
                           {t.priority}
@@ -550,11 +609,11 @@ export default function KanbanPage({
                         </span>
                         <span className="text-[11px] text-slate-500 dark:text-gray-400 flex items-center gap-1">
                           <MapPin size={9} />
-                          {t.contract}
+                          {typeof t.contract === "object" ? t.contract?.name : t.contract}
                         </span>
                         {t.city && (
                           <span className="text-[11px] text-slate-500 dark:text-gray-400 flex items-center gap-1 pl-[13px]">
-                            {t.city}
+                            {typeof t.city === "object" ? t.city?.name : t.city}
                             {t.nucleus ? ` · ${t.nucleus}` : ""}
                           </span>
                         )}
@@ -571,13 +630,13 @@ export default function KanbanPage({
                           Prazo: <b className="text-slate-900 dark:text-gray-50">{t.deadline}</b>
                         </div>
                       )}
-                      {t.subtasks?.length > 0 && (
+                      {(t.subtasks?.length ?? 0) > 0 && (
                         <div>
                           <div className="flex justify-between text-[10px] text-slate-500 dark:text-gray-400 mb-[3px]">
                             <span>Subtarefas</span>
                             <span>
-                              {t.subtasks.filter((s: any) => s.done).length}/
-                              {t.subtasks.length}
+                              {t.subtasks!.filter((s: Subtask) => s.done).length}/
+                              {t.subtasks!.length}
                             </span>
                           </div>
                           <div className="h-[3px] bg-slate-200 dark:bg-gray-700 rounded">
@@ -588,10 +647,10 @@ export default function KanbanPage({
                           </div>
                         </div>
                       )}
-                      {t.time > 0 && (
+                      {(t.time ?? 0) > 0 && (
                         <div className="text-[10px] text-slate-500 dark:text-gray-400 flex items-center gap-[3px] mt-1.5">
                           <Clock size={9} />
-                          {fmtTime(t.time)}
+                          {fmtTime(t.time ?? 0)}
                         </div>
                       )}
                     </div>

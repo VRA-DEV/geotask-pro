@@ -11,11 +11,12 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { DateRange } from "react-day-picker";
 import { TASK_TYPES } from "@/lib/constants";
-import { exportToExcel, exportToPDF, getKpiData } from "@/lib/exportUtils";
+import { exportToExcel, exportToPDF, getKpiData, type ExportKPIs } from "@/lib/exportUtils";
 import { DatePicker } from "@/app/components/DatePicker";
+import type { Task, User, Sector, ThemeColors, CitiesNeighborhoods } from "@/types";
 
 // ── ExportButtons (inline) ───────────────────────────────────────
-const ExportButtons = ({ filtered, kpi, users, user, filterLabel }: any) => (
+const ExportButtons = ({ filtered, kpi, users, user, filterLabel }: { filtered: Task[]; kpi: ExportKPIs; users: User[]; user?: User; filterLabel?: string }) => (
   <div className="flex items-center gap-2">
     <button
       onClick={() => exportToExcel(filtered, kpi, user, filterLabel)}
@@ -90,9 +91,9 @@ function MultiSelect({
 
       {open && (
         <div className="absolute top-full left-0 z-[9999] mt-1 min-w-[180px] max-h-[300px] overflow-y-auto rounded-lg p-1.5 shadow-[0_10px_30px_rgba(0,0,0,0.15)] bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700">
-          {opts.map((o: any, i: number) => {
+          {opts.map((o: string | { name?: string; label?: string; id?: string | number; value?: string | number }, i: number) => {
             const label = typeof o === "object" ? o.name || o.label : o;
-            const value = typeof o === "object" ? o.id || o.value : o;
+            const value = String(typeof o === "object" ? o.id || o.value || "" : o);
             const selected = val.includes(value);
             const key =
               typeof o === "object"
@@ -134,7 +135,7 @@ function FilterSelect({
   opts,
   placeholder = "",
   label = "",
-}: any) {
+}: { T: ThemeColors; val: string; onChange: (v: string) => void; opts: { label: string; value: string }[]; placeholder?: string; label?: string }) {
   return (
     <select
       value={val}
@@ -146,7 +147,7 @@ function FilterSelect({
       } bg-white dark:bg-gray-800`}
     >
       <option value="">{placeholder || label}</option>
-      {opts.map((o: any, i: number) => {
+      {opts.map((o: string | { name?: string; label?: string; id?: string | number; value?: string | number }, i: number) => {
         const label = typeof o === "object" ? o.name || o.label : o;
         const value = typeof o === "object" ? o.id || o.value : o;
         const key =
@@ -164,7 +165,7 @@ function FilterSelect({
 }
 
 // ── DateRangePicker (inline) ─────────────────────────────────────
-function DateRangePicker({ date, setDate, label, T }: any) {
+function DateRangePicker({ date, setDate, label, T }: { date: DateRange | undefined; setDate: (d: DateRange | undefined) => void; label: string; T: ThemeColors }) {
   return (
     <div className="flex flex-col gap-1">
       <label className="text-[11px] font-bold text-slate-500 dark:text-gray-400">
@@ -183,7 +184,7 @@ function DateRangePicker({ date, setDate, label, T }: any) {
           <DatePicker
             T={T}
             date={date?.to}
-            setDate={(d) => setDate({ ...date, to: d })}
+            setDate={(d) => setDate({ from: date?.from, to: d })}
             label=""
           />
         </div>
@@ -193,6 +194,16 @@ function DateRangePicker({ date, setDate, label, T }: any) {
 }
 
 // ── CronogramaPage ───────────────────────────────────────────────
+interface CronogramaPageProps {
+  T: ThemeColors;
+  tasks: Task[];
+  onSelect: (t: Task) => void;
+  users?: User[];
+  contracts?: string[];
+  citiesNeighborhoods?: CitiesNeighborhoods;
+  sectors?: (Sector | string)[];
+}
+
 export default function CronogramaPage({
   T,
   tasks,
@@ -201,7 +212,7 @@ export default function CronogramaPage({
   contracts = [],
   citiesNeighborhoods = {},
   sectors = [],
-}: any) {
+}: CronogramaPageProps) {
   const [search, setSearch] = useState("");
   const [fSector, setFSector] = useState<string[]>([]);
   const [fContract, setFContract] = useState("");
@@ -214,7 +225,7 @@ export default function CronogramaPage({
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   // Helper local para garantir funcionamento
-  const parseDate = (d: string) => {
+  const parseDate = (d: string | null | undefined) => {
     if (!d) return null;
     const [day, month, year] = d.split("/").map(Number);
     return new Date(year, month - 1, day);
@@ -222,14 +233,16 @@ export default function CronogramaPage({
 
   const cityNeighborhoods = fCity ? citiesNeighborhoods[fCity] || [] : [];
 
-  const filtered = tasks.filter((t: any) => {
+  const filtered = tasks.filter((t: Task) => {
     if (search && !t.title.toLowerCase().includes(search.toLowerCase()))
       return false;
     const sectorVal =
       t.sector && typeof t.sector === "object" ? t.sector.name : t.sector || "";
     if (fSector.length > 0 && !fSector.includes(sectorVal)) return false;
-    if (fContract && t.contract !== fContract) return false;
-    if (fCity && t.city !== fCity) return false;
+    const contractVal = t.contract && typeof t.contract === "object" ? t.contract.name : t.contract || "";
+    if (fContract && contractVal !== fContract) return false;
+    const cityVal = t.city && typeof t.city === "object" ? t.city.name : t.city || "";
+    if (fCity && cityVal !== fCity) return false;
     if (fNeighbor && t.nucleus !== fNeighbor) return false;
     if (fPriority && t.priority !== fPriority) return false;
     if (fType && t.type !== fType) return false;
@@ -240,7 +253,7 @@ export default function CronogramaPage({
       if (fDateFrom.to && td > fDateFrom.to) return false;
     }
     if (fDateTo?.from || fDateTo?.to) {
-      const tc = new Date(t.created_at);
+      const tc = new Date(t.created_at || "");
       if (fDateTo.from && tc < fDateTo.from) return false;
       if (fDateTo.to && tc > fDateTo.to) return false;
     }
@@ -344,7 +357,7 @@ export default function CronogramaPage({
                 l: "Setor",
                 v: fSector,
                 s: setFSector,
-                o: sectors.map((s: any) =>
+                o: sectors.map((s: Sector | string) =>
                   typeof s === "object" ? s.name : s,
                 ),
                 isMulti: true,
@@ -368,7 +381,7 @@ export default function CronogramaPage({
                 l: "Contrato",
                 v: fContract,
                 s: setFContract,
-                o: contracts.map((c: any) => ({
+                o: contracts.map((c: string) => ({
                   label: c,
                   value: c,
                 })),
@@ -404,45 +417,50 @@ export default function CronogramaPage({
                 s: setFDateTo,
                 type: "date-range",
               },
-            ].map((f: any, i) => (
-              <div key={i}>
-                {f.type === "date-range" ? (
-                  <DateRangePicker date={f.v} setDate={f.s} label={f.l} T={T} />
-                ) : (
-                  <>
-                    <label className="mb-1 block text-[11px] font-bold text-slate-500 dark:text-gray-400">
-                      {f.l}
-                    </label>
-                    {f.isMulti ? (
-                      <MultiSelect
-                        val={f.v}
-                        onChange={f.s}
-                        opts={f.o}
-                        placeholder={f.l}
-                      />
-                    ) : (
-                      <select
-                        value={f.v}
-                        onChange={(e) => f.s(e.target.value)}
-                        disabled={f.disabled}
-                        className={`w-full rounded-lg p-2 text-[13px] border ${
-                          f.disabled
-                            ? "border-slate-200 dark:border-gray-700 bg-slate-50 dark:bg-gray-900 text-slate-500 dark:text-gray-400"
-                            : "border-slate-200 dark:border-gray-700 bg-slate-100 dark:bg-gray-700 text-slate-900 dark:text-gray-50"
-                        }`}
-                      >
-                        <option value="">Todos</option>
-                        {f.o?.map((opt: any) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </>
-                )}
-              </div>
-            ))}
+            ].map((f, i) => {
+              /* eslint-disable @typescript-eslint/no-explicit-any */
+              const fa = f as Record<string, any>;
+              return (
+                <div key={i}>
+                  {fa.type === "date-range" ? (
+                    <DateRangePicker date={fa.v as DateRange | undefined} setDate={fa.s} label={fa.l as string} T={T} />
+                  ) : (
+                    <>
+                      <label className="mb-1 block text-[11px] font-bold text-slate-500 dark:text-gray-400">
+                        {fa.l as string}
+                      </label>
+                      {fa.isMulti ? (
+                        <MultiSelect
+                          val={fa.v as string[]}
+                          onChange={fa.s}
+                          opts={fa.o as string[]}
+                          placeholder={fa.l as string}
+                        />
+                      ) : (
+                        <select
+                          value={fa.v as string}
+                          onChange={(e) => fa.s(e.target.value)}
+                          disabled={!!fa.disabled}
+                          className={`w-full rounded-lg p-2 text-[13px] border ${
+                            fa.disabled
+                              ? "border-slate-200 dark:border-gray-700 bg-slate-50 dark:bg-gray-900 text-slate-500 dark:text-gray-400"
+                              : "border-slate-200 dark:border-gray-700 bg-slate-100 dark:bg-gray-700 text-slate-900 dark:text-gray-50"
+                          }`}
+                        >
+                          <option value="">Todos</option>
+                          {(fa.o as { label: string; value: string }[] | undefined)?.map((opt: { label: string; value: string }) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+              /* eslint-enable @typescript-eslint/no-explicit-any */
+            })}
             <div className="col-span-full mt-2 flex justify-end">
               <button
                 onClick={clearAll}
@@ -478,7 +496,7 @@ export default function CronogramaPage({
             LINHA DO TEMPO
           </span>
         </div>
-        {filtered.map((t: any, i: number) => (
+        {filtered.map((t: Task, i: number) => (
           <div
             key={t.id}
             onClick={() => onSelect(t)}
@@ -497,9 +515,10 @@ export default function CronogramaPage({
             </div>
             <div className="flex items-center overflow-x-auto">
               {evts.map((ev, ei) => {
-                const val = t[ev.k];
+                const tRec = t as unknown as Record<string, string | undefined>;
+                const val = tRec[ev.k];
                 if (!val) return null;
-                const prev = evts.slice(0, ei).find((pe) => t[pe.k]);
+                const prev = evts.slice(0, ei).find((pe) => tRec[pe.k]);
                 return (
                   <div key={ev.k} className="flex shrink-0 items-center">
                     {prev && (
@@ -533,7 +552,7 @@ export default function CronogramaPage({
                       Histórico de Pausas
                     </div>
                     <div className="flex gap-2">
-                      {t.pauses.map((p: any, pi: number) => (
+                      {t.pauses.map((p: { started_at: string; ended_at?: string }, pi: number) => (
                         <div
                           key={pi}
                           className="whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] text-slate-500 dark:text-gray-400 bg-slate-100 dark:bg-gray-700"

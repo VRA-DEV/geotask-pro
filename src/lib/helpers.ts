@@ -65,7 +65,7 @@ export const parseDateStr = (s?: string): Date | undefined => {
 };
 
 export const getTaskState = (
-  task: { deadline?: string; status?: string; completed_at?: string },
+  task: { deadline?: string | null; status?: string | null; completed_at?: string | null },
 ): { label: string; color: string } | null => {
   if (!task.deadline) return null;
   const deadlineDate = parseDateStr(task.deadline);

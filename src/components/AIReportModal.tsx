@@ -39,7 +39,7 @@ interface Stats {
 }
 
 interface AIReportModalProps {
-  user?: { name?: string; role?: { name?: string } } | null;
+  user?: { name?: string; role?: { name?: string } | null } | null;
 }
 
 // ─── Opções de análise disponíveis ───────────────────────────────────────────

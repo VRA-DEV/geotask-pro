@@ -30,13 +30,43 @@ import {
   TASK_TYPES,
 } from "@/lib/constants";
 import { getTaskState, parseDate, parseDateStr } from "@/lib/helpers";
-import { exportToExcel, exportToPDF, getKpiData } from "@/lib/exportUtils";
+import { exportToExcel, exportToPDF, getKpiData, type ExportKPIs } from "@/lib/exportUtils";
 import AIReportModal from "@/components/AIReportModal";
 import { DatePicker } from "@/app/components/DatePicker";
+import type { User, Sector, ThemeColors, CitiesNeighborhoods, Subtask, Task, Contract, City, Neighborhood } from "@/types";
+
+// ── DashboardTask: extends the shared Task type with extra runtime aliases ──
+interface DashboardTask extends Task {
+  /** Alias – API sometimes returns pre-computed time instead of time_spent */
+  time?: number;
+}
+
+// ── Filter option type (supports both strings and objects with name/id/label/value) ──
+type FilterOption = string | { id?: string | number; name?: string; label?: string; value?: string | number };
+
+// ── Sector/User rank entry types ──
+interface SectorDataEntry {
+  name: string;
+  v: number;
+}
+
+interface UserRankEntry {
+  name: string;
+  v: number;
+  sector: string | Sector | null | undefined;
+}
 
 // ── Inline helper components ─────────────────────────────────
 
-const ExportButtons = ({ filtered, kpi, users, user, filterLabel }: any) => (
+interface ExportButtonsProps {
+  filtered: DashboardTask[];
+  kpi: ExportKPIs;
+  users: User[];
+  user: User;
+  filterLabel: string;
+}
+
+const ExportButtons = ({ filtered, kpi, users, user, filterLabel }: ExportButtonsProps) => (
   <div className="flex gap-2 items-center">
     <button
       onClick={() => exportToExcel(filtered, kpi, user, filterLabel)}
@@ -53,13 +83,21 @@ const ExportButtons = ({ filtered, kpi, users, user, filterLabel }: any) => (
   </div>
 );
 
+interface FilterSelectProps {
+  val: string;
+  onChange: (v: string) => void;
+  opts: FilterOption[];
+  placeholder?: string;
+  label?: string;
+}
+
 function FilterSelect({
   val,
   onChange,
   opts,
   placeholder = "",
   label = "",
-}: any) {
+}: FilterSelectProps) {
   return (
     <select
       value={val}
@@ -71,7 +109,7 @@ function FilterSelect({
       }`}
     >
       <option value="">{placeholder || label}</option>
-      {opts.map((o: any, i: number) => {
+      {opts.map((o: FilterOption, i: number) => {
         const label = typeof o === "object" ? o.name || o.label : o;
         const value = typeof o === "object" ? o.id || o.value : o;
         const key =
@@ -88,7 +126,14 @@ function FilterSelect({
   );
 }
 
-function DateRangePicker({ date, setDate, label, T }: any) {
+interface DateRangePickerProps {
+  date: DateRange | undefined;
+  setDate: (d: DateRange | undefined) => void;
+  label: string;
+  T: ThemeColors;
+}
+
+function DateRangePicker({ date, setDate, label, T }: DateRangePickerProps) {
   return (
     <div className="flex flex-col gap-1">
       <label className="text-[11px] font-bold text-slate-500 dark:text-gray-400">
@@ -99,7 +144,7 @@ function DateRangePicker({ date, setDate, label, T }: any) {
           <DatePicker
             T={T}
             date={date?.from}
-            setDate={(d: any) => setDate({ ...date, from: d })}
+            setDate={(d: Date | undefined) => setDate({ from: d, to: date?.to })}
             label=""
           />
         </div>
@@ -107,7 +152,7 @@ function DateRangePicker({ date, setDate, label, T }: any) {
           <DatePicker
             T={T}
             date={date?.to}
-            setDate={(d: any) => setDate({ ...date, to: d })}
+            setDate={(d: Date | undefined) => setDate({ from: date?.from, to: d })}
             label=""
           />
         </div>
@@ -173,14 +218,11 @@ function MultiSelect({
 
       {open && (
         <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg shadow-[0_10px_30px_rgba(0,0,0,0.15)] z-[9999] p-1.5 min-w-[180px] max-h-[300px] overflow-y-auto">
-          {opts.map((o: any, i: number) => {
-            const label = typeof o === "object" ? o.name || o.label : o;
-            const value = typeof o === "object" ? o.id || o.value : o;
+          {opts.map((o: string, i: number) => {
+            const label = o;
+            const value = o;
             const selected = val.includes(value);
-            const key =
-              typeof o === "object"
-                ? o.id || o.name || `mopt-${i}`
-                : `mopt-${o}-${i}`;
+            const key = `mopt-${o}-${i}`;
 
             return (
               <div
@@ -224,6 +266,17 @@ function MultiSelect({
 
 const TODAY = new Date();
 
+interface DashboardPageProps {
+  T: ThemeColors;
+  tasks: DashboardTask[];
+  user: User;
+  onSelect: (task: DashboardTask) => void;
+  users?: User[];
+  contracts?: string[];
+  citiesNeighborhoods?: CitiesNeighborhoods;
+  sectors?: Sector[];
+}
+
 export default function DashboardPage({
   T,
   tasks,
@@ -233,7 +286,7 @@ export default function DashboardPage({
   contracts = [],
   citiesNeighborhoods = {},
   sectors = [],
-}: any) {
+}: DashboardPageProps) {
   const [fSearch, setFSearch] = useState("");
   const [fContract, setFContract] = useState("");
   const [fCity, setFCity] = useState("");
@@ -249,7 +302,7 @@ export default function DashboardPage({
 
   const cityNeighborhoods = fCity ? citiesNeighborhoods[fCity] || [] : [];
 
-  const filtered = tasks.filter((t: any) => {
+  const filtered = tasks.filter((t: DashboardTask) => {
     const txt = (fSearch || "").toLowerCase();
     if (
       txt &&
@@ -257,8 +310,10 @@ export default function DashboardPage({
       !(t.description || "").toLowerCase().includes(txt)
     )
       return false;
-    if (fContract && t.contract !== fContract) return false;
-    if (fCity && t.city !== fCity) return false;
+    const contractVal = t.contract && typeof t.contract === "object" ? t.contract.name : t.contract || "";
+    if (fContract && contractVal !== fContract) return false;
+    const cityVal = t.city && typeof t.city === "object" ? t.city.name : t.city || "";
+    if (fCity && cityVal !== fCity) return false;
     if (fNeighbor && t.nucleus !== fNeighbor) return false;
     if (fStatus && t.status !== fStatus) return false;
     if (fType && t.type !== fType) return false;
@@ -282,7 +337,7 @@ export default function DashboardPage({
       if (fDateFrom.to && td > fDateFrom.to) return false;
     }
     if (fDateTo?.from || fDateTo?.to) {
-      const tc = new Date(t.created_at);
+      const tc = new Date(t.created_at as string);
       if (fDateTo.from && tc < fDateTo.from) return false;
       if (fDateTo.to && tc > fDateTo.to) return false;
     }
@@ -328,23 +383,23 @@ export default function DashboardPage({
 
   // KPIs
   const total = filtered.length;
-  const concluded = filtered.filter((t: any) => t.status === "Conclu\u00EDdo");
+  const concluded = filtered.filter((t: DashboardTask) => t.status === "Conclu\u00EDdo");
   const concludedForAvg = concluded.filter(
-    (t: any) => !t.subtasks || t.subtasks.length === 0,
+    (t: DashboardTask) => !t.subtasks || t.subtasks.length === 0,
   );
   const avgTime = concludedForAvg.length
     ? Math.round(
-        concludedForAvg.reduce((a: any, t: any) => a + t.time, 0) /
+        concludedForAvg.reduce((a: number, t: DashboardTask) => a + (t.time || 0), 0) /
           concludedForAvg.length,
       )
     : 0;
   const byType = TASK_TYPES.map((tp) => ({
     name: tp,
-    val: filtered.filter((t: any) => t.type === tp).length,
+    val: filtered.filter((t: DashboardTask) => t.type === tp).length,
   })).filter((x) => x.val > 0);
   const byPriority = PRIORITIES.map((p) => ({
     name: p,
-    val: filtered.filter((t: any) => t.priority === p).length,
+    val: filtered.filter((t: DashboardTask) => t.priority === p).length,
     color: PRIO_COLOR[p],
   }));
 
@@ -352,44 +407,44 @@ export default function DashboardPage({
   const pieData = ["A Fazer", "Em Andamento", "Pausado", "Conclu\u00EDdo"]
     .map((s) => ({
       name: s,
-      value: filtered.filter((t: any) => t.status === s).length,
+      value: filtered.filter((t: DashboardTask) => t.status === s).length,
     }))
     .filter((d) => d.value > 0);
   const sectorData = SECTORS.map((s) => ({
     name: s,
     v: filtered.filter(
-      (t: any) =>
+      (t: DashboardTask) =>
         (t.sector && typeof t.sector === "object"
           ? t.sector.name
           : t.sector || "") === s,
     ).length,
   }))
-    .filter((x: any) => x.v > 0)
-    .sort((a: any, b: any) => b.v - a.v);
+    .filter((x: SectorDataEntry) => x.v > 0)
+    .sort((a: SectorDataEntry, b: SectorDataEntry) => b.v - a.v);
   const sectorRank = SECTORS.map((s) => ({
     name: s,
     v: filtered.filter(
-      (t: any) =>
+      (t: DashboardTask) =>
         (t.sector && typeof t.sector === "object"
           ? t.sector.name
           : t.sector || "") === s && t.status === "Conclu\u00EDdo",
     ).length,
   }))
-    .filter((x: any) => x.v > 0)
-    .sort((a: any, b: any) => b.v - a.v);
+    .filter((x: SectorDataEntry) => x.v > 0)
+    .sort((a: SectorDataEntry, b: SectorDataEntry) => b.v - a.v);
   const userRank = users
-    .map((u: any) => ({
+    .map((u: User) => ({
       name: u.name,
       v: filtered.filter(
-        (t: any) =>
+        (t: DashboardTask) =>
           (typeof t.responsible === "object"
             ? t.responsible?.name
             : t.responsible) === u.name && t.status === "Conclu\u00EDdo",
       ).length,
       sector: u.sector?.name || u.sector || "\u2014",
     }))
-    .filter((x: any) => x.v > 0)
-    .sort((a: any, b: any) => b.v - a.v);
+    .filter((x: UserRankEntry) => x.v > 0)
+    .sort((a: UserRankEntry, b: UserRankEntry) => b.v - a.v);
 
   // Proximas tarefas
   const upcoming = [...filtered]
@@ -401,7 +456,7 @@ export default function DashboardPage({
     })
     .slice(0, 10);
 
-  const daysLeft = (deadlineStr: any) => {
+  const daysLeft = (deadlineStr: string | null | undefined) => {
     const d = parseDate(deadlineStr);
     if (!d) return null;
     const diff = Math.round(
@@ -435,20 +490,20 @@ export default function DashboardPage({
       const weekNum = 4 - i;
       const label = `${weekNum}\u00AA sem: ${String(weekStart.getDate()).padStart(2, "0")}-${String(weekEnd.getDate()).padStart(2, "0")}/${String(weekEnd.getMonth() + 1).padStart(2, "0")}`;
 
-      const novas = filtered.filter((t: any) => {
+      const novas = filtered.filter((t: DashboardTask) => {
         if (!t.created_at) return false;
         const d = new Date(t.created_at);
         return d >= weekStart && d <= weekEnd;
       }).length;
-      const entregar = filtered.filter((t: any) => {
+      const entregar = filtered.filter((t: DashboardTask) => {
         const d = parseDate(t.deadline);
         return d ? d >= weekStart && d <= weekEnd : false;
       }).length;
-      const atrasadas = filtered.filter((t: any) => {
+      const atrasadas = filtered.filter((t: DashboardTask) => {
         const d = parseDate(t.deadline);
         return d && d < weekStart && t.status !== "Conclu\u00EDdo" ? true : false;
       }).length;
-      const concluidas = filtered.filter((t: any) => {
+      const concluidas = filtered.filter((t: DashboardTask) => {
         if (!t.completed_at) return false;
         const d = new Date(t.completed_at);
         return d >= weekStart && d <= weekEnd;
@@ -563,7 +618,7 @@ export default function DashboardPage({
         </div>
         {filtersOpen && (
           <div className="flex gap-2 flex-wrap items-end mt-2.5 pt-2.5 border-t border-slate-200 dark:border-gray-700">
-            {[
+            {([
               [
                 "CONTRATO",
                 fContract,
@@ -574,7 +629,7 @@ export default function DashboardPage({
               [
                 "CIDADE",
                 fCity,
-                (v: any) => {
+                (v: string) => {
                   setFCity(v);
                   setFNeighbor("");
                 },
@@ -593,10 +648,10 @@ export default function DashboardPage({
                 "RESPONS\u00C1VEL",
                 fUser,
                 setFUser,
-                users.map((u: any) => u.name),
+                users.map((u: User) => u.name),
                 "Todos",
               ],
-            ].map(([label, val, onChange, opts, ph]) => (
+            ] as [string, string, (v: string) => void, string[], string][]).map(([label, val, onChange, opts, ph]) => (
               <div key={label}>
                 <div className="text-[10px] font-bold text-slate-500 dark:text-gray-400 mb-1">
                   {label}
@@ -880,7 +935,7 @@ export default function DashboardPage({
           {userRank.length === 0 && (
             <div className="text-[11px] text-slate-500 dark:text-gray-400">&mdash;</div>
           )}
-          {userRank.slice(0, 3).map((r: any, i: any) => (
+          {userRank.slice(0, 3).map((r: UserRankEntry, i: number) => (
             <div
               key={r.name}
               className="flex items-center gap-2 mb-1.5"
@@ -1061,8 +1116,8 @@ export default function DashboardPage({
               <span
                 className="text-[10px] px-2 py-0.5 rounded-full font-bold text-center inline-block"
                 style={{
-                  background: PRIO_COLOR[t.priority] + "22",
-                  color: PRIO_COLOR[t.priority],
+                  background: PRIO_COLOR[t.priority as string] + "22",
+                  color: PRIO_COLOR[t.priority as string],
                 }}
               >
                 {t.priority}
@@ -1085,15 +1140,15 @@ export default function DashboardPage({
               </div>
               <div className="text-[11px] text-slate-500 dark:text-gray-400 overflow-hidden text-ellipsis whitespace-nowrap">
                 {typeof t.contract === "object"
-                  ? t.contract?.name
+                  ? (t.contract as { name?: string })?.name
                   : t.contract || "\u2014"}
               </div>
               <div className="text-[11px] text-slate-500 dark:text-gray-400 overflow-hidden text-ellipsis whitespace-nowrap">
-                {typeof t.city === "object" ? t.city?.name : t.city || "\u2014"}
+                {typeof t.city === "object" ? (t.city as { name?: string })?.name : t.city || "\u2014"}
               </div>
               <div className="text-[11px] text-slate-500 dark:text-gray-400 overflow-hidden text-ellipsis whitespace-nowrap">
-                {typeof t.nucleus === "object"
-                  ? t.nucleus?.name
+                {typeof t.nucleus === "object" && t.nucleus !== null
+                  ? (t.nucleus as unknown as { name?: string })?.name
                   : t.nucleus || "\u2014"}
               </div>
               <div className="text-[11px] text-slate-500 dark:text-gray-400">
