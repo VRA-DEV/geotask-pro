@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
-import { NextResponse } from "next/server";
+import { type Prisma } from "@prisma/client";
+import { type NextRequest, NextResponse } from "next/server";
 
 async function resolveSectorId(s: any): Promise<number | null> {
   if (!s) return null;
@@ -84,10 +85,27 @@ async function notifyManagers(
   }
 }
 
-// GET /api/tasks
-export async function GET() {
+// GET /api/tasks?page=1&limit=50&status=A+Fazer&sector_id=3
+export async function GET(request: NextRequest) {
   try {
+    const url = request.nextUrl;
+    const page = Math.max(1, Number(url.searchParams.get("page")) || 1);
+    const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit")) || 0));
+    const status = url.searchParams.get("status");
+    const sectorId = Number(url.searchParams.get("sector_id")) || undefined;
+    const responsibleId = Number(url.searchParams.get("responsible_id")) || undefined;
+
+    // Build optional where clause
+    const where: Prisma.TaskWhereInput = {
+      parent_id: null, // Only top-level tasks (children are included via relations)
+      ...(status ? { status } : {}),
+      ...(sectorId ? { sector_id: sectorId } : {}),
+      ...(responsibleId ? { responsible_id: responsibleId } : {}),
+    };
+
     const tasks = await prisma.task.findMany({
+      where,
+      ...(limit > 0 ? { take: limit, skip: (page - 1) * limit } : {}),
       include: {
         contract: { select: { id: true, name: true } },
         city: { select: { id: true, name: true } },
@@ -204,6 +222,21 @@ export async function GET() {
       pauses: t.pauses || [],
     }));
 
+    // If pagination was requested, return paginated response with metadata
+    if (limit > 0) {
+      const total = await prisma.task.count({ where });
+      return NextResponse.json({
+        data: result,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      });
+    }
+
+    // Default: return flat array (backward compatible)
     return NextResponse.json(result);
   } catch (error) {
     console.error("Erro ao buscar tarefas:", error);

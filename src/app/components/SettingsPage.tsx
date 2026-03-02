@@ -238,40 +238,16 @@ export function SettingsPage({
 
   const tabs = isAdmin ? allTabs : allTabs.filter((t) => t.id === "account");
 
-  // ── Shared styles ─────────────────────────────────────────────────────────
-
-  const actionBtn = (danger = false): React.CSSProperties => ({
-    background: danger ? "#fef2f2" : T.inp,
-    border: "none",
-    borderRadius: 6,
-    padding: 5,
-    cursor: "pointer",
-  });
-
-  const addBtn: React.CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    gap: 5,
-    padding: "6px 12px",
-    background: "#98af3b",
-    color: "white",
-    border: "none",
-    borderRadius: 8,
-    fontSize: 12,
-    fontWeight: 600,
-    cursor: "pointer",
-  };
-
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+    <div className="h-full flex flex-col">
       {/* Page header */}
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: T.text }}>
+      <div className="mb-5">
+        <h1 className="m-0 text-[22px] font-bold text-slate-900 dark:text-gray-50">
           Configurações
         </h1>
-        <p style={{ margin: "4px 0 0", fontSize: 13, color: T.sub }}>
+        <p className="mt-1 mb-0 text-[13px] text-slate-500 dark:text-gray-400">
           {isAdmin
             ? "Gerencie suas preferências e o sistema"
             : "Gerencie suas preferências"}
@@ -279,35 +255,16 @@ export function SettingsPage({
       </div>
 
       {/* Tab bar */}
-      <div
-        style={{
-          display: "flex",
-          gap: 4,
-          background: T.col,
-          borderRadius: 10,
-          padding: 4,
-          width: "fit-content",
-          marginBottom: 20,
-          flexWrap: "wrap",
-        }}
-      >
+      <div className="flex gap-1 bg-slate-100 dark:bg-gray-900 rounded-[10px] p-1 w-fit mb-5 flex-wrap">
         {tabs.map(({ id, l, icon: Icon }) => (
           <button
             key={id}
             onClick={() => setTab(id)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "7px 14px",
-              borderRadius: 7,
-              border: "none",
-              background: tab === id ? "#98af3b" : "transparent",
-              color: tab === id ? "white" : T.sub,
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
+            className={`flex items-center gap-1.5 py-[7px] px-3.5 rounded-[7px] border-none text-xs font-semibold cursor-pointer ${
+              tab === id
+                ? "bg-primary text-white"
+                : "bg-transparent text-slate-500 dark:text-gray-400"
+            }`}
           >
             <Icon size={13} />
             {l}
@@ -316,117 +273,46 @@ export function SettingsPage({
       </div>
 
       {loading ? (
-        <div style={{ padding: 20, color: T.sub }}>Carregando...</div>
+        <div className="p-5 text-slate-500 dark:text-gray-400">Carregando...</div>
       ) : (
         <>
           {/* ═══════════════════════════════════════════════════════════════
               ACCOUNT TAB — all users
           ═══════════════════════════════════════════════════════════════ */}
           {tab === "account" && (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 16,
-                maxWidth: 520,
-              }}
-            >
+            <div className="flex flex-col gap-4 max-w-[520px]">
               {/* User info card */}
-              <div
-                style={{
-                  background: T.card,
-                  border: `1px solid ${T.border}`,
-                  borderRadius: 14,
-                  padding: 24,
-                }}
-              >
-                <h3
-                  style={{
-                    margin: "0 0 16px",
-                    fontSize: 15,
-                    fontWeight: 600,
-                    color: T.text,
-                  }}
-                >
+              <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-[14px] p-6">
+                <h3 className="mb-4 mt-0 text-[15px] font-semibold text-slate-900 dark:text-gray-50">
                   Informações da Conta
                 </h3>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 14,
-                    marginBottom: 16,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 48,
-                      height: 48,
-                      borderRadius: "50%",
-                      background: "#98af3b",
-                      color: "white",
-                      fontSize: 16,
-                      fontWeight: 700,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
+                <div className="flex items-center gap-3.5 mb-4">
+                  <div className="w-12 h-12 rounded-full bg-primary text-white text-base font-bold flex items-center justify-center">
                     {currentUser?.avatar || currentUser?.name?.charAt(0) || "?"}
                   </div>
                   <div>
-                    <div
-                      style={{ fontSize: 15, fontWeight: 600, color: T.text }}
-                    >
+                    <div className="text-[15px] font-semibold text-slate-900 dark:text-gray-50">
                       {currentUser?.name}
                     </div>
-                    <div style={{ fontSize: 12, color: T.sub }}>
+                    <div className="text-xs text-slate-500 dark:text-gray-400">
                       {currentUser?.email}
                     </div>
                   </div>
                 </div>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: 12,
-                  }}
-                >
-                  <div
-                    style={{
-                      background: T.inp,
-                      borderRadius: 8,
-                      padding: "10px 14px",
-                      border: `1px solid ${T.border}`,
-                    }}
-                  >
-                    <div
-                      style={{ fontSize: 10, color: T.sub, marginBottom: 2 }}
-                    >
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-slate-100 dark:bg-gray-700 rounded-lg py-2.5 px-3.5 border border-slate-200 dark:border-gray-700">
+                    <div className="text-[10px] text-slate-500 dark:text-gray-400 mb-0.5">
                       CARGO
                     </div>
-                    <div
-                      style={{ fontSize: 13, fontWeight: 600, color: T.text }}
-                    >
+                    <div className="text-[13px] font-semibold text-slate-900 dark:text-gray-50">
                       {currentUser?.role?.name || "—"}
                     </div>
                   </div>
-                  <div
-                    style={{
-                      background: T.inp,
-                      borderRadius: 8,
-                      padding: "10px 14px",
-                      border: `1px solid ${T.border}`,
-                    }}
-                  >
-                    <div
-                      style={{ fontSize: 10, color: T.sub, marginBottom: 2 }}
-                    >
+                  <div className="bg-slate-100 dark:bg-gray-700 rounded-lg py-2.5 px-3.5 border border-slate-200 dark:border-gray-700">
+                    <div className="text-[10px] text-slate-500 dark:text-gray-400 mb-0.5">
                       SETOR
                     </div>
-                    <div
-                      style={{ fontSize: 13, fontWeight: 600, color: T.text }}
-                    >
+                    <div className="text-[13px] font-semibold text-slate-900 dark:text-gray-50">
                       {currentUser?.sector?.name || "—"}
                     </div>
                   </div>
@@ -434,38 +320,16 @@ export function SettingsPage({
               </div>
 
               {/* Security card */}
-              <div
-                style={{
-                  background: T.card,
-                  border: `1px solid ${T.border}`,
-                  borderRadius: 14,
-                  padding: 24,
-                }}
-              >
-                <h3
-                  style={{
-                    margin: "0 0 16px",
-                    fontSize: 15,
-                    fontWeight: 600,
-                    color: T.text,
-                  }}
-                >
+              <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-[14px] p-6">
+                <h3 className="mb-4 mt-0 text-[15px] font-semibold text-slate-900 dark:text-gray-50">
                   Segurança
                 </h3>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                  }}
-                >
+                <div className="flex items-center justify-between">
                   <div>
-                    <div
-                      style={{ fontSize: 14, fontWeight: 500, color: T.text }}
-                    >
+                    <div className="text-sm font-medium text-slate-900 dark:text-gray-50">
                       Senha
                     </div>
-                    <div style={{ fontSize: 12, color: T.sub }}>
+                    <div className="text-xs text-slate-500 dark:text-gray-400">
                       Recomendamos alterar sua senha periodicamente.
                     </div>
                   </div>
@@ -478,19 +342,7 @@ export function SettingsPage({
                         setShowPasswordModal(true);
                       }
                     }}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "8px 16px",
-                      background: T.inp,
-                      color: T.text,
-                      border: `1px solid ${T.border}`,
-                      borderRadius: 8,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: "pointer",
-                    }}
+                    className="flex items-center gap-2 py-2 px-4 bg-slate-100 dark:bg-gray-700 text-slate-900 dark:text-gray-50 border border-slate-200 dark:border-gray-700 rounded-lg text-[13px] font-semibold cursor-pointer"
                   >
                     <Lock size={14} />
                     Alterar senha
@@ -504,25 +356,10 @@ export function SettingsPage({
               USERS TAB — Admin only
           ═══════════════════════════════════════════════════════════════ */}
           {tab === "users" && isAdmin && (
-            <div
-              style={{
-                background: T.card,
-                border: `1px solid ${T.border}`,
-                borderRadius: 14,
-                overflow: "hidden",
-              }}
-            >
+            <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-[14px] overflow-hidden">
               {/* Header */}
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: "14px 16px",
-                  borderBottom: `1px solid ${T.border}`,
-                }}
-              >
-                <span style={{ fontSize: 13, fontWeight: 600, color: T.text }}>
+              <div className="flex justify-between items-center py-3.5 px-4 border-b border-slate-200 dark:border-gray-700">
+                <span className="text-[13px] font-semibold text-slate-900 dark:text-gray-50">
                   Usuários ({users.length})
                 </span>
                 <button
@@ -530,7 +367,7 @@ export function SettingsPage({
                     setEditingUser(null);
                     setShowUserModal(true);
                   }}
-                  style={addBtn}
+                  className="flex items-center gap-[5px] py-1.5 px-3 bg-primary text-white border-none rounded-lg text-xs font-semibold cursor-pointer"
                 >
                   <Plus size={12} />
                   Novo usuário
@@ -539,17 +376,13 @@ export function SettingsPage({
 
               {/* Table header */}
               <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "2fr 2fr 1.5fr 1.2fr 130px",
-                  padding: "8px 16px",
-                  borderBottom: `1px solid ${T.border}`,
-                }}
+                className="grid py-2 px-4 border-b border-slate-200 dark:border-gray-700"
+                style={{ gridTemplateColumns: "2fr 2fr 1.5fr 1.2fr 130px" }}
               >
                 {["Nome", "E-mail", "Cargo", "Setor", "Ações"].map((h) => (
                   <span
                     key={h}
-                    style={{ fontSize: 10, fontWeight: 700, color: T.sub }}
+                    className="text-[10px] font-bold text-slate-500 dark:text-gray-400"
                   >
                     {h}
                   </span>
@@ -560,62 +393,33 @@ export function SettingsPage({
               {users.map((u, i) => (
                 <div
                   key={u.id}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "2fr 2fr 1.5fr 1.2fr 130px",
-                    alignItems: "center",
-                    padding: "10px 16px",
-                    borderBottom:
-                      i < users.length - 1 ? `1px solid ${T.border}` : "none",
-                    opacity: u.active ? 1 : 0.5,
-                    transition: "background 0.15s",
-                  }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.background = T.hover)
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.background = "transparent")
-                  }
+                  className={`grid items-center py-2.5 px-4 transition-colors duration-150 hover:bg-slate-100 dark:hover:bg-white/5 ${
+                    i < users.length - 1
+                      ? "border-b border-slate-200 dark:border-gray-700"
+                      : ""
+                  } ${!u.active ? "opacity-50" : ""}`}
+                  style={{ gridTemplateColumns: "2fr 2fr 1.5fr 1.2fr 130px" }}
                 >
                   {/* Name & avatar */}
-                  <div
-                    style={{ display: "flex", alignItems: "center", gap: 8 }}
-                  >
+                  <div className="flex items-center gap-2">
                     <div
-                      style={{
-                        width: 30,
-                        height: 30,
-                        borderRadius: "50%",
-                        background: u.active ? "#98af3b" : "#9ca3af",
-                        color: "white",
-                        fontSize: 11,
-                        fontWeight: 700,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexShrink: 0,
-                      }}
+                      className={`w-[30px] h-[30px] rounded-full text-white text-[11px] font-bold flex items-center justify-center shrink-0 ${
+                        u.active ? "bg-primary" : "bg-gray-400"
+                      }`}
                     >
                       {u.avatar || u.name.charAt(0)}
                     </div>
                     <div>
-                      <span
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 500,
-                          color: T.text,
-                          display: "block",
-                        }}
-                      >
+                      <span className="text-[13px] font-medium text-slate-900 dark:text-gray-50 block">
                         {u.name}
                       </span>
                       {!u.active && (
-                        <span style={{ fontSize: 10, color: "#ef4444" }}>
+                        <span className="text-[10px] text-red-500">
                           Desativado
                         </span>
                       )}
                       {u.must_change_password && u.active && (
-                        <span style={{ fontSize: 10, color: "#f59e0b" }}>
+                        <span className="text-[10px] text-amber-500">
                           ⚠ Deve trocar senha
                         </span>
                       )}
@@ -623,30 +427,20 @@ export function SettingsPage({
                   </div>
 
                   {/* Email */}
-                  <span style={{ fontSize: 12, color: T.sub }}>{u.email}</span>
+                  <span className="text-xs text-slate-500 dark:text-gray-400">{u.email}</span>
 
                   {/* Role badge */}
-                  <span
-                    style={{
-                      fontSize: 11,
-                      padding: "2px 8px",
-                      borderRadius: 20,
-                      background: T.tag,
-                      color: T.tagText,
-                      width: "fit-content",
-                      fontWeight: 600,
-                    }}
-                  >
+                  <span className="text-[11px] py-0.5 px-2 rounded-full bg-slate-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 w-fit font-semibold">
                     {u.role?.name || "Sem cargo"}
                   </span>
 
                   {/* Sector */}
-                  <span style={{ fontSize: 12, color: T.sub }}>
+                  <span className="text-xs text-slate-500 dark:text-gray-400">
                     {u.sector?.name || "Sem setor"}
                   </span>
 
                   {/* Actions */}
-                  <div style={{ display: "flex", gap: 4 }}>
+                  <div className="flex gap-1">
                     {/* Reset password */}
                     <button
                       title="Resetar Senha"
@@ -656,9 +450,9 @@ export function SettingsPage({
                         setIsAdminPasswordReset(true);
                         setShowPasswordModal(true);
                       }}
-                      style={actionBtn()}
+                      className="bg-slate-100 dark:bg-gray-700 border-none rounded-md p-[5px] cursor-pointer text-slate-500 dark:text-gray-400"
                     >
-                      <Lock size={12} color={T.sub} />
+                      <Lock size={12} />
                     </button>
 
                     {/* Edit */}
@@ -668,9 +462,9 @@ export function SettingsPage({
                         setEditingUser(u);
                         setShowUserModal(true);
                       }}
-                      style={actionBtn()}
+                      className="bg-slate-100 dark:bg-gray-700 border-none rounded-md p-[5px] cursor-pointer text-slate-500 dark:text-gray-400"
                     >
-                      <Edit size={12} color={T.sub} />
+                      <Edit size={12} />
                     </button>
 
                     {/* Deactivate / Reactivate */}
@@ -678,7 +472,7 @@ export function SettingsPage({
                       <button
                         title="Desativar usuário"
                         onClick={() => handleDeleteUser(u.id)}
-                        style={actionBtn(true)}
+                        className="bg-red-50 border-none rounded-md p-[5px] cursor-pointer"
                       >
                         <Trash2 size={12} color="#ef4444" />
                       </button>
@@ -686,7 +480,7 @@ export function SettingsPage({
                       <button
                         title="Reativar usuário"
                         onClick={() => handleReactivateUser(u.id)}
-                        style={actionBtn()}
+                        className="bg-slate-100 dark:bg-gray-700 border-none rounded-md p-[5px] cursor-pointer"
                       >
                         <UserCheck size={12} color="#10b981" />
                       </button>
@@ -696,14 +490,7 @@ export function SettingsPage({
               ))}
 
               {users.length === 0 && (
-                <div
-                  style={{
-                    padding: "24px 16px",
-                    textAlign: "center",
-                    color: T.sub,
-                    fontSize: 13,
-                  }}
-                >
+                <div className="py-6 px-4 text-center text-slate-500 dark:text-gray-400 text-[13px]">
                   Nenhum usuário encontrado.
                 </div>
               )}
@@ -714,34 +501,14 @@ export function SettingsPage({
               ROLES TAB — Admin only
           ═══════════════════════════════════════════════════════════════ */}
           {tab === "roles" && isAdmin && (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))",
-                gap: 12,
-              }}
-            >
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
               {/* Add new role card */}
               <button
                 onClick={() => {
                   setEditingRole(null);
                   setShowRoleModal(true);
                 }}
-                style={{
-                  background: "transparent",
-                  border: `1.5px dashed ${T.border}`,
-                  borderRadius: 12,
-                  padding: 16,
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 8,
-                  fontSize: 13,
-                  color: T.sub,
-                  cursor: "pointer",
-                  minHeight: 100,
-                }}
+                className="bg-transparent border-[1.5px] border-dashed border-slate-200 dark:border-gray-700 rounded-xl p-4 flex flex-col items-center justify-center gap-2 text-[13px] text-slate-500 dark:text-gray-400 cursor-pointer min-h-[100px]"
               >
                 <Plus size={20} />
                 Novo Cargo
@@ -750,45 +517,31 @@ export function SettingsPage({
               {roles.map((r) => (
                 <div
                   key={r.id}
-                  style={{
-                    background: T.card,
-                    border: `1px solid ${T.border}`,
-                    borderRadius: 12,
-                    padding: 16,
-                  }}
+                  className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl p-4"
                 >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginBottom: 8,
-                    }}
-                  >
-                    <span
-                      style={{ fontSize: 14, fontWeight: 600, color: T.text }}
-                    >
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-semibold text-slate-900 dark:text-gray-50">
                       {r.name}
                     </span>
-                    <div style={{ display: "flex", gap: 6 }}>
+                    <div className="flex gap-1.5">
                       <button
                         onClick={() => {
                           setEditingRole(r);
                           setShowRoleModal(true);
                         }}
-                        style={actionBtn()}
+                        className="bg-slate-100 dark:bg-gray-700 border-none rounded-md p-[5px] cursor-pointer text-slate-500 dark:text-gray-400"
                       >
-                        <Edit size={12} color={T.sub} />
+                        <Edit size={12} />
                       </button>
                       <button
                         onClick={() => handleDeleteRole(r.id)}
-                        style={actionBtn(true)}
+                        className="bg-red-50 border-none rounded-md p-[5px] cursor-pointer"
                       >
                         <Trash2 size={12} color="#ef4444" />
                       </button>
                     </div>
                   </div>
-                  <div style={{ fontSize: 12, color: T.sub }}>
+                  <div className="text-xs text-slate-500 dark:text-gray-400">
                     {users.filter((u) => u.role_id === r.id).length} usuário(s)
                   </div>
                 </div>
@@ -800,61 +553,39 @@ export function SettingsPage({
               SECTORS TAB — Admin only
           ═══════════════════════════════════════════════════════════════ */}
           {tab === "sectors" && isAdmin && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div className="flex flex-col gap-2">
               {sectors.map((s) => (
                 <div
                   key={s.id}
-                  style={{
-                    background: T.card,
-                    border: `1px solid ${T.border}`,
-                    borderRadius: 12,
-                    padding: "12px 16px",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
+                  className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl py-3 px-4 flex justify-between items-center"
                 >
-                  <div
-                    style={{ display: "flex", alignItems: "center", gap: 10 }}
-                  >
-                    <div
-                      style={{
-                        width: 34,
-                        height: 34,
-                        background: "#ede9fe",
-                        borderRadius: 8,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-[34px] h-[34px] bg-violet-100 rounded-lg flex items-center justify-center">
                       <Building2 size={16} color="#98af3b" />
                     </div>
                     <div>
-                      <div
-                        style={{ fontSize: 13, fontWeight: 600, color: T.text }}
-                      >
+                      <div className="text-[13px] font-semibold text-slate-900 dark:text-gray-50">
                         {s.name}
                       </div>
-                      <div style={{ fontSize: 11, color: T.sub }}>
+                      <div className="text-[11px] text-slate-500 dark:text-gray-400">
                         {users.filter((u) => u.sector_id === s.id).length}{" "}
                         colaborador(es)
                       </div>
                     </div>
                   </div>
-                  <div style={{ display: "flex", gap: 6 }}>
+                  <div className="flex gap-1.5">
                     <button
                       onClick={() => {
                         setEditingSector(s);
                         setShowSectorModal(true);
                       }}
-                      style={actionBtn()}
+                      className="bg-slate-100 dark:bg-gray-700 border-none rounded-md p-[5px] cursor-pointer text-slate-500 dark:text-gray-400"
                     >
-                      <Edit size={13} color={T.sub} />
+                      <Edit size={13} />
                     </button>
                     <button
                       onClick={() => handleDeleteSector(s.id)}
-                      style={actionBtn(true)}
+                      className="bg-red-50 border-none rounded-md p-[5px] cursor-pointer"
                     >
                       <Trash2 size={13} color="#ef4444" />
                     </button>
@@ -867,19 +598,7 @@ export function SettingsPage({
                   setEditingSector(null);
                   setShowSectorModal(true);
                 }}
-                style={{
-                  background: "transparent",
-                  border: `1.5px dashed ${T.border}`,
-                  borderRadius: 12,
-                  padding: 14,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 6,
-                  fontSize: 13,
-                  color: T.sub,
-                  cursor: "pointer",
-                }}
+                className="bg-transparent border-[1.5px] border-dashed border-slate-200 dark:border-gray-700 rounded-xl p-3.5 flex items-center justify-center gap-1.5 text-[13px] text-slate-500 dark:text-gray-400 cursor-pointer"
               >
                 <Plus size={14} />
                 Novo setor
@@ -891,110 +610,47 @@ export function SettingsPage({
               PERMISSIONS TAB — Admin only
           ═══════════════════════════════════════════════════════════════ */}
           {tab === "permissions" && isAdmin && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div className="flex flex-col gap-4">
               {/* Legend */}
-              <div
-                style={{
-                  display: "flex",
-                  gap: 12,
-                  flexWrap: "wrap",
-                  background: T.card,
-                  border: `1px solid ${T.border}`,
-                  borderRadius: 10,
-                  padding: "10px 16px",
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: T.sub,
-                    marginRight: 4,
-                  }}
-                >
+              <div className="flex gap-3 flex-wrap bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-[10px] py-2.5 px-4">
+                <span className="text-xs font-semibold text-slate-500 dark:text-gray-400 mr-1">
                   Legenda:
                 </span>
                 {PERMISSION_LEVELS.map((pl) => (
                   <span
                     key={pl.value}
-                    style={{
-                      fontSize: 12,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 5,
-                    }}
+                    className="text-xs flex items-center gap-[5px]"
                   >
                     <span
-                      style={{
-                        display: "inline-block",
-                        width: 9,
-                        height: 9,
-                        borderRadius: "50%",
-                        background: pl.color,
-                      }}
+                      className="inline-block w-[9px] h-[9px] rounded-full"
+                      style={{ background: pl.color }}
                     />
-                    <span style={{ color: T.text }}>{pl.label}</span>
+                    <span className="text-slate-900 dark:text-gray-50">{pl.label}</span>
                   </span>
                 ))}
               </div>
 
               {/* Permissions table */}
-              <div
-                style={{
-                  background: T.card,
-                  border: `1px solid ${T.border}`,
-                  borderRadius: 14,
-                  overflow: "auto",
-                }}
-              >
-                <div
-                  style={{
-                    padding: "14px 16px",
-                    borderBottom: `1px solid ${T.border}`,
-                  }}
-                >
-                  <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>
+              <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-[14px] overflow-auto">
+                <div className="py-3.5 px-4 border-b border-slate-200 dark:border-gray-700">
+                  <div className="text-[13px] font-semibold text-slate-900 dark:text-gray-50">
                     Permissões por Cargo
                   </div>
-                  <div style={{ fontSize: 12, color: T.sub, marginTop: 2 }}>
+                  <div className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">
                     As alterações são salvas automaticamente.
                   </div>
                 </div>
 
-                <table
-                  style={{
-                    width: "100%",
-                    borderCollapse: "collapse",
-                    minWidth: 500,
-                  }}
-                >
+                <table className="w-full border-collapse min-w-[500px]">
                   <thead>
-                    <tr style={{ borderBottom: `1px solid ${T.border}` }}>
-                      <th
-                        style={{
-                          padding: "10px 16px",
-                          textAlign: "left",
-                          fontSize: 11,
-                          fontWeight: 700,
-                          color: T.sub,
-                          position: "sticky",
-                          left: 0,
-                          background: T.card,
-                        }}
-                      >
+                    <tr className="border-b border-slate-200 dark:border-gray-700">
+                      <th className="py-2.5 px-4 text-left text-[11px] font-bold text-slate-500 dark:text-gray-400 sticky left-0 bg-white dark:bg-gray-800">
                         Módulo
                       </th>
                       {roles.map((r) => (
                         <th
                           key={r.id}
-                          style={{
-                            padding: "10px 14px",
-                            textAlign: "center",
-                            fontSize: 11,
-                            fontWeight: 700,
-                            color: T.sub,
-                            whiteSpace: "nowrap",
-                          }}
+                          className="py-2.5 px-3.5 text-center text-[11px] font-bold text-slate-500 dark:text-gray-400 whitespace-nowrap"
                         >
                           {r.name}
                         </th>
@@ -1005,24 +661,13 @@ export function SettingsPage({
                     {PERMISSION_MODULES.map((mod, i) => (
                       <tr
                         key={mod}
-                        style={{
-                          borderBottom:
-                            i < PERMISSION_MODULES.length - 1
-                              ? `1px solid ${T.border}`
-                              : "none",
-                        }}
+                        className={
+                          i < PERMISSION_MODULES.length - 1
+                            ? "border-b border-slate-200 dark:border-gray-700"
+                            : ""
+                        }
                       >
-                        <td
-                          style={{
-                            padding: "10px 16px",
-                            fontSize: 13,
-                            fontWeight: 500,
-                            color: T.text,
-                            position: "sticky",
-                            left: 0,
-                            background: T.card,
-                          }}
-                        >
+                        <td className="py-2.5 px-4 text-[13px] font-medium text-slate-900 dark:text-gray-50 sticky left-0 bg-white dark:bg-gray-800">
                           {mod}
                         </td>
                         {roles.map((r) => {
@@ -1037,10 +682,7 @@ export function SettingsPage({
                           return (
                             <td
                               key={r.id}
-                              style={{
-                                padding: "8px 14px",
-                                textAlign: "center",
-                              }}
+                              className="py-2 px-3.5 text-center"
                             >
                               <select
                                 value={currentLevel}
@@ -1051,16 +693,10 @@ export function SettingsPage({
                                     e.target.value as PermissionLevel,
                                   )
                                 }
+                                className="py-1 px-2 rounded-md bg-slate-100 dark:bg-gray-700 text-[11px] font-semibold cursor-pointer outline-none"
                                 style={{
-                                  padding: "4px 8px",
-                                  borderRadius: 6,
-                                  border: `1.5px solid ${levelInfo?.color || T.border}`,
-                                  background: T.inp,
-                                  color: levelInfo?.color || T.text,
-                                  fontSize: 11,
-                                  fontWeight: 600,
-                                  cursor: "pointer",
-                                  outline: "none",
+                                  border: `1.5px solid ${levelInfo?.color || "#e2e8f0"}`,
+                                  color: levelInfo?.color || "#0f172a",
                                 }}
                               >
                                 {PERMISSION_LEVELS.map((pl) => (
@@ -1079,44 +715,32 @@ export function SettingsPage({
               </div>
 
               {/* Business rules note */}
-              <div
-                style={{
-                  background: T.inp,
-                  border: `1px solid ${T.border}`,
-                  borderRadius: 10,
-                  padding: "12px 16px",
-                  fontSize: 12,
-                  color: T.sub,
-                  lineHeight: 1.6,
-                }}
-              >
-                <strong
-                  style={{ color: T.text, display: "block", marginBottom: 6 }}
-                >
+              <div className="bg-slate-100 dark:bg-gray-700 border border-slate-200 dark:border-gray-700 rounded-[10px] py-3 px-4 text-xs text-slate-500 dark:text-gray-400 leading-relaxed">
+                <strong className="text-slate-900 dark:text-gray-50 block mb-1.5">
                   📋 Regras de negócio:
                 </strong>
-                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                <ul className="m-0 pl-[18px]">
                   <li>
-                    <strong style={{ color: T.text }}>
+                    <strong className="text-slate-900 dark:text-gray-50">
                       Controle de tarefas
                     </strong>{" "}
                     (iniciar/pausar/concluir): restrito ao responsável da tarefa
                     OU ao Gestor do setor atribuído.
                   </li>
                   <li>
-                    <strong style={{ color: T.text }}>
+                    <strong className="text-slate-900 dark:text-gray-50">
                       Criação de tarefas
                     </strong>
                     : Admin, Gerente e Coordenador → qualquer setor. Gestor →
                     apenas seu setor. Liderado → sem acesso.
                   </li>
                   <li>
-                    <strong style={{ color: T.text }}>Atribuição</strong>:
+                    <strong className="text-slate-900 dark:text-gray-50">Atribuição</strong>:
                     Admin/Gerente/Coordenador → qualquer usuário. Gestor →
                     apenas usuários do seu setor.
                   </li>
                   <li>
-                    <strong style={{ color: T.text }}>Menções</strong>: qualquer
+                    <strong className="text-slate-900 dark:text-gray-50">Menções</strong>: qualquer
                     cargo pode mencionar qualquer usuário ou setor. O mencionado
                     recebe notificação e pode visualizar a tarefa.
                   </li>

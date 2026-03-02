@@ -1,9 +1,0 @@
-1129:              <FormField label="Setor" req err={errors.sector}>
-1132:                  val={form.sector}
-1138:                  err={errors.sector}
-1333:                      {typeof s.sector === "object" ? s.sector.name : s.sector}
-2361:                      value={newSubtask.sector}
-7651:                      : tpl.sector}{" "}
-7736:                  : active.sector}
-8157:                      value={t.sector}
-8213:                          value={st.sector}

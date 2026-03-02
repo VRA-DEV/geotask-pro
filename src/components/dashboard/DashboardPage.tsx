@@ -1,0 +1,1115 @@
+"use client";
+
+import {
+  Check,
+  ChevronDown,
+  Eye,
+  FileText,
+  Filter,
+  Search,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { DateRange } from "react-day-picker";
+import {
+  Bar,
+  BarChart,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+
+import {
+  PRIO_COLOR,
+  PRIORITIES,
+  SECTORS,
+  STATUS_COLOR,
+  TASK_TYPES,
+} from "@/lib/constants";
+import { getTaskState, parseDate, parseDateStr } from "@/lib/helpers";
+import { exportToExcel, exportToPDF, getKpiData } from "@/lib/exportUtils";
+import AIReportModal from "@/components/AIReportModal";
+import { DatePicker } from "@/app/components/DatePicker";
+
+// ── Inline helper components ─────────────────────────────────
+
+const ExportButtons = ({ filtered, kpi, users, user, filterLabel }: any) => (
+  <div className="flex gap-2 items-center">
+    <button
+      onClick={() => exportToExcel(filtered, kpi, user, filterLabel)}
+      className="bg-emerald-500 text-white border-none px-3 py-1.5 rounded-lg text-[11px] font-semibold cursor-pointer flex items-center gap-1 transition-[filter] duration-100 hover:brightness-90"
+    >
+      <FileText size={13} /> EXCEL
+    </button>
+    <button
+      onClick={() => exportToPDF(filtered, kpi, users, user, filterLabel)}
+      className="bg-red-500 text-white border-none px-3 py-1.5 rounded-lg text-[11px] font-semibold cursor-pointer flex items-center gap-1 transition-[filter] duration-100 hover:brightness-90"
+    >
+      <FileText size={13} /> PDF
+    </button>
+  </div>
+);
+
+function FilterSelect({
+  val,
+  onChange,
+  opts,
+  placeholder = "",
+  label = "",
+}: any) {
+  return (
+    <select
+      value={val}
+      onChange={(e) => onChange(e.target.value)}
+      className={`px-2.5 py-1.5 rounded-lg text-xs outline-none cursor-pointer max-w-[170px] bg-white dark:bg-gray-800 ${
+        val
+          ? "border border-primary text-primary"
+          : "border border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400"
+      }`}
+    >
+      <option value="">{placeholder || label}</option>
+      {opts.map((o: any, i: number) => {
+        const label = typeof o === "object" ? o.name || o.label : o;
+        const value = typeof o === "object" ? o.id || o.value : o;
+        const key =
+          typeof o === "object"
+            ? o.id || o.name || `fopt-${i}`
+            : `fopt-${o}-${i}`;
+        return (
+          <option key={key} value={value}>
+            {label}
+          </option>
+        );
+      })}
+    </select>
+  );
+}
+
+function DateRangePicker({ date, setDate, label, T }: any) {
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-[11px] font-bold text-slate-500 dark:text-gray-400">
+        {label}
+      </label>
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <DatePicker
+            T={T}
+            date={date?.from}
+            setDate={(d: any) => setDate({ ...date, from: d })}
+            label=""
+          />
+        </div>
+        <div className="flex-1">
+          <DatePicker
+            T={T}
+            date={date?.to}
+            setDate={(d: any) => setDate({ ...date, to: d })}
+            label=""
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MultiSelect({
+  val = [],
+  onChange,
+  opts,
+  placeholder = "",
+}: {
+  val: string[];
+  onChange: (v: string[]) => void;
+  opts: string[];
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const toggle = (opt: string) => {
+    if (val.includes(opt)) {
+      onChange(val.filter((x) => x !== opt));
+    } else {
+      onChange([...val, opt]);
+    }
+  };
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div
+        onClick={() => setOpen(!open)}
+        className={`px-2.5 py-1.5 rounded-lg text-xs cursor-pointer min-w-[140px] max-w-[200px] flex justify-between items-center bg-white dark:bg-gray-800 ${
+          val.length > 0
+            ? "border border-primary text-primary"
+            : "border border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400"
+        }`}
+      >
+        <span className="whitespace-nowrap overflow-hidden text-ellipsis">
+          {val.length === 0
+            ? placeholder
+            : val.length === 1
+              ? val[0]
+              : `${val.length} selecionados`}
+        </span>
+        <ChevronDown size={14} />
+      </div>
+
+      {open && (
+        <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg shadow-[0_10px_30px_rgba(0,0,0,0.15)] z-[9999] p-1.5 min-w-[180px] max-h-[300px] overflow-y-auto">
+          {opts.map((o: any, i: number) => {
+            const label = typeof o === "object" ? o.name || o.label : o;
+            const value = typeof o === "object" ? o.id || o.value : o;
+            const selected = val.includes(value);
+            const key =
+              typeof o === "object"
+                ? o.id || o.name || `mopt-${i}`
+                : `mopt-${o}-${i}`;
+
+            return (
+              <div
+                key={key}
+                onClick={() => toggle(value)}
+                className="px-2.5 py-1.5 rounded-md text-xs text-slate-900 dark:text-gray-50 cursor-pointer flex items-center gap-2 hover:bg-white dark:hover:bg-gray-900"
+                style={{
+                  background: selected ? "#98af3b11" : undefined,
+                }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.background = selected
+                    ? "#98af3b22"
+                    : "")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.background = selected
+                    ? "#98af3b11"
+                    : "")
+                }
+              >
+                <div
+                  className={`w-3.5 h-3.5 rounded-[3px] flex items-center justify-center ${
+                    selected
+                      ? "border border-primary bg-primary"
+                      : "border border-slate-500 dark:border-gray-400 bg-transparent"
+                  }`}
+                >
+                  {selected && <Check size={10} color="white" />}
+                </div>
+                <span>{label}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main component ───────────────────────────────────────────
+
+const TODAY = new Date();
+
+export default function DashboardPage({
+  T,
+  tasks,
+  user,
+  onSelect,
+  users = [],
+  contracts = [],
+  citiesNeighborhoods = {},
+  sectors = [],
+}: any) {
+  const [fSearch, setFSearch] = useState("");
+  const [fContract, setFContract] = useState("");
+  const [fCity, setFCity] = useState("");
+  const [fNeighbor, setFNeighbor] = useState("");
+  const [fStatus, setFStatus] = useState("");
+  const [fType, setFType] = useState("");
+  const [fPriority, setFPriority] = useState("");
+  const [fSector, setFSector] = useState<string[]>([]);
+  const [fUser, setFUser] = useState("");
+  const [fDateFrom, setFDateFrom] = useState<DateRange | undefined>(undefined); // Prazo
+  const [fDateTo, setFDateTo] = useState<DateRange | undefined>(undefined); // Criacao
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  const cityNeighborhoods = fCity ? citiesNeighborhoods[fCity] || [] : [];
+
+  const filtered = tasks.filter((t: any) => {
+    const txt = (fSearch || "").toLowerCase();
+    if (
+      txt &&
+      !t.title.toLowerCase().includes(txt) &&
+      !(t.description || "").toLowerCase().includes(txt)
+    )
+      return false;
+    if (fContract && t.contract !== fContract) return false;
+    if (fCity && t.city !== fCity) return false;
+    if (fNeighbor && t.nucleus !== fNeighbor) return false;
+    if (fStatus && t.status !== fStatus) return false;
+    if (fType && t.type !== fType) return false;
+    if (fPriority && t.priority !== fPriority) return false;
+    const sectorVal =
+      t.sector && typeof t.sector === "object"
+        ? t.sector?.name
+        : t.sector || "";
+    if (fSector.length > 0 && !fSector.includes(sectorVal)) return false;
+    if (
+      fUser &&
+      (typeof t.responsible === "object"
+        ? t.responsible?.name
+        : t.responsible) !== fUser
+    )
+      return false;
+    if (fDateFrom?.from || fDateFrom?.to) {
+      const td = parseDate(t.deadline);
+      if (!td) return false;
+      if (fDateFrom.from && td < fDateFrom.from) return false;
+      if (fDateFrom.to && td > fDateFrom.to) return false;
+    }
+    if (fDateTo?.from || fDateTo?.to) {
+      const tc = new Date(t.created_at);
+      if (fDateTo.from && tc < fDateTo.from) return false;
+      if (fDateTo.to && tc > fDateTo.to) return false;
+    }
+    return true;
+  });
+
+  const totalActiveFilters = [
+    fContract,
+    fCity,
+    fNeighbor,
+    fStatus,
+    fType,
+    fPriority,
+    fSector.length > 0,
+    fUser,
+    fDateFrom?.from || fDateFrom?.to,
+    fDateTo?.from || fDateTo?.to,
+  ].filter(Boolean).length;
+
+  const activeAdvancedFilters = [
+    fContract,
+    fCity,
+    fNeighbor,
+    fType,
+    fUser,
+    fDateFrom?.from || fDateFrom?.to,
+    fDateTo?.from || fDateTo?.to,
+  ].filter(Boolean).length;
+
+  const clearAll = () => {
+    setFSearch("");
+    setFContract("");
+    setFCity("");
+    setFNeighbor("");
+    setFStatus("");
+    setFType("");
+    setFPriority("");
+    setFSector([]);
+    setFUser("");
+    setFDateFrom(undefined);
+    setFDateTo(undefined);
+  };
+
+  // KPIs
+  const total = filtered.length;
+  const concluded = filtered.filter((t: any) => t.status === "Conclu\u00EDdo");
+  const concludedForAvg = concluded.filter(
+    (t: any) => !t.subtasks || t.subtasks.length === 0,
+  );
+  const avgTime = concludedForAvg.length
+    ? Math.round(
+        concludedForAvg.reduce((a: any, t: any) => a + t.time, 0) /
+          concludedForAvg.length,
+      )
+    : 0;
+  const byType = TASK_TYPES.map((tp) => ({
+    name: tp,
+    val: filtered.filter((t: any) => t.type === tp).length,
+  })).filter((x) => x.val > 0);
+  const byPriority = PRIORITIES.map((p) => ({
+    name: p,
+    val: filtered.filter((t: any) => t.priority === p).length,
+    color: PRIO_COLOR[p],
+  }));
+
+  // Graficos
+  const pieData = ["A Fazer", "Em Andamento", "Pausado", "Conclu\u00EDdo"]
+    .map((s) => ({
+      name: s,
+      value: filtered.filter((t: any) => t.status === s).length,
+    }))
+    .filter((d) => d.value > 0);
+  const sectorData = SECTORS.map((s) => ({
+    name: s,
+    v: filtered.filter(
+      (t: any) =>
+        (t.sector && typeof t.sector === "object"
+          ? t.sector.name
+          : t.sector || "") === s,
+    ).length,
+  }))
+    .filter((x: any) => x.v > 0)
+    .sort((a: any, b: any) => b.v - a.v);
+  const sectorRank = SECTORS.map((s) => ({
+    name: s,
+    v: filtered.filter(
+      (t: any) =>
+        (t.sector && typeof t.sector === "object"
+          ? t.sector.name
+          : t.sector || "") === s && t.status === "Conclu\u00EDdo",
+    ).length,
+  }))
+    .filter((x: any) => x.v > 0)
+    .sort((a: any, b: any) => b.v - a.v);
+  const userRank = users
+    .map((u: any) => ({
+      name: u.name,
+      v: filtered.filter(
+        (t: any) =>
+          (typeof t.responsible === "object"
+            ? t.responsible?.name
+            : t.responsible) === u.name && t.status === "Conclu\u00EDdo",
+      ).length,
+      sector: u.sector?.name || u.sector || "\u2014",
+    }))
+    .filter((x: any) => x.v > 0)
+    .sort((a: any, b: any) => b.v - a.v);
+
+  // Proximas tarefas
+  const upcoming = [...filtered]
+    .filter((t) => t.status !== "Conclu\u00EDdo" && t.deadline)
+    .sort((a, b) => {
+      const da = parseDate(a.deadline),
+        db = parseDate(b.deadline);
+      return (da ? da.getTime() : 0) - (db ? db.getTime() : 0);
+    })
+    .slice(0, 10);
+
+  const daysLeft = (deadlineStr: any) => {
+    const d = parseDate(deadlineStr);
+    if (!d) return null;
+    const diff = Math.round(
+      (d.getTime() - TODAY.getTime()) / (1000 * 60 * 60 * 24),
+    );
+    if (diff < 0)
+      return { label: `${Math.abs(diff)}d atrasada`, color: "#ef4444" };
+    if (diff === 0) return { label: "Hoje", color: "#f59e0b" };
+    if (diff < 2) return { label: `${diff * 24}h restantes`, color: "#f59e0b" };
+    return { label: `${diff}d restantes`, color: "#10b981" };
+  };
+
+  // Compute weekly data from real tasks (last 13 weeks)
+  const weeklyData = (() => {
+    const weeks: {
+      label: string;
+      novas: number;
+      entregar: number;
+      atrasadas: number;
+      concluidas: number;
+    }[] = [];
+    const now = TODAY;
+    for (let i = 3; i >= -3; i--) {
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - i * 7 - now.getDay());
+      weekStart.setHours(0, 0, 0, 0);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+
+      const weekNum = 4 - i;
+      const label = `${weekNum}\u00AA sem: ${String(weekStart.getDate()).padStart(2, "0")}-${String(weekEnd.getDate()).padStart(2, "0")}/${String(weekEnd.getMonth() + 1).padStart(2, "0")}`;
+
+      const novas = filtered.filter((t: any) => {
+        if (!t.created_at) return false;
+        const d = new Date(t.created_at);
+        return d >= weekStart && d <= weekEnd;
+      }).length;
+      const entregar = filtered.filter((t: any) => {
+        const d = parseDate(t.deadline);
+        return d ? d >= weekStart && d <= weekEnd : false;
+      }).length;
+      const atrasadas = filtered.filter((t: any) => {
+        const d = parseDate(t.deadline);
+        return d && d < weekStart && t.status !== "Conclu\u00EDdo" ? true : false;
+      }).length;
+      const concluidas = filtered.filter((t: any) => {
+        if (!t.completed_at) return false;
+        const d = new Date(t.completed_at);
+        return d >= weekStart && d <= weekEnd;
+      }).length;
+      weeks.push({ label, novas, entregar, atrasadas, concluidas });
+    }
+    return weeks;
+  })();
+
+  const kpi = getKpiData(filtered, users);
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="flex justify-between items-start mb-4">
+        <div>
+          <h1 className="m-0 text-[22px] font-bold text-slate-900 dark:text-gray-50">
+            Dashboard
+          </h1>
+          <p className="mt-1 mb-0 text-[13px] text-slate-500 dark:text-gray-400">
+            Ol&aacute;, {user.name.split(" ")[0]}! Veja o resumo das atividades.
+          </p>
+        </div>
+        <div className="flex gap-2.5 items-center">
+          <ExportButtons
+            filtered={filtered}
+            kpi={kpi}
+            users={users}
+            user={user}
+            filterLabel={
+              [
+                fContract && `Contrato: ${fContract}`,
+                fCity && `Cidade: ${fCity}`,
+                fNeighbor && `Bairro: ${fNeighbor}`,
+                fStatus && `Status: ${fStatus}`,
+                fType && `Tipo: ${fType}`,
+                fPriority && `Prioridade: ${fPriority}`,
+                fSector.length > 0 && `Setores: ${fSector.join(", ")}`,
+                fUser && `Respons\u00E1vel: ${fUser}`,
+                (fDateFrom?.from || fDateFrom?.to) && "Filtro de Prazo",
+                (fDateTo?.from || fDateTo?.to) && "Filtro de Cria\u00E7\u00E3o",
+              ]
+                .filter(Boolean)
+                .join(" | ") || "Nenhum"
+            }
+          />
+          <AIReportModal user={user} />
+          <span className="text-xs text-slate-500 dark:text-gray-400 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5">
+            {new Date().toLocaleDateString("pt-BR", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            })}
+          </span>
+        </div>
+      </div>
+
+      {/* -- FILTROS -- */}
+      <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl p-3 mb-5">
+        <div className="flex gap-2 flex-wrap items-center">
+          {/* busca */}
+          <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-gray-700 rounded-lg px-2.5 py-1.5 flex-[1_1_180px] max-w-[240px]">
+            <Search size={12} className="text-slate-500 dark:text-gray-400" />
+            <input
+              value={fSearch}
+              onChange={(e) => setFSearch(e.target.value)}
+              placeholder="Buscar t\u00EDtulo ou descri\u00E7\u00E3o..."
+              className="bg-transparent border-none outline-none text-xs text-slate-900 dark:text-gray-50 w-full"
+            />
+          </div>
+          <FilterSelect
+            val={fStatus}
+            onChange={setFStatus}
+            opts={["A Fazer", "Em Andamento", "Pausado", "Conclu\u00EDdo"]}
+            placeholder="Todos status"
+          />
+          <MultiSelect
+            val={fSector}
+            onChange={setFSector}
+            opts={SECTORS}
+            placeholder="Setores"
+          />
+          <FilterSelect
+            val={fPriority}
+            onChange={setFPriority}
+            opts={PRIORITIES}
+            placeholder="Todas prioridades"
+          />
+          <button
+            onClick={() => setFiltersOpen((o) => !o)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer ${
+              filtersOpen || activeAdvancedFilters
+                ? "bg-primary/5 border border-primary text-primary"
+                : "bg-transparent border border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400"
+            }`}
+          >
+            <Filter size={12} /> Mais filtros
+            {activeAdvancedFilters > 0 && (
+              <span className="bg-primary text-white rounded-full w-4 h-4 text-[10px] flex items-center justify-center">
+                {activeAdvancedFilters}
+              </span>
+            )}
+          </button>
+          {(fSearch || totalActiveFilters > 0) && (
+            <button
+              onClick={clearAll}
+              className="px-3 py-1.5 bg-red-50 border border-red-200 rounded-lg text-xs font-semibold text-red-500 cursor-pointer"
+            >
+              ✕ Limpar
+            </button>
+          )}
+        </div>
+        {filtersOpen && (
+          <div className="flex gap-2 flex-wrap items-end mt-2.5 pt-2.5 border-t border-slate-200 dark:border-gray-700">
+            {[
+              [
+                "CONTRATO",
+                fContract,
+                setFContract,
+                contracts,
+                "Todos contratos",
+              ],
+              [
+                "CIDADE",
+                fCity,
+                (v: any) => {
+                  setFCity(v);
+                  setFNeighbor("");
+                },
+                Object.keys(citiesNeighborhoods).sort(),
+                "Todas cidades",
+              ],
+              [
+                "BAIRRO",
+                fNeighbor,
+                setFNeighbor,
+                cityNeighborhoods,
+                fCity ? "Todos bairros" : "Cidade primeiro",
+              ],
+              ["TIPO", fType, setFType, TASK_TYPES, "Todos tipos"],
+              [
+                "RESPONS\u00C1VEL",
+                fUser,
+                setFUser,
+                users.map((u: any) => u.name),
+                "Todos",
+              ],
+            ].map(([label, val, onChange, opts, ph]) => (
+              <div key={label}>
+                <div className="text-[10px] font-bold text-slate-500 dark:text-gray-400 mb-1">
+                  {label}
+                </div>
+                <FilterSelect
+                  val={val}
+                  onChange={onChange}
+                  opts={opts}
+                  placeholder={ph}
+                />
+              </div>
+            ))}
+            <div>
+              <DateRangePicker
+                T={T}
+                date={fDateFrom}
+                setDate={setFDateFrom}
+                label="Prazo de Entrega"
+              />
+            </div>
+            <div>
+              <DateRangePicker
+                T={T}
+                date={fDateTo}
+                setDate={setFDateTo}
+                label="Data de Cria\u00E7\u00E3o"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* -- KPIs -- */}
+      <div className="grid grid-cols-5 gap-3.5 mb-5">
+        {/* Total (Merged with Priority) - Spans 2 cols */}
+        <div className="col-span-2 bg-white dark:bg-gray-800 rounded-[14px] p-4 border border-slate-200 dark:border-gray-700 flex flex-col gap-3">
+          <div className="flex justify-between items-start">
+            <div>
+              <div className="text-[11px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-wide mb-1">
+                Total de Tarefas
+              </div>
+              <div className="text-[34px] font-extrabold text-primary leading-none">
+                {total}
+              </div>
+              <div className="text-[11px] text-slate-500 dark:text-gray-400 mt-1">
+                {concluded.length} conclu&iacute;das
+              </div>
+            </div>
+
+            {/* Priority List (Compact) */}
+            <div className="flex flex-col gap-1.5 min-w-[140px]">
+              {byPriority.map((p) => (
+                <div
+                  key={p.name}
+                  className="flex items-center justify-between text-[11px]"
+                >
+                  <div className="flex items-center gap-1.5 text-slate-500 dark:text-gray-400">
+                    <div
+                      className="w-1.5 h-1.5 rounded-full"
+                      style={{ background: p.color }}
+                    />
+                    {p.name}
+                  </div>
+                  <span className="font-bold text-slate-900 dark:text-gray-50">
+                    {p.val}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Por tipo - Spans 2 cols */}
+        <div className="col-span-2 bg-white dark:bg-gray-800 rounded-[14px] p-4 border border-slate-200 dark:border-gray-700">
+          <div className="text-[11px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-wide mb-2.5">
+            Por Tipo
+          </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 overflow-y-auto max-h-[100px]">
+            {byType.length === 0 && (
+              <div className="text-xs text-slate-500 dark:text-gray-400">&mdash;</div>
+            )}
+            {byType.map((tp) => (
+              <div
+                key={tp.name}
+                className="flex justify-between items-center text-[11px]"
+              >
+                <span className="text-slate-500 dark:text-gray-400 whitespace-nowrap overflow-hidden text-ellipsis">
+                  {tp.name}
+                </span>
+                <span className="font-bold text-slate-900 dark:text-gray-50 bg-slate-200 dark:bg-gray-700 rounded-full px-2 py-[1px] text-[10px]">
+                  {tp.val}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Tempo medio - Spans 1 col */}
+        <div className="col-span-1 bg-white dark:bg-gray-800 rounded-[14px] p-4 border border-slate-200 dark:border-gray-700 flex flex-col gap-1.5">
+          <div className="text-[11px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-wide">
+            Tempo M&eacute;dio
+          </div>
+          <div className="text-2xl font-extrabold text-emerald-500 leading-none mt-1">
+            {avgTime > 0
+              ? `${Math.floor(avgTime / 60)}h ${avgTime % 60}m`
+              : "\u2014"}
+          </div>
+          <div className="text-[10px] text-slate-500 dark:text-gray-400 mt-1">
+            Em {concluded.length} concluidas
+          </div>
+        </div>
+      </div>
+
+      {/* -- GRAFICOS LINHA 1 -- */}
+      <div className="grid grid-cols-3 gap-3.5 mb-3.5">
+        {/* Status */}
+        <div className="bg-white dark:bg-gray-800 rounded-[14px] p-4 border border-slate-200 dark:border-gray-700">
+          <div className="text-[13px] font-semibold text-slate-900 dark:text-gray-50 mb-3">
+            Tarefas por Status
+          </div>
+          <ResponsiveContainer width="100%" height={160}>
+            <PieChart>
+              <Pie
+                data={pieData}
+                cx="50%"
+                cy="50%"
+                innerRadius={38}
+                outerRadius={62}
+                paddingAngle={3}
+                dataKey="value"
+              >
+                {pieData.map((d, i) => (
+                  <Cell key={i} fill={STATUS_COLOR[d.name]} />
+                ))}
+              </Pie>
+              <Tooltip
+                contentStyle={{
+                  background: "var(--color-white, #fff)",
+                  border: "1px solid var(--color-slate-200, #e2e8f0)",
+                  borderRadius: 8,
+                  color: "var(--color-slate-900, #0f172a)",
+                  fontSize: 11,
+                }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="flex flex-col gap-1 mt-1">
+            {pieData.map((d) => (
+              <div
+                key={d.name}
+                className="flex justify-between text-[11px]"
+              >
+                <div className="flex items-center gap-1.5">
+                  <div
+                    className="w-2 h-2 rounded-full"
+                    style={{ background: STATUS_COLOR[d.name] }}
+                  />
+                  <span className="text-slate-500 dark:text-gray-400">{d.name}</span>
+                </div>
+                <span className="font-bold text-slate-900 dark:text-gray-50">
+                  {d.value}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Por setor */}
+        <div className="bg-white dark:bg-gray-800 rounded-[14px] p-4 border border-slate-200 dark:border-gray-700">
+          <div className="text-[13px] font-semibold text-slate-900 dark:text-gray-50 mb-3">
+            Tarefas por Setor
+          </div>
+          <ResponsiveContainer width="100%" height={160}>
+            <PieChart>
+              <Pie
+                data={sectorData}
+                cx="50%"
+                cy="50%"
+                innerRadius={38}
+                outerRadius={62}
+                paddingAngle={3}
+                dataKey="v"
+              >
+                {sectorData.map((d, i) => (
+                  <Cell
+                    key={i}
+                    fill={
+                      [
+                        "#98af3b",
+                        "#10b981",
+                        "#f59e0b",
+                        "#ef4444",
+                        "#ec4899",
+                        "#8b5cf6",
+                        "#06b6d4",
+                        "#14b8a6",
+                      ][i % 8]
+                    }
+                  />
+                ))}
+              </Pie>
+              <Tooltip
+                contentStyle={{
+                  background: "var(--color-white, #fff)",
+                  border: "1px solid var(--color-slate-200, #e2e8f0)",
+                  borderRadius: 8,
+                  color: "var(--color-slate-900, #0f172a)",
+                  fontSize: 11,
+                }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="flex flex-col gap-1 mt-1">
+            {sectorData.map((d, i) => (
+              <div
+                key={d.name}
+                className="flex justify-between text-[11px]"
+              >
+                <div className="flex items-center gap-1.5">
+                  <div
+                    className="w-2 h-2 rounded-full"
+                    style={{
+                      background: [
+                        "#98af3b",
+                        "#10b981",
+                        "#f59e0b",
+                        "#ef4444",
+                        "#ec4899",
+                        "#8b5cf6",
+                        "#06b6d4",
+                        "#14b8a6",
+                      ][i % 8],
+                    }}
+                  />
+                  <span className="text-slate-500 dark:text-gray-400">{d.name}</span>
+                </div>
+                <span className="font-bold text-slate-900 dark:text-gray-50">{d.v}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Rankings */}
+        <div className="bg-white dark:bg-gray-800 rounded-[14px] p-4 border border-slate-200 dark:border-gray-700">
+          <div className="text-[13px] font-semibold text-slate-900 dark:text-gray-50 mb-2.5">
+            {"\uD83C\uDFC6"} Rankings (Conclu&iacute;das)
+          </div>
+          <div className="text-[11px] font-bold text-slate-500 dark:text-gray-400 mb-1.5 uppercase">
+            Por Setor
+          </div>
+          {sectorRank.length === 0 && (
+            <div className="text-[11px] text-slate-500 dark:text-gray-400 mb-2">&mdash;</div>
+          )}
+          {sectorRank.slice(0, 3).map((r, i) => (
+            <div
+              key={r.name}
+              className="flex items-center gap-2 mb-1.5"
+            >
+              <span className="text-[13px]">
+                {["\uD83E\uDD47", "\uD83E\uDD48", "\uD83E\uDD49"][i] || "\u00B7"}
+              </span>
+              <span className="text-[11px] text-slate-500 dark:text-gray-400 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                {r.name}
+              </span>
+              <div className="w-20 h-1.5 bg-slate-200 dark:bg-gray-700 rounded">
+                <div
+                  className="h-full bg-primary rounded"
+                  style={{
+                    width: `${sectorRank[0]?.v ? (r.v / sectorRank[0].v) * 100 : 0}%`,
+                  }}
+                />
+              </div>
+              <span className="text-[11px] font-bold text-slate-900 dark:text-gray-50 w-4 text-right">
+                {r.v}
+              </span>
+            </div>
+          ))}
+          <div className="text-[11px] font-bold text-slate-500 dark:text-gray-400 mb-1.5 mt-3 uppercase">
+            Por Usu&aacute;rio
+          </div>
+          {userRank.length === 0 && (
+            <div className="text-[11px] text-slate-500 dark:text-gray-400">&mdash;</div>
+          )}
+          {userRank.slice(0, 3).map((r: any, i: any) => (
+            <div
+              key={r.name}
+              className="flex items-center gap-2 mb-1.5"
+            >
+              <span className="text-[13px]">
+                {["\uD83E\uDD47", "\uD83E\uDD48", "\uD83E\uDD49"][i] || "\u00B7"}
+              </span>
+              <span className="text-[11px] text-slate-500 dark:text-gray-400 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                {r.name}
+              </span>
+              <div className="w-20 h-1.5 bg-slate-200 dark:bg-gray-700 rounded">
+                <div
+                  className="h-full bg-emerald-500 rounded"
+                  style={{
+                    width: `${userRank[0]?.v ? (r.v / userRank[0].v) * 100 : 0}%`,
+                  }}
+                />
+              </div>
+              <span className="text-[11px] font-bold text-slate-900 dark:text-gray-50 w-4 text-right">
+                {r.v}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* -- GRAFICO SEMANAL -- */}
+      <div className="bg-white dark:bg-gray-800 rounded-[14px] p-4 border border-slate-200 dark:border-gray-700 mb-5">
+        <div className="flex justify-between items-center mb-3.5">
+          <div>
+            <div className="text-[13px] font-semibold text-slate-900 dark:text-gray-50">
+              Vis&atilde;o Semanal
+            </div>
+            <div className="text-[11px] text-slate-500 dark:text-gray-400 mt-0.5">
+              Novas tarefas, a entregar e atrasadas por semana
+            </div>
+          </div>
+          <div className="flex gap-3">
+            {[
+              ["Novas", "#3b43af"],
+              ["A Entregar", "#f59e0b"],
+              ["Atrasadas", "#ef4444"],
+              ["Conclu\u00EDdas", "#10b981"],
+            ].map(([l, c]) => (
+              <div
+                key={l}
+                className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-gray-400"
+              >
+                <div
+                  className="w-2.5 h-2.5 rounded-sm"
+                  style={{ background: c }}
+                />
+                {l}
+              </div>
+            ))}
+          </div>
+        </div>
+        <ResponsiveContainer width="100%" height={200}>
+          <BarChart data={weeklyData} barGap={2} barCategoryGap="30%">
+            <XAxis
+              dataKey="label"
+              tick={{ fill: "var(--color-slate-500, #64748b)", fontSize: 10 }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis
+              tick={{ fill: "var(--color-slate-500, #64748b)", fontSize: 10 }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <Tooltip
+              contentStyle={{
+                background: "var(--color-white, #fff)",
+                border: "1px solid var(--color-slate-200, #e2e8f0)",
+                borderRadius: 8,
+                color: "var(--color-slate-900, #0f172a)",
+                fontSize: 11,
+              }}
+            />
+            <Bar
+              dataKey="novas"
+              name="Novas"
+              fill="#3b43af"
+              radius={[4, 4, 0, 0]}
+            />
+            <Bar
+              dataKey="entregar"
+              name="A Entregar"
+              fill="#f59e0b"
+              radius={[4, 4, 0, 0]}
+            />
+            <Bar
+              dataKey="atrasadas"
+              name="Atrasadas"
+              fill="#ef4444"
+              radius={[4, 4, 0, 0]}
+            />
+            <Bar
+              dataKey="concluidas"
+              name="Conclu\u00EDdas"
+              fill="#10b981"
+              radius={[4, 4, 0, 0]}
+            />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* -- TABELA PROXIMAS TAREFAS -- */}
+      <div className="bg-white dark:bg-gray-800 rounded-[14px] border border-slate-200 dark:border-gray-700 overflow-hidden">
+        <div className="px-4 py-3.5 border-b border-slate-200 dark:border-gray-700 flex justify-between items-center">
+          <div>
+            <div className="text-[13px] font-bold text-slate-900 dark:text-gray-50">
+              Pr&oacute;ximas Tarefas a Entregar
+            </div>
+            <div className="text-[11px] text-slate-500 dark:text-gray-400 mt-0.5">
+              {upcoming.length} tarefa(s) pendentes
+            </div>
+          </div>
+        </div>
+        {/* Header */}
+        <div
+          className="grid px-4 py-2 border-b border-slate-200 dark:border-gray-700 gap-2"
+          style={{
+            gridTemplateColumns:
+              "2fr 80px 100px 110px 140px 100px 120px 60px 60px 48px",
+          }}
+        >
+          {[
+            "T\u00EDtulo",
+            "Prioridade",
+            "Prazo",
+            "Estado",
+            "Contrato",
+            "Cidade",
+            "Bairro",
+            "Quadra",
+            "Lote",
+            "",
+          ].map((h, i) => (
+            <span
+              key={i}
+              className="text-[10px] font-bold text-slate-500 dark:text-gray-400 overflow-hidden text-ellipsis whitespace-nowrap"
+            >
+              {h}
+            </span>
+          ))}
+        </div>
+        {upcoming.length === 0 && (
+          <div className="px-4 py-8 text-center text-[13px] text-slate-500 dark:text-gray-400">
+            Nenhuma tarefa pendente com os filtros aplicados.
+          </div>
+        )}
+        {upcoming.map((t, i) => {
+          return (
+            <div
+              key={t.id}
+              className="grid px-4 py-2.5 items-center gap-2 transition-colors duration-100 hover:bg-slate-100 dark:hover:bg-gray-700"
+              style={{
+                gridTemplateColumns:
+                  "2fr 80px 100px 110px 140px 100px 120px 60px 60px 48px",
+                borderBottom:
+                  i < upcoming.length - 1
+                    ? "1px solid var(--color-slate-200, #e2e8f0)"
+                    : "none",
+              }}
+            >
+              <div className="min-w-0">
+                <div className="text-[13px] font-semibold text-slate-900 dark:text-gray-50 overflow-hidden text-ellipsis whitespace-nowrap">
+                  {t.title}
+                </div>
+                <div className="text-[10px] text-slate-500 dark:text-gray-400 mt-px">
+                  {t.type} &middot;{" "}
+                  {t.sector && typeof t.sector === "object"
+                    ? t.sector.name
+                    : t.sector || ""}
+                </div>
+              </div>
+              <span
+                className="text-[10px] px-2 py-0.5 rounded-full font-bold text-center inline-block"
+                style={{
+                  background: PRIO_COLOR[t.priority] + "22",
+                  color: PRIO_COLOR[t.priority],
+                }}
+              >
+                {t.priority}
+              </span>
+              <div className="text-[11px] text-slate-900 dark:text-gray-50 font-semibold">
+                {t.deadline}
+              </div>
+              <div>
+                {getTaskState(t) && (
+                  <span
+                    className="text-[9px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap"
+                    style={{
+                      background: getTaskState(t)!.color + "22",
+                      color: getTaskState(t)!.color,
+                    }}
+                  >
+                    {getTaskState(t)!.label}
+                  </span>
+                )}
+              </div>
+              <div className="text-[11px] text-slate-500 dark:text-gray-400 overflow-hidden text-ellipsis whitespace-nowrap">
+                {typeof t.contract === "object"
+                  ? t.contract?.name
+                  : t.contract || "\u2014"}
+              </div>
+              <div className="text-[11px] text-slate-500 dark:text-gray-400 overflow-hidden text-ellipsis whitespace-nowrap">
+                {typeof t.city === "object" ? t.city?.name : t.city || "\u2014"}
+              </div>
+              <div className="text-[11px] text-slate-500 dark:text-gray-400 overflow-hidden text-ellipsis whitespace-nowrap">
+                {typeof t.nucleus === "object"
+                  ? t.nucleus?.name
+                  : t.nucleus || "\u2014"}
+              </div>
+              <div className="text-[11px] text-slate-500 dark:text-gray-400">
+                {t.quadra || "\u2014"}
+              </div>
+              <div className="text-[11px] text-slate-500 dark:text-gray-400">{t.lote || "\u2014"}</div>
+              <button
+                onClick={() => onSelect(t)}
+                className="bg-primary/5 border border-primary/20 rounded-[7px] px-2 py-1.5 cursor-pointer flex items-center justify-center"
+              >
+                <Eye size={13} className="text-primary" />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

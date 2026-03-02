@@ -1,6 +1,9 @@
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-import * as XLSX from "xlsx";
+import type jsPDF from "jspdf";
+
+// Lazy-loaded to avoid 1MB+ upfront bundle cost
+const getJsPDF = () => import("jspdf").then((m) => m.default);
+const getAutoTable = () => import("jspdf-autotable").then((m) => m.default);
+const getXLSX = () => import("xlsx");
 
 // ─── Company Info ────────────────────────────────────────────────────────────
 const COMPANY = {
@@ -610,12 +613,13 @@ const drawTimeline = (
 };
 
 // ─── EXCEL EXPORT ─────────────────────────────────────────────────────────────
-export const exportToExcel = (
+export const exportToExcel = async (
   tasks: ExportTask[],
   kpi?: ExportKPIs,
   currentUser?: { name?: string } | null,
   filterLabel?: string,
 ) => {
+  const XLSX = await getXLSX();
   const wb = XLSX.utils.book_new();
 
   // ── Sheet 1: Resumo ──
@@ -817,6 +821,8 @@ export const exportToPDF = async (
     generatedBy: currentUser?.name || "",
     filters: filterLabel || "Nenhum",
   };
+  const jsPDF = await getJsPDF();
+  const autoTable = await getAutoTable();
   const doc = new jsPDF("l", "mm", "a4");
   const logo = await getLogoBase64();
   let p = 1;

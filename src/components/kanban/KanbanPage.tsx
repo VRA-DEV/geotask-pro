@@ -1,0 +1,612 @@
+"use client";
+
+import {
+  Building2,
+  Calendar,
+  Check,
+  ChevronDown,
+  Clock,
+  FileText,
+  Filter,
+  MapPin,
+  Plus,
+  Search,
+  User,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { DateRange } from "react-day-picker";
+import { DatePicker } from "@/app/components/DatePicker";
+import { exportToExcel, exportToPDF, getKpiData } from "@/lib/exportUtils";
+import {
+  STATUS_COLOR,
+  PRIO_COLOR,
+  TASK_TYPES,
+  PRIORITIES,
+  SECTORS,
+} from "@/lib/constants";
+import { fmtTime, getTaskState, sectorDisplay, parseDate } from "@/lib/helpers";
+
+// ── Inline helper components ────────────────────────────────────
+
+function MultiSelect({
+  val = [],
+  onChange,
+  opts,
+  placeholder = "",
+}: {
+  val: string[];
+  onChange: (v: string[]) => void;
+  opts: string[];
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const toggle = (opt: string) => {
+    if (val.includes(opt)) {
+      onChange(val.filter((x) => x !== opt));
+    } else {
+      onChange([...val, opt]);
+    }
+  };
+
+  const hasValue = val.length > 0;
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div
+        onClick={() => setOpen(!open)}
+        className={`px-2.5 py-1.5 rounded-lg border text-xs cursor-pointer min-w-[140px] max-w-[200px] flex justify-between items-center bg-white dark:bg-gray-800 ${
+          hasValue
+            ? "border-primary text-primary"
+            : "border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400"
+        }`}
+      >
+        <span className="whitespace-nowrap overflow-hidden text-ellipsis">
+          {val.length === 0
+            ? placeholder
+            : val.length === 1
+              ? val[0]
+              : `${val.length} selecionados`}
+        </span>
+        <ChevronDown size={14} />
+      </div>
+
+      {open && (
+        <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg shadow-[0_10px_30px_rgba(0,0,0,0.15)] z-[9999] p-1.5 min-w-[180px] max-h-[300px] overflow-y-auto">
+          {opts.map((o: any, i: number) => {
+            const label = typeof o === "object" ? o.name || o.label : o;
+            const value = typeof o === "object" ? o.id || o.value : o;
+            const selected = val.includes(value);
+            const key =
+              typeof o === "object"
+                ? o.id || o.name || `mopt-${i}`
+                : `mopt-${o}-${i}`;
+
+            return (
+              <div
+                key={key}
+                onClick={() => toggle(value)}
+                className={`px-2.5 py-1.5 rounded-md text-xs text-slate-900 dark:text-gray-50 cursor-pointer flex items-center gap-2 ${
+                  selected ? "bg-primary/[0.07]" : "bg-transparent"
+                } hover:bg-white dark:hover:bg-gray-900`}
+              >
+                <div
+                  className={`w-3.5 h-3.5 rounded-sm border flex items-center justify-center ${
+                    selected
+                      ? "border-primary bg-primary"
+                      : "border-slate-500 dark:border-gray-400 bg-transparent"
+                  }`}
+                >
+                  {selected && <Check size={10} color="white" />}
+                </div>
+                <span>{label}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FilterSelect({
+  val,
+  onChange,
+  opts,
+  placeholder = "",
+  label = "",
+}: any) {
+  return (
+    <select
+      value={val}
+      onChange={(e) => onChange(e.target.value)}
+      className={`px-2.5 py-1.5 rounded-lg border text-xs outline-none cursor-pointer max-w-[170px] bg-white dark:bg-gray-800 ${
+        val
+          ? "border-primary text-primary"
+          : "border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400"
+      }`}
+    >
+      <option value="">{placeholder || label}</option>
+      {opts.map((o: any, i: number) => {
+        const label = typeof o === "object" ? o.name || o.label : o;
+        const value = typeof o === "object" ? o.id || o.value : o;
+        const key =
+          typeof o === "object"
+            ? o.id || o.name || `fopt-${i}`
+            : `fopt-${o}-${i}`;
+        return (
+          <option key={key} value={value}>
+            {label}
+          </option>
+        );
+      })}
+    </select>
+  );
+}
+
+function DateRangePicker({ date, setDate, label, T }: any) {
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-[11px] font-bold text-slate-500 dark:text-gray-400">
+        {label}
+      </label>
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <DatePicker
+            T={T}
+            date={date?.from}
+            setDate={(d) => setDate({ ...date, from: d })}
+            label=""
+          />
+        </div>
+        <div className="flex-1">
+          <DatePicker
+            T={T}
+            date={date?.to}
+            setDate={(d) => setDate({ ...date, to: d })}
+            label=""
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const ExportButtons = ({ filtered, kpi, users, user, filterLabel }: any) => (
+  <div className="flex gap-2 items-center">
+    <button
+      onClick={() => exportToExcel(filtered, kpi, user, filterLabel)}
+      className="bg-emerald-500 text-white border-none px-3 py-1.5 rounded-lg text-[11px] font-semibold cursor-pointer flex items-center gap-1 transition-[filter] duration-100 hover:brightness-90"
+    >
+      <FileText size={13} /> EXCEL
+    </button>
+    <button
+      onClick={() => exportToPDF(filtered, kpi, users, user, filterLabel)}
+      className="bg-red-500 text-white border-none px-3 py-1.5 rounded-lg text-[11px] font-semibold cursor-pointer flex items-center gap-1 transition-[filter] duration-100 hover:brightness-90"
+    >
+      <FileText size={13} /> PDF
+    </button>
+  </div>
+);
+
+// ── KANBAN ─────────────────────────────────────────────────────
+export default function KanbanPage({
+  T,
+  tasks,
+  user,
+  onSelect,
+  canCreate,
+  onNew,
+  users = [],
+  contracts = [],
+  citiesNeighborhoods = {},
+  sectors = [],
+}: any) {
+  const [search, setSearch] = useState("");
+  const [fSector, setFSector] = useState<string[]>([]);
+  const [fContract, setFContract] = useState("");
+  const [fCity, setFCity] = useState("");
+  const [fNeighbor, setFNeighbor] = useState("");
+  const [fPriority, setFPriority] = useState("");
+  const [fType, setFType] = useState("");
+  const [fDateFrom, setFDateFrom] = useState<DateRange | undefined>(undefined);
+  const [fDateTo, setFDateTo] = useState<DateRange | undefined>(undefined);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  const cityNeighborhoods = fCity ? citiesNeighborhoods[fCity] || [] : [];
+
+  const cols = ["A Fazer", "Em Andamento", "Pausado", "Concluído"];
+
+  const filtered = tasks.filter((t: any) => {
+    if (search && !t.title.toLowerCase().includes(search.toLowerCase()))
+      return false;
+    const sectorVal =
+      t.sector && typeof t.sector === "object"
+        ? t.sector?.name
+        : t.sector || "";
+    if (fSector.length > 0 && !fSector.includes(sectorVal)) return false;
+    if (fContract && t.contract !== fContract) return false;
+    if (fCity && t.city !== fCity) return false;
+    if (fNeighbor && t.nucleus !== fNeighbor) return false;
+    if (fPriority && t.priority !== fPriority) return false;
+    if (fType && t.type !== fType) return false;
+    if (fDateFrom?.from || fDateFrom?.to) {
+      const td = parseDate(t.deadline);
+      if (!td) return false;
+      if (fDateFrom.from && td < fDateFrom.from) return false;
+      if (fDateFrom.to && td > fDateFrom.to) return false;
+    }
+    if (fDateTo?.from || fDateTo?.to) {
+      const tc = new Date(t.created_at);
+      if (fDateTo.from && tc < fDateTo.from) return false;
+      if (fDateTo.to && tc > fDateTo.to) return false;
+    }
+    return true;
+  });
+
+  const totalActiveFilters = [
+    fSector.length > 0,
+    fContract,
+    fCity,
+    fNeighbor,
+    fPriority,
+    fType,
+    fDateFrom?.from || fDateFrom?.to,
+    fDateTo?.from || fDateTo?.to,
+  ].filter(Boolean).length;
+
+  const activeAdvancedFilters = [
+    fPriority,
+    fType,
+    fNeighbor,
+    fDateFrom?.from || fDateFrom?.to,
+    fDateTo?.from || fDateTo?.to,
+  ].filter(Boolean).length;
+
+  const clearAll = () => {
+    setSearch("");
+    setFSector([]);
+    setFContract("");
+    setFCity("");
+    setFNeighbor("");
+    setFPriority("");
+    setFType("");
+    setFDateFrom(undefined);
+    setFDateTo(undefined);
+  };
+
+  // mini select helper for filters bar
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="flex justify-between items-center mb-3.5">
+        <div>
+          <h1 className="m-0 text-[22px] font-bold text-slate-900 dark:text-gray-50">
+            Quadro de Tarefas
+          </h1>
+          <p className="mt-1 mb-0 text-[13px] text-slate-500 dark:text-gray-400">
+            {filtered.length} de {tasks.length} tarefas
+          </p>
+        </div>
+        <div className="flex gap-2 items-center">
+          <ExportButtons
+            filtered={filtered}
+            kpi={getKpiData(filtered, users)}
+            users={users}
+          />
+          {canCreate && (
+            <button
+              onClick={onNew}
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-primary text-white border-none rounded-lg text-[13px] font-semibold cursor-pointer"
+            >
+              <Plus size={15} />
+              Nova Tarefa
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Barra de filtros */}
+      <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl p-3 mb-4">
+        {/* Linha 1: busca + botão expandir */}
+        <div className="flex gap-2 items-center flex-wrap">
+          <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-gray-700 rounded-lg px-2.5 py-1.5 flex-[1_1_180px] max-w-[260px]">
+            <Search size={13} className="text-slate-500 dark:text-gray-400" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar tarefa..."
+              className="bg-transparent border-none outline-none text-xs text-slate-900 dark:text-gray-50 w-full"
+            />
+          </div>
+          <MultiSelect
+            val={fSector}
+            onChange={setFSector}
+            opts={SECTORS}
+            placeholder="Setores"
+          />
+          <FilterSelect
+            val={fContract}
+            onChange={(v: any) => {
+              setFContract(v);
+              setFCity("");
+              setFNeighbor("");
+            }}
+            opts={contracts}
+            placeholder="Todos contratos"
+          />
+          <FilterSelect
+            val={fCity}
+            onChange={(v: any) => {
+              setFCity(v);
+              setFNeighbor("");
+            }}
+            opts={Object.keys(citiesNeighborhoods).sort()}
+            placeholder="Todas cidades"
+          />
+          <button
+            onClick={() => setFiltersOpen((o) => !o)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer border ${
+              filtersOpen || activeAdvancedFilters
+                ? "bg-primary/[0.07] border-primary text-primary"
+                : "bg-transparent border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400"
+            }`}
+          >
+            <Filter size={12} /> Mais filtros{" "}
+            {activeAdvancedFilters > 0 && (
+              <span className="bg-primary text-white rounded-full w-4 h-4 text-[10px] flex items-center justify-center">
+                {activeAdvancedFilters}
+              </span>
+            )}
+          </button>
+          {(search || totalActiveFilters > 0) && (
+            <button
+              onClick={clearAll}
+              className="px-3 py-1.5 bg-red-50 border border-red-200 rounded-lg text-xs font-semibold text-red-500 cursor-pointer"
+            >
+              ✕ Limpar
+            </button>
+          )}
+        </div>
+
+        {/* Linha 2: filtros extras (expansível) */}
+        {filtersOpen && (
+          <div className="flex gap-2 items-end flex-wrap mt-2.5 pt-2.5 border-t border-slate-200 dark:border-gray-700">
+            <div>
+              <div className="text-[10px] font-bold text-slate-500 dark:text-gray-400 mb-1">
+                BAIRRO / NUCLEO
+              </div>
+              <select
+                value={fNeighbor}
+                onChange={(e) => setFNeighbor(e.target.value)}
+                className={`px-2.5 py-1.5 rounded-lg border text-xs outline-none cursor-pointer max-w-[200px] bg-white dark:bg-gray-800 ${
+                  fNeighbor
+                    ? "border-primary text-primary"
+                    : "border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400"
+                }`}
+              >
+                <option value="">
+                  {fCity ? "Todos bairros" : "Selecione cidade primeiro"}
+                </option>
+                {cityNeighborhoods.map((n: any) => (
+                  <option key={n}>{n}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <div className="text-[10px] font-bold text-slate-500 dark:text-gray-400 mb-1">
+                PRIORIDADE
+              </div>
+              <FilterSelect
+                val={fPriority}
+                onChange={setFPriority}
+                opts={PRIORITIES}
+                placeholder="Todas"
+              />
+            </div>
+            <div>
+              <div className="text-[10px] font-bold text-slate-500 dark:text-gray-400 mb-1">
+                TIPO DE TAREFA
+              </div>
+              <FilterSelect
+                val={fType}
+                onChange={setFType}
+                opts={TASK_TYPES}
+                placeholder="Todos"
+              />
+            </div>
+            {/* DatePicker replaced directly below */}
+            <div>
+              <DateRangePicker
+                date={fDateFrom}
+                setDate={setFDateFrom}
+                label="Prazo de Entrega"
+                T={T}
+              />
+            </div>
+            <div>
+              <DateRangePicker
+                date={fDateTo}
+                setDate={setFDateTo}
+                label="Data de Criação"
+                T={T}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Colunas */}
+      <div className="flex gap-3.5 overflow-x-auto pb-2">
+        {cols.map((col) => {
+          const colTasks = filtered.filter((t: any) => t.status === col);
+          return (
+            <div key={col} className="shrink-0 w-[272px]">
+              <div className="flex items-center gap-2 mb-2.5">
+                <div
+                  className="w-2.5 h-2.5 rounded-full"
+                  style={{ background: STATUS_COLOR[col] }}
+                />
+                <span className="text-[13px] font-semibold text-slate-900 dark:text-gray-50">
+                  {col}
+                </span>
+                <span className="ml-auto text-[11px] px-2 py-px rounded-[20px] bg-slate-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold">
+                  {colTasks.length}
+                </span>
+              </div>
+              <div className="bg-slate-100 dark:bg-gray-900 rounded-xl p-2 min-h-[200px] flex flex-col gap-2">
+                {colTasks.map((t: any) => {
+                  const prog = t.subtasks?.length
+                    ? (t.subtasks.filter((s: any) => s.done).length /
+                        t.subtasks.length) *
+                      100
+                    : 0;
+                  return (
+                    <div
+                      key={t.id}
+                      onClick={() => onSelect(t)}
+                      className="bg-white dark:bg-gray-800 rounded-[10px] p-3 border border-slate-200 dark:border-gray-700 cursor-pointer transition-all duration-150 hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] hover:-translate-y-px"
+                    >
+                      {t.parent_id && (
+                        <div className="text-[10px] text-slate-500 dark:text-gray-400 mb-1.5 flex items-center gap-1">
+                          <span className="text-xs">↳</span>
+                          <span>
+                            de:{" "}
+                            <b>
+                              {tasks.find((p: any) => p.id === t.parent_id)
+                                ?.title || "..."}
+                            </b>
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex justify-between mb-[7px]">
+                        <span className="text-[10px] px-[7px] py-0.5 rounded-md bg-slate-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold flex items-center gap-1">
+                          {t.type}
+                          {getTaskState(t) && (
+                            <span
+                              className="w-1.5 h-1.5 rounded-full"
+                              style={{
+                                background: getTaskState(t)!.color,
+                              }}
+                            />
+                          )}
+                        </span>
+                        <span
+                          className="text-[10px] px-[7px] py-0.5 rounded-md font-bold"
+                          style={{
+                            background: PRIO_COLOR[t.priority] + "22",
+                            color: PRIO_COLOR[t.priority],
+                          }}
+                        >
+                          {t.priority}
+                        </span>
+                      </div>
+                      <div className="text-[13px] font-semibold text-slate-900 dark:text-gray-50 mb-[7px] leading-[1.3]">
+                        {t.title}
+                      </div>
+                      {t.description && (
+                        <div className="text-[11px] text-slate-500 dark:text-gray-400 mb-[7px] overflow-hidden text-ellipsis whitespace-nowrap">
+                          {t.description}
+                        </div>
+                      )}
+                      {getTaskState(t) && (
+                        <div className="mb-[7px]">
+                          <span
+                            className="text-[9px] font-bold px-1.5 py-0.5 rounded"
+                            style={{
+                              background: getTaskState(t)!.color + "22",
+                              color: getTaskState(t)!.color,
+                            }}
+                          >
+                            {getTaskState(t)!.label}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex flex-col gap-[3px] mb-[7px]">
+                        <span className="text-[11px] text-slate-500 dark:text-gray-400 flex items-center gap-1">
+                          <Building2 size={9} />
+                          {sectorDisplay(t.sector)}
+                        </span>
+                        <span className="text-[11px] text-slate-500 dark:text-gray-400 flex items-center gap-1">
+                          <User size={9} />
+                          {t.responsible && typeof t.responsible === "object"
+                            ? t.responsible.name
+                            : t.responsible || "Não atribuído"}
+                        </span>
+                        <span className="text-[11px] text-slate-500 dark:text-gray-400 flex items-center gap-1">
+                          <MapPin size={9} />
+                          {t.contract}
+                        </span>
+                        {t.city && (
+                          <span className="text-[11px] text-slate-500 dark:text-gray-400 flex items-center gap-1 pl-[13px]">
+                            {t.city}
+                            {t.nucleus ? ` · ${t.nucleus}` : ""}
+                          </span>
+                        )}
+                        {(t.quadra || t.lote) && (
+                          <span className="text-[10px] text-slate-500 dark:text-gray-400 pl-[13px]">
+                            {t.quadra ? `Q: ${t.quadra} ` : ""}
+                            {t.lote ? `L: ${t.lote}` : ""}
+                          </span>
+                        )}
+                      </div>
+                      {t.deadline && (
+                        <div className="text-[10px] text-slate-500 dark:text-gray-400 flex items-center gap-[3px] mb-1.5">
+                          <Calendar size={9} />
+                          Prazo: <b className="text-slate-900 dark:text-gray-50">{t.deadline}</b>
+                        </div>
+                      )}
+                      {t.subtasks?.length > 0 && (
+                        <div>
+                          <div className="flex justify-between text-[10px] text-slate-500 dark:text-gray-400 mb-[3px]">
+                            <span>Subtarefas</span>
+                            <span>
+                              {t.subtasks.filter((s: any) => s.done).length}/
+                              {t.subtasks.length}
+                            </span>
+                          </div>
+                          <div className="h-[3px] bg-slate-200 dark:bg-gray-700 rounded">
+                            <div
+                              className="h-full bg-primary rounded"
+                              style={{ width: `${prog}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                      {t.time > 0 && (
+                        <div className="text-[10px] text-slate-500 dark:text-gray-400 flex items-center gap-[3px] mt-1.5">
+                          <Clock size={9} />
+                          {fmtTime(t.time)}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {colTasks.length === 0 && (
+                  <div className="text-center py-[30px] text-xs text-slate-500 dark:text-gray-400">
+                    Sem tarefas
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

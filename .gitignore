@@ -49,6 +49,9 @@ next-env.d.ts
 *.swp
 *.swo
 
+# Compiled seed
+/dist-seed
+
 # Temporary files
 log.txt
 gen_log.txt

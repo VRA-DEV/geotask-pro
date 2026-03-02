@@ -1,28 +1,23 @@
 import prisma from "@/lib/prisma";
+import { changePasswordSchema } from "@/lib/validators/auth";
+import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 
-// POST /api/auth/change-password
-// Body: { userId, currentPassword, newPassword }
 export async function POST(req: Request) {
   try {
-    const { userId, currentPassword, newPassword } = await req.json();
-
-    if (!userId || !newPassword) {
+    const body = await req.json();
+    const parsed = changePasswordSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "userId e newPassword são obrigatórios" },
+        { error: parsed.error.issues[0].message },
         { status: 400 },
       );
     }
 
-    if (newPassword.length < 6) {
-      return NextResponse.json(
-        { error: "A nova senha deve ter pelo menos 6 caracteres" },
-        { status: 400 },
-      );
-    }
+    const { userId, currentPassword, newPassword } = parsed.data;
 
     const user = await prisma.user.findUnique({
-      where: { id: Number(userId) },
+      where: { id: userId },
     });
     if (!user) {
       return NextResponse.json(
@@ -33,7 +28,13 @@ export async function POST(req: Request) {
 
     // If currentPassword is provided, validate it (user changing own password)
     if (currentPassword !== undefined && currentPassword !== null) {
-      if (user.password_hash !== currentPassword) {
+      let valid = false;
+      if (user.password_hash.startsWith("$2")) {
+        valid = await bcrypt.compare(currentPassword, user.password_hash);
+      } else {
+        valid = user.password_hash === currentPassword;
+      }
+      if (!valid) {
         return NextResponse.json(
           { error: "Senha atual incorreta" },
           { status: 401 },
@@ -41,10 +42,12 @@ export async function POST(req: Request) {
       }
     }
 
+    const hash = await bcrypt.hash(newPassword, 10);
+
     await prisma.user.update({
-      where: { id: Number(userId) },
+      where: { id: userId },
       data: {
-        password_hash: newPassword,
+        password_hash: hash,
         must_change_password: false,
       },
     });

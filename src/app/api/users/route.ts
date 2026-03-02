@@ -1,4 +1,6 @@
 import prisma from "@/lib/prisma";
+import { createUserSchema, updateUserSchema } from "@/lib/validators/user";
+import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 
 const DEFAULT_PASSWORD = "Geogis2026";
@@ -11,8 +13,9 @@ export async function GET() {
       orderBy: { name: "asc" },
     });
 
-    const transformed = users.map((u: any) => ({
+    const transformed = users.map((u) => ({
       ...u,
+      password_hash: undefined,
       role: u.Role,
       sector: u.Sector,
     }));
@@ -27,21 +30,22 @@ export async function GET() {
   }
 }
 
-// POST /api/users — sempre usa senha padrão
+// POST /api/users
 export async function POST(req: Request) {
   try {
-    const data = await req.json();
-    const { name, email, role, sector, role_id, sector_id, avatar } = data;
-
-    const finalRoleId = Number(role_id || role);
-    const finalSectorId = Number(sector_id || sector);
-
-    if (!name || !email || isNaN(finalRoleId) || isNaN(finalSectorId)) {
+    const body = await req.json();
+    const parsed = createUserSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Campos obrigatórios: name, email, role_id, sector_id" },
+        { error: parsed.error.issues[0].message },
         { status: 400 },
       );
     }
+
+    const { name, email, role_id, sector_id, role, sector, avatar } =
+      parsed.data;
+    const finalRoleId = Number(role_id || role);
+    const finalSectorId = Number(sector_id || sector);
 
     const initials = name
       .split(" ")
@@ -50,14 +54,16 @@ export async function POST(req: Request) {
       .toUpperCase()
       .slice(0, 2);
 
-    const user: any = await prisma.user.create({
+    const hash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
+
+    const user = await prisma.user.create({
       data: {
         name,
         email,
         role_id: finalRoleId,
         sector_id: finalSectorId,
         avatar: avatar || initials,
-        password_hash: DEFAULT_PASSWORD,
+        password_hash: hash,
         must_change_password: true,
         active: true,
       },
@@ -65,7 +71,12 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json(
-      { ...user, role: user.Role, sector: user.Sector },
+      {
+        ...user,
+        password_hash: undefined,
+        role: user.Role,
+        sector: user.Sector,
+      },
       { status: 201 },
     );
   } catch (error) {
@@ -81,6 +92,14 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const body = await req.json();
+    const parsed = updateUserSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0].message },
+        { status: 400 },
+      );
+    }
+
     const {
       id,
       role,
@@ -90,32 +109,33 @@ export async function PATCH(req: Request) {
       password,
       resetPassword,
       ...data
-    } = body;
+    } = parsed.data;
 
-    if (!id)
-      return NextResponse.json({ error: "ID obrigatório" }, { status: 400 });
-
-    const updateData: any = { ...data };
+    const updateData: Record<string, unknown> = { ...data };
     if (role || role_id) updateData.role_id = Number(role_id || role);
-    if (sector || sector_id) updateData.sector_id = Number(sector_id || sector);
+    if (sector || sector_id)
+      updateData.sector_id = Number(sector_id || sector);
 
     if (resetPassword) {
-      // Admin reseta para senha padrão
-      updateData.password_hash = DEFAULT_PASSWORD;
+      updateData.password_hash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
       updateData.must_change_password = true;
     } else if (password) {
-      // Admin define senha manual
-      updateData.password_hash = password;
+      updateData.password_hash = await bcrypt.hash(password, 10);
       updateData.must_change_password = true;
     }
 
-    const user: any = await prisma.user.update({
-      where: { id: Number(id) },
+    const user = await prisma.user.update({
+      where: { id },
       data: updateData,
       include: { Role: true, Sector: true },
     });
 
-    return NextResponse.json({ ...user, role: user.Role, sector: user.Sector });
+    return NextResponse.json({
+      ...user,
+      password_hash: undefined,
+      role: user.Role,
+      sector: user.Sector,
+    });
   } catch (error) {
     console.error("Erro ao atualizar usuário:", error);
     return NextResponse.json(
@@ -125,7 +145,7 @@ export async function PATCH(req: Request) {
   }
 }
 
-// DELETE /api/users — soft delete (desativar)
+// DELETE /api/users — soft delete
 export async function DELETE(req: Request) {
   try {
     const id = new URL(req.url).searchParams.get("id");

@@ -1,16 +1,20 @@
 import prisma from "@/lib/prisma";
+import { loginSchema } from "@/lib/validators/auth";
+import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
   try {
-    const { email, password } = await req.json();
-
-    if (!email || !password) {
+    const body = await req.json();
+    const parsed = loginSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Email e senha são obrigatórios" },
+        { error: parsed.error.issues[0].message },
         { status: 400 },
       );
     }
+
+    const { email, password } = parsed.data;
 
     const user = await prisma.user.findUnique({
       where: { email },
@@ -22,8 +26,8 @@ export async function POST(req: Request) {
 
     if (!user) {
       return NextResponse.json(
-        { error: "Usuário não encontrado" },
-        { status: 404 },
+        { error: "Credenciais inválidas" },
+        { status: 401 },
       );
     }
 
@@ -34,11 +38,29 @@ export async function POST(req: Request) {
       );
     }
 
-    if (user.password_hash !== password) {
-      return NextResponse.json({ error: "Senha incorreta" }, { status: 401 });
+    // Support both bcrypt hashes and legacy plain text passwords
+    let passwordValid = false;
+    if (user.password_hash.startsWith("$2")) {
+      passwordValid = await bcrypt.compare(password, user.password_hash);
+    } else {
+      // Legacy plain text — validate and upgrade to bcrypt
+      passwordValid = user.password_hash === password;
+      if (passwordValid) {
+        const hash = await bcrypt.hash(password, 10);
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { password_hash: hash },
+        });
+      }
     }
 
-    // Return user without password and with formatted role/sector
+    if (!passwordValid) {
+      return NextResponse.json(
+        { error: "Credenciais inválidas" },
+        { status: 401 },
+      );
+    }
+
     return NextResponse.json({
       id: user.id,
       name: user.name,
@@ -50,7 +72,9 @@ export async function POST(req: Request) {
       must_change_password: user.must_change_password,
       created_at: user.created_at,
       role: user.Role ? { name: user.Role.name } : { name: "Sem Cargo" },
-      sector: user.Sector ? { name: user.Sector.name } : { name: "Sem Setor" },
+      sector: user.Sector
+        ? { name: user.Sector.name }
+        : { name: "Sem Setor" },
     });
   } catch (error) {
     console.error("Login error:", error);
