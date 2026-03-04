@@ -1,7 +1,7 @@
 "use client";
 
 import { TaskFilters } from "@/components/shared/TaskFilters";
-import { getKpiData, type ExportKPIs } from "@/lib/exportUtils";
+import { exportToExcel, getKpiData, type ExportKPIs } from "@/lib/exportUtils";
 import type {
   CitiesNeighborhoods,
   Subtask,
@@ -9,7 +9,7 @@ import type {
   ThemeColors,
   User,
 } from "@/types";
-import { ArrowLeft, Check, Eye, X } from "lucide-react";
+import { ArrowLeft, Check, Eye, FileText, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { DateRange } from "react-day-picker";
 
@@ -80,7 +80,16 @@ const ExportButtons = ({
   users,
   user,
   filterLabel,
-}: ExportButtonsProps) => {};
+}: ExportButtonsProps) => (
+  <div className="flex gap-2 items-center">
+    <button
+      onClick={() => exportToExcel(filtered, kpi, user, filterLabel, "kanban")}
+      className="bg-emerald-500 text-white border-none px-3 py-1.5 rounded-lg text-[11px] h-8 font-semibold cursor-pointer flex items-center gap-1 transition-[filter] duration-100 hover:brightness-90"
+    >
+      <FileText size={13} /> EXCEL
+    </button>
+  </div>
+);
 
 export default function MindMapPage({
   T,
