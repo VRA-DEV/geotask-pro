@@ -1,10 +1,17 @@
 "use client";
 
-import { ArrowLeft, Check, Eye, FileText, X } from "lucide-react";
+import { TaskFilters } from "@/components/shared/TaskFilters";
+import { getKpiData, type ExportKPIs } from "@/lib/exportUtils";
+import type {
+  CitiesNeighborhoods,
+  Subtask,
+  Task,
+  ThemeColors,
+  User,
+} from "@/types";
+import { ArrowLeft, Check, Eye, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { exportToExcel, exportToPDF, getKpiData } from "@/lib/exportUtils";
-import type { Task, User, Subtask } from "@/types";
-import type { ExportKPIs } from "@/lib/exportUtils";
+import { DateRange } from "react-day-picker";
 
 // ── Local mind-map hierarchy types ────────────────────────────────────
 
@@ -53,41 +60,69 @@ interface NodeProps {
 }
 
 interface MindMapPageProps {
+  T: ThemeColors;
   tasks?: Task[];
   users?: User[];
+  contracts?: string[];
+  citiesNeighborhoods?: CitiesNeighborhoods;
 }
 
 const STATUS_COLOR: Record<string, string> = {
   "A Fazer": "#6366f1",
   "Em Andamento": "#f59e0b",
   Pausado: "#ef4444",
-  "Concluído": "#10b981",
+  Concluído: "#10b981",
 };
 
-const ExportButtons = ({ filtered, kpi, users, user, filterLabel }: ExportButtonsProps) => (
-  <div className="flex items-center gap-2">
-    <button
-      onClick={() => exportToExcel(filtered, kpi, user, filterLabel)}
-      className="flex items-center gap-1 border-none bg-emerald-500 px-3 py-1.5 text-[11px] font-semibold text-white rounded-lg cursor-pointer transition-[filter] duration-100 hover:brightness-90"
-    >
-      <FileText size={13} /> EXCEL
-    </button>
-    <button
-      onClick={() => exportToPDF(filtered, kpi, users, user, filterLabel)}
-      className="flex items-center gap-1 border-none bg-red-500 px-3 py-1.5 text-[11px] font-semibold text-white rounded-lg cursor-pointer transition-[filter] duration-100 hover:brightness-90"
-    >
-      <FileText size={13} /> PDF
-    </button>
-  </div>
-);
+const ExportButtons = ({
+  filtered,
+  kpi,
+  users,
+  user,
+  filterLabel,
+}: ExportButtonsProps) => {};
 
-export default function MindMapPage({ tasks = [], users = [] }: MindMapPageProps) {
+export default function MindMapPage({
+  T,
+  tasks = [],
+  users = [],
+  contracts = [],
+  citiesNeighborhoods = {},
+}: MindMapPageProps) {
+  // ── Filter States ──
+  const [fSearch, setFSearch] = useState("");
+  const [fStatus, setFStatus] = useState("");
+  const [fSector, setFSector] = useState<string[]>([]);
+  const [fPriority, setFPriority] = useState("");
+  const [fType, setFType] = useState("");
+  const [fContract, setFContract] = useState("");
+  const [fCity, setFCity] = useState("");
+  const [fNeighbor, setFNeighbor] = useState("");
+  const [fUser, setFUser] = useState("");
+  const [fDateFrom, setFDateFrom] = useState<DateRange | undefined>(undefined);
+  const [fDateTo, setFDateTo] = useState<DateRange | undefined>(undefined);
+
   const [sel, setSel] = useState<MindMapSelection>({
     contractId: null,
     cityId: null,
     neighborhoodId: null,
     taskId: null,
   });
+
+  const clearAll = () => {
+    setFSearch("");
+    setFStatus("");
+    setFSector([]);
+    setFPriority("");
+    setFType("");
+    setFContract("");
+    setFCity("");
+    setFNeighbor("");
+    setFUser("");
+    setFDateFrom(undefined);
+    setFDateTo(undefined);
+  };
+
   const [detail, setDetail] = useState<Task | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const nodeRefs = useRef<Record<string, HTMLElement>>({});
@@ -96,24 +131,89 @@ export default function MindMapPage({ tasks = [], users = [] }: MindMapPageProps
   >([]);
   const [svgDim, setSvgDim] = useState({ w: 800, h: 600 });
 
-  // Build hierarchy from real tasks
+  // ── Filtering Logic ──
+  const parseDateLocal = (d: string | null | undefined) => {
+    if (!d) return null;
+    const [day, month, year] = d.split("/").map(Number);
+    return new Date(year, month - 1, day);
+  };
+
+  const filteredTasks = tasks.filter((t) => {
+    if (fSearch && !t.title.toLowerCase().includes(fSearch.toLowerCase()))
+      return false;
+    if (fStatus && t.status !== fStatus) return false;
+
+    const sectorVal =
+      t.sector && typeof t.sector === "object"
+        ? (t.sector as any).name
+        : t.sector || "";
+    if (fSector.length > 0 && !fSector.includes(sectorVal)) return false;
+
+    if (fPriority && t.priority !== fPriority) return false;
+    if (fType && t.type !== fType) return false;
+
+    const contractVal =
+      t.contract && typeof t.contract === "object"
+        ? (t.contract as any).name
+        : t.contract || "";
+    if (fContract && contractVal !== fContract) return false;
+
+    const cityVal =
+      t.city && typeof t.city === "object"
+        ? (t.city as any).name
+        : t.city || "";
+    if (fCity && cityVal !== fCity) return false;
+
+    if (fNeighbor && t.nucleus !== fNeighbor) return false;
+
+    const respName =
+      t.responsible && typeof t.responsible === "object"
+        ? (t.responsible as any).name
+        : t.responsible || "";
+    if (fUser && respName !== fUser) return false;
+
+    if (fDateFrom?.from || fDateFrom?.to) {
+      const td = parseDateLocal(t.deadline);
+      if (!td) return false;
+      if (fDateFrom.from && td < fDateFrom.from) return false;
+      if (fDateFrom.to && td > fDateFrom.to) return false;
+    }
+    if (fDateTo?.from || fDateTo?.to) {
+      const td = parseDateLocal(t.created_at);
+      if (!td) return false;
+      if (fDateTo.from && td < fDateTo.from) return false;
+      if (fDateTo.to && td > fDateTo.to) return false;
+    }
+
+    return true;
+  });
+
+  // Build hierarchy from filtered tasks
   const CONTRACTS_MM = (() => {
     const contractMap: Record<string, MindMapContract> = {};
     let cid = 0,
       cityId = 0,
       neighId = 0;
-    tasks.forEach((t: Task) => {
+    filteredTasks.forEach((t: Task) => {
       if (!t.contract) return;
       if (t.parent_id) return; // skip subtasks — they show under their parent
-      const contractName = typeof t.contract === "object" ? t.contract?.name || "" : String(t.contract);
-      const cityName = typeof t.city === "object" ? t.city?.name || "Sem cidade" : String(t.city || "Sem cidade");
+      const contractName =
+        t.contract && typeof t.contract === "object"
+          ? (t.contract as any)?.name || ""
+          : String(t.contract);
+      const cityName =
+        t.city && typeof t.city === "object"
+          ? (t.city as any)?.name || "Sem cidade"
+          : String(t.city || "Sem cidade");
       if (!contractMap[contractName]) {
-        contractMap[contractName] = { id: ++cid, name: contractName, cities: [] };
+        contractMap[contractName] = {
+          id: ++cid,
+          name: contractName,
+          cities: [],
+        };
       }
       const cObj = contractMap[contractName];
-      let cityObj = cObj.cities.find(
-        (c: MindMapCity) => c.name === cityName,
-      );
+      let cityObj = cObj.cities.find((c: MindMapCity) => c.name === cityName);
       if (!cityObj) {
         cityObj = {
           id: ++cityId,
@@ -135,11 +235,15 @@ export default function MindMapPage({ tasks = [], users = [] }: MindMapPageProps
     return Object.values(contractMap);
   })();
 
-  const contract = CONTRACTS_MM.find((c: MindMapContract) => c.id === sel.contractId);
+  const contract = CONTRACTS_MM.find(
+    (c: MindMapContract) => c.id === sel.contractId,
+  );
   const cities = contract?.cities || [];
   const city = cities.find((c: MindMapCity) => c.id === sel.cityId);
   const neighborhoods = city?.neighborhoods || [];
-  const neighborhood = neighborhoods.find((n: MindMapNeighborhood) => n.id === sel.neighborhoodId);
+  const neighborhood = neighborhoods.find(
+    (n: MindMapNeighborhood) => n.id === sel.neighborhoodId,
+  );
   const taskList = neighborhood?.tasks || [];
   const task = taskList.find((t: Task) => t.id === sel.taskId);
   const subtasks = task?.subtasks || [];
@@ -189,7 +293,9 @@ export default function MindMapPage({ tasks = [], users = [] }: MindMapPageProps
         cn(`neigh-${sel.neighborhoodId}`, `task-${t.id}`, t.id === sel.taskId),
       );
     if (sel.taskId != null)
-      subtasks.forEach((s: Subtask) => cn(`task-${sel.taskId}`, `sub-${s.id}`, true));
+      subtasks.forEach((s: Subtask) =>
+        cn(`task-${sel.taskId}`, `sub-${s.id}`, true),
+      );
     setSvgDim({ w: cont.scrollWidth, h: cont.scrollHeight });
     setLines(nl);
   };
@@ -204,7 +310,7 @@ export default function MindMapPage({ tasks = [], users = [] }: MindMapPageProps
     <div
       ref={(el) => setRef(id, el)}
       onClick={onClick}
-      className="rounded-xl px-3 py-2.5 cursor-pointer transition-all duration-[180ms] select-none"
+      className="rounded-xl px-3 py-2.5 cursor-pointer transition-all duration-150 select-none"
       style={{
         background: selected ? color : "var(--t-card)",
         border: `2px solid ${selected ? color : "var(--t-border)"}`,
@@ -253,8 +359,8 @@ export default function MindMapPage({ tasks = [], users = [] }: MindMapPageProps
         </div>
         <div className="flex items-center gap-2.5">
           <ExportButtons
-            filtered={tasks}
-            kpi={getKpiData(tasks, users)}
+            filtered={filteredTasks}
+            kpi={getKpiData(filteredTasks, users)}
             users={users}
           />
           {sel.contractId != null && (
@@ -275,26 +381,38 @@ export default function MindMapPage({ tasks = [], users = [] }: MindMapPageProps
           )}
         </div>
       </div>
-      <div className="flex flex-wrap gap-3 mb-3">
-        {[
-          ["Contrato", LC[0]],
-          ["Cidade", LC[1]],
-          ["Bairro", LC[2]],
-          ["Tarefa", LC[3]],
-          ["Subtarefa", LC[4]],
-        ].map(([l, c]) => (
-          <div
-            key={l}
-            className="flex items-center gap-[5px] text-[11px] text-slate-500 dark:text-gray-400"
-          >
-            <div
-              className="w-2 h-2 rounded-full"
-              style={{ background: c }}
-            />
-            {l}
-          </div>
-        ))}
-      </div>
+
+      <TaskFilters
+        T={T}
+        search={fSearch}
+        setSearch={setFSearch}
+        status={fStatus}
+        setStatus={setFStatus}
+        sector={fSector}
+        setSector={setFSector}
+        priority={fPriority}
+        setPriority={setFPriority}
+        type={fType}
+        setType={setFType}
+        contract={fContract}
+        setContract={setFContract}
+        city={fCity}
+        setCity={setFCity}
+        neighbor={fNeighbor}
+        setNeighbor={setFNeighbor}
+        responsible={fUser}
+        setResponsible={setFUser}
+        dateFrom={fDateFrom}
+        setDateFrom={setFDateFrom}
+        dateTo={fDateTo}
+        setDateTo={setFDateTo}
+        users={users}
+        contracts={contracts}
+        citiesNeighborhoods={citiesNeighborhoods}
+        onClear={clearAll}
+        totalTasks={tasks.length}
+        filteredTasks={filteredTasks.length}
+      />
       <div
         ref={containerRef}
         className="relative overflow-x-auto overflow-y-auto max-h-[calc(100vh-260px)] min-h-[300px] rounded-2xl p-7 px-5 border"
@@ -322,10 +440,16 @@ export default function MindMapPage({ tasks = [], users = [] }: MindMapPageProps
             );
           })}
         </svg>
-        <div className="relative z-[1] inline-flex items-start min-w-full gap-[56px]">
+        <div className="relative z-0 inline-flex items-start min-w-full gap-[56px]">
           <div className="flex flex-col gap-2 shrink-0 w-[190px]">
-            <div className="text-[10px] font-extrabold mb-1 uppercase tracking-[0.06em] flex items-center gap-[5px]" style={{ color: LC[0] }}>
-              <div className="w-[7px] h-[7px] rounded-full" style={{ background: LC[0] }} />
+            <div
+              className="text-[10px] font-extrabold mb-1 uppercase tracking-[0.06em] flex items-center gap-[5px]"
+              style={{ color: LC[0] }}
+            >
+              <div
+                className="w-[7px] h-[7px] rounded-full"
+                style={{ background: LC[0] }}
+              />
               Contratos
             </div>
             {CONTRACTS_MM.map((c) => (
@@ -349,8 +473,14 @@ export default function MindMapPage({ tasks = [], users = [] }: MindMapPageProps
           </div>
           {sel.contractId != null && (
             <div className="flex flex-col gap-2 shrink-0 w-[190px]">
-              <div className="text-[10px] font-extrabold mb-1 uppercase tracking-[0.06em] flex items-center gap-[5px]" style={{ color: LC[1] }}>
-                <div className="w-[7px] h-[7px] rounded-full" style={{ background: LC[1] }} />
+              <div
+                className="text-[10px] font-extrabold mb-1 uppercase tracking-[0.06em] flex items-center gap-[5px]"
+                style={{ color: LC[1] }}
+              >
+                <div
+                  className="w-[7px] h-[7px] rounded-full"
+                  style={{ background: LC[1] }}
+                />
                 Cidades
               </div>
               {cities.map((c: MindMapCity) => (
@@ -375,8 +505,14 @@ export default function MindMapPage({ tasks = [], users = [] }: MindMapPageProps
           )}
           {sel.cityId != null && (
             <div className="flex flex-col gap-2 shrink-0 w-[190px]">
-              <div className="text-[10px] font-extrabold mb-1 uppercase tracking-[0.06em] flex items-center gap-[5px]" style={{ color: LC[2] }}>
-                <div className="w-[7px] h-[7px] rounded-full" style={{ background: LC[2] }} />
+              <div
+                className="text-[10px] font-extrabold mb-1 uppercase tracking-[0.06em] flex items-center gap-[5px]"
+                style={{ color: LC[2] }}
+              >
+                <div
+                  className="w-[7px] h-[7px] rounded-full"
+                  style={{ background: LC[2] }}
+                />
                 Bairros
               </div>
               {neighborhoods.map((n: MindMapNeighborhood) => (
@@ -400,8 +536,14 @@ export default function MindMapPage({ tasks = [], users = [] }: MindMapPageProps
           )}
           {sel.neighborhoodId != null && (
             <div className="flex flex-col gap-2 shrink-0 w-[210px]">
-              <div className="text-[10px] font-extrabold mb-1 uppercase tracking-[0.06em] flex items-center gap-[5px]" style={{ color: LC[3] }}>
-                <div className="w-[7px] h-[7px] rounded-full" style={{ background: LC[3] }} />
+              <div
+                className="text-[10px] font-extrabold mb-1 uppercase tracking-[0.06em] flex items-center gap-[5px]"
+                style={{ color: LC[3] }}
+              >
+                <div
+                  className="w-[7px] h-[7px] rounded-full"
+                  style={{ background: LC[3] }}
+                />
                 Tarefas
               </div>
               {taskList.length === 0 && (
@@ -416,7 +558,7 @@ export default function MindMapPage({ tasks = [], users = [] }: MindMapPageProps
                   <div
                     key={t.id}
                     ref={(el) => setRef(`task-${t.id}`, el)}
-                    className="rounded-xl px-3 py-2.5 transition-all duration-[180ms]"
+                    className="rounded-xl px-3 py-2.5 transition-all duration-150"
                     style={{
                       background: isSel ? LC[3] : "var(--t-card)",
                       border: `2px solid ${isSel ? LC[3] : "var(--t-border)"}`,
@@ -454,7 +596,9 @@ export default function MindMapPage({ tasks = [], users = [] }: MindMapPageProps
                       }}
                       className="w-full px-2 py-[5px] rounded-[7px] text-[11px] font-bold cursor-pointer flex items-center justify-center gap-[5px]"
                       style={{
-                        background: isSel ? "rgba(255,255,255,0.2)" : "#98af3b11",
+                        background: isSel
+                          ? "rgba(255,255,255,0.2)"
+                          : "#98af3b11",
                         border: `1px solid ${isSel ? "rgba(255,255,255,0.3)" : "#98af3b33"}`,
                         color: isSel ? "white" : "#98af3b",
                       }}
@@ -469,8 +613,14 @@ export default function MindMapPage({ tasks = [], users = [] }: MindMapPageProps
           )}
           {sel.taskId != null && (
             <div className="flex flex-col gap-2 shrink-0 w-[190px]">
-              <div className="text-[10px] font-extrabold mb-1 uppercase tracking-[0.06em] flex items-center gap-[5px]" style={{ color: LC[4] }}>
-                <div className="w-[7px] h-[7px] rounded-full" style={{ background: LC[4] }} />
+              <div
+                className="text-[10px] font-extrabold mb-1 uppercase tracking-[0.06em] flex items-center gap-[5px]"
+                style={{ color: LC[4] }}
+              >
+                <div
+                  className="w-[7px] h-[7px] rounded-full"
+                  style={{ background: LC[4] }}
+                />
                 Subtarefas
               </div>
               {subtasks.length === 0 && (
@@ -492,7 +642,9 @@ export default function MindMapPage({ tasks = [], users = [] }: MindMapPageProps
                     <div
                       className="w-4 h-4 rounded flex items-center justify-center shrink-0 mt-px"
                       style={{
-                        background: s.done ? "rgba(255,255,255,0.3)" : "transparent",
+                        background: s.done
+                          ? "rgba(255,255,255,0.3)"
+                          : "transparent",
                         border: s.done ? "none" : "2px solid var(--t-border)",
                       }}
                     >
@@ -507,7 +659,11 @@ export default function MindMapPage({ tasks = [], users = [] }: MindMapPageProps
                       </div>
                       <div
                         className="text-[10px] mt-0.5"
-                        style={{ color: s.done ? "rgba(255,255,255,0.65)" : "var(--t-sub)" }}
+                        style={{
+                          color: s.done
+                            ? "rgba(255,255,255,0.65)"
+                            : "var(--t-sub)",
+                        }}
                       >
                         {s.done ? "Concluida" : "Pendente"}
                       </div>
@@ -517,7 +673,9 @@ export default function MindMapPage({ tasks = [], users = [] }: MindMapPageProps
                     onClick={() => setDetail(task ?? null)}
                     className="w-full px-2 py-1 rounded-[7px] text-[11px] font-bold cursor-pointer flex items-center justify-center gap-[5px]"
                     style={{
-                      background: s.done ? "rgba(255,255,255,0.18)" : "#10b98111",
+                      background: s.done
+                        ? "rgba(255,255,255,0.18)"
+                        : "#10b98111",
                       border: `1px solid ${s.done ? "rgba(255,255,255,0.3)" : "#10b98133"}`,
                       color: s.done ? "white" : "#10b981",
                     }}
@@ -539,7 +697,7 @@ export default function MindMapPage({ tasks = [], users = [] }: MindMapPageProps
       {detail && (
         <div
           onClick={() => setDetail(null)}
-          className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4 font-[system-ui,sans-serif]"
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 font-[system-ui,sans-serif]"
         >
           <div
             onClick={(e) => e.stopPropagation()}

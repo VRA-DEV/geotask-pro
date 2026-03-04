@@ -1,13 +1,13 @@
 import prisma from "@/lib/prisma";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextRequest, NextResponse } from "next/server";
+import OpenAI from "openai";
 
 export async function POST(req: NextRequest) {
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.XAI_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { error: "A chave GEMINI_API_KEY não está configurada." },
+        { error: "A chave XAI_API_KEY não está configurada." },
         { status: 500 },
       );
     }
@@ -23,8 +23,10 @@ export async function POST(req: NextRequest) {
       periodDays: number;
     } = body;
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const client = new OpenAI({
+      apiKey,
+      baseURL: "https://api.x.ai/v1",
+    });
 
     // ─── Janela de tempo ───────────────────────────────────────────────────────
     const since = new Date();
@@ -257,8 +259,22 @@ O usuário fez a seguinte solicitação específica. RESPONDA DIRETAMENTE a ela 
 - Ao final, sempre inclua uma seção "✅ Próximos Passos Recomendados" com 3-5 ações concretas
 `;
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
+    const completion = await client.chat.completions.create({
+      model: "grok-4-1-fast-reasoning",
+      messages: [
+        {
+          role: "system",
+          content:
+            "Você é o assistente inteligente do GeoTask Pro, sistema de gestão de tarefas geoespaciais. Responda SEMPRE em português do Brasil, usando Markdown com seções bem formatadas.",
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+    });
+    const text =
+      completion.choices[0]?.message?.content || "Sem resposta da IA.";
 
     return NextResponse.json({
       report: text,

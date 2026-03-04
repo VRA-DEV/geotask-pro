@@ -9,7 +9,7 @@ export function useUsers() {
   });
 
   return {
-    users: (data as any[]) || [],
+    users: Array.isArray(data) ? data : [],
     isLoading,
     error,
     mutate,

@@ -3,7 +3,7 @@ import useSWR from "swr";
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 export function useLookups() {
-  const { data, error, isLoading } = useSWR("/api/lookups", fetcher, {
+  const { data, error, isLoading, mutate } = useSWR("/api/lookups", fetcher, {
     revalidateOnFocus: false,
     revalidateOnReconnect: false,
     dedupingInterval: 60000,
@@ -15,5 +15,6 @@ export function useLookups() {
     citiesNeighborhoods: data?.cities_neighborhoods || {},
     isLoading,
     error,
+    mutate,
   };
 }

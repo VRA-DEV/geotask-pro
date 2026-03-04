@@ -3,14 +3,10 @@ import useSWR from "swr";
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 export function useTemplates() {
-  const { data, error, isLoading, mutate } = useSWR(
-    "/api/templates",
-    fetcher,
-    {
-      revalidateOnFocus: false,
-      dedupingInterval: 10000,
-    },
-  );
+  const { data, error, isLoading, mutate } = useSWR("/api/templates", fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 10000,
+  });
 
   const saveTemplate = async (templateData: any, userId?: number) => {
     const isEdit = !!templateData.id;
@@ -32,7 +28,7 @@ export function useTemplates() {
   };
 
   return {
-    templates: (data as any[]) || [],
+    templates: Array.isArray(data) ? data : [],
     isLoading,
     error,
     mutate,

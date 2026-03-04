@@ -5,6 +5,7 @@ import {
   Building2,
   Edit,
   Lock,
+  MapPin,
   Plus,
   Settings,
   Trash2,
@@ -13,6 +14,7 @@ import {
   Users,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useSWRConfig } from "swr";
 import { ChangePasswordModal } from "./ChangePasswordModal";
 import { RoleModal } from "./RoleModal";
 import { SectorModal } from "./SectorModal";
@@ -50,6 +52,26 @@ interface User {
   must_change_password?: boolean;
 }
 
+interface Contract {
+  id: number;
+  name: string;
+}
+
+interface City {
+  id: number;
+  name: string;
+  _count?: {
+    neighborhoods: number;
+  };
+}
+
+interface Neighborhood {
+  id: number;
+  name: string;
+  city_id: number;
+  city?: City;
+}
+
 interface SettingsPageProps {
   T: any;
   tab: string;
@@ -84,7 +106,11 @@ export function SettingsPage({
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [sectors, setSectors] = useState<Sector[]>([]);
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [cities, setCities] = useState<City[]>([]);
+  const [neighborhoods, setNeighborhoods] = useState<Neighborhood[]>([]);
   const [loading, setLoading] = useState(false);
+  const { mutate } = useSWRConfig();
 
   // Modal state
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -102,12 +128,15 @@ export function SettingsPage({
   const [editingSector, setEditingSector] = useState<any | null>(null);
 
   const isAdmin = currentUser?.role?.name === "Admin";
+  const isManager = currentUser?.role?.name === "Gerente";
+  const isCoordinator = currentUser?.role?.name === "Coordenador";
+  const canManageLocations = isAdmin || isManager || isCoordinator;
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (isAdmin) fetchData();
-  }, [isAdmin]);
+    if (isAdmin || canManageLocations) fetchData();
+  }, [isAdmin, canManageLocations]);
 
   useEffect(() => {
     if (!isAdmin && tab !== "account") setTab("account");
@@ -116,14 +145,30 @@ export function SettingsPage({
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [uRes, rRes, sRes] = await Promise.all([
-        fetch("/api/users"),
-        fetch("/api/roles"),
-        fetch("/api/sectors"),
-      ]);
-      if (uRes.ok) setUsers(await uRes.json());
-      if (rRes.ok) setRoles(await rRes.json());
-      if (sRes.ok) setSectors(await sRes.json());
+      const proms: Promise<any>[] = [];
+      if (isAdmin) {
+        proms.push(fetch("/api/users").then((r) => r.json()));
+        proms.push(fetch("/api/roles").then((r) => r.json()));
+        proms.push(fetch("/api/sectors").then((r) => r.json()));
+      }
+      if (canManageLocations) {
+        proms.push(fetch("/api/contracts").then((r) => r.json()));
+        proms.push(fetch("/api/cities").then((r) => r.json()));
+        proms.push(fetch("/api/neighborhoods").then((r) => r.json()));
+      }
+
+      const results = await Promise.all(proms);
+      let idx = 0;
+      if (isAdmin) {
+        setUsers(results[idx++]);
+        setRoles(results[idx++]);
+        setSectors(results[idx++]);
+      }
+      if (canManageLocations) {
+        setContracts(results[idx++]);
+        setCities(results[idx++]);
+        setNeighborhoods(results[idx++]);
+      }
     } catch (error) {
       console.error("Failed to fetch settings data", error);
     } finally {
@@ -193,6 +238,108 @@ export function SettingsPage({
     }
   };
 
+  const handleAddContract = async () => {
+    const name = prompt("Nome do novo contrato:");
+    if (!name) return;
+    try {
+      const res = await fetch("/api/contracts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (res.ok) {
+        fetchData();
+        mutate("/api/lookups");
+      } else alert("Erro ao criar contrato");
+    } catch {
+      alert("Erro ao criar contrato");
+    }
+  };
+
+  const handleDeleteContract = async (id: number) => {
+    if (!confirm("Excluir este contrato?")) return;
+    try {
+      const res = await fetch(`/api/contracts?id=${id}`, { method: "DELETE" });
+      if (res.ok) {
+        fetchData();
+        mutate("/api/lookups");
+      } else alert((await res.json()).error || "Erro ao excluir");
+    } catch {
+      alert("Erro ao excluir");
+    }
+  };
+
+  const handleAddCity = async () => {
+    const name = prompt("Nome da nova cidade:");
+    if (!name) return;
+    try {
+      const res = await fetch("/api/cities", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (res.ok) {
+        fetchData();
+        mutate("/api/lookups");
+      } else alert("Erro ao criar cidade");
+    } catch {
+      alert("Erro ao criar cidade");
+    }
+  };
+
+  const handleDeleteCity = async (id: number) => {
+    if (!confirm("Excluir esta cidade?")) return;
+    try {
+      const res = await fetch(`/api/cities?id=${id}`, { method: "DELETE" });
+      if (res.ok) {
+        fetchData();
+        mutate("/api/lookups");
+      } else alert((await res.json()).error || "Erro ao excluir");
+    } catch {
+      alert("Erro ao excluir");
+    }
+  };
+
+  const handleAddNeighborhood = async () => {
+    if (cities.length === 0) return alert("Crie uma cidade primeiro");
+    const name = prompt("Nome do novo bairro:");
+    if (!name) return;
+    const cityNames = cities.map((c, i) => `${i + 1}. ${c.name}`).join("\n");
+    const cityIdx = prompt(`Selecione a cidade (número):\n${cityNames}`);
+    if (!cityIdx) return;
+    const city = cities[Number(cityIdx) - 1];
+    if (!city) return alert("Cidade inválida");
+
+    try {
+      const res = await fetch("/api/neighborhoods", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, cityId: city.id }),
+      });
+      if (res.ok) {
+        fetchData();
+        mutate("/api/lookups");
+      } else alert((await res.json()).error || "Erro ao criar bairro");
+    } catch {
+      alert("Erro ao criar bairro");
+    }
+  };
+
+  const handleDeleteNeighborhood = async (id: number) => {
+    if (!confirm("Excluir este bairro?")) return;
+    try {
+      const res = await fetch(`/api/neighborhoods?id=${id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        fetchData();
+        mutate("/api/lookups");
+      } else alert((await res.json()).error || "Erro ao excluir");
+    } catch {
+      alert("Erro ao excluir");
+    }
+  };
+
   const handleSetPermission = async (
     roleId: number,
     module: string,
@@ -233,10 +380,15 @@ export function SettingsPage({
     { id: "users", l: "Usuários", icon: Users },
     { id: "roles", l: "Cargos", icon: Briefcase },
     { id: "sectors", l: "Setores", icon: Building2 },
+    { id: "locations", l: "Localidades", icon: MapPin },
     { id: "permissions", l: "Permissões", icon: Settings },
   ];
 
-  const tabs = isAdmin ? allTabs : allTabs.filter((t) => t.id === "account");
+  const tabs = allTabs.filter((t) => {
+    if (t.id === "account") return true;
+    if (t.id === "locations") return canManageLocations;
+    return isAdmin;
+  });
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -273,7 +425,9 @@ export function SettingsPage({
       </div>
 
       {loading ? (
-        <div className="p-5 text-slate-500 dark:text-gray-400">Carregando...</div>
+        <div className="p-5 text-slate-500 dark:text-gray-400">
+          Carregando...
+        </div>
       ) : (
         <>
           {/* ═══════════════════════════════════════════════════════════════
@@ -427,7 +581,9 @@ export function SettingsPage({
                   </div>
 
                   {/* Email */}
-                  <span className="text-xs text-slate-500 dark:text-gray-400">{u.email}</span>
+                  <span className="text-xs text-slate-500 dark:text-gray-400">
+                    {u.email}
+                  </span>
 
                   {/* Role badge */}
                   <span className="text-[11px] py-0.5 px-2 rounded-full bg-slate-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 w-fit font-semibold">
@@ -625,7 +781,9 @@ export function SettingsPage({
                       className="inline-block w-[9px] h-[9px] rounded-full"
                       style={{ background: pl.color }}
                     />
-                    <span className="text-slate-900 dark:text-gray-50">{pl.label}</span>
+                    <span className="text-slate-900 dark:text-gray-50">
+                      {pl.label}
+                    </span>
                   </span>
                 ))}
               </div>
@@ -680,10 +838,7 @@ export function SettingsPage({
                           );
 
                           return (
-                            <td
-                              key={r.id}
-                              className="py-2 px-3.5 text-center"
-                            >
+                            <td key={r.id} className="py-2 px-3.5 text-center">
                               <select
                                 value={currentLevel}
                                 onChange={(e) =>
@@ -735,16 +890,154 @@ export function SettingsPage({
                     apenas seu setor. Liderado → sem acesso.
                   </li>
                   <li>
-                    <strong className="text-slate-900 dark:text-gray-50">Atribuição</strong>:
-                    Admin/Gerente/Coordenador → qualquer usuário. Gestor →
+                    <strong className="text-slate-900 dark:text-gray-50">
+                      Atribuição
+                    </strong>
+                    : Admin/Gerente/Coordenador → qualquer usuário. Gestor →
                     apenas usuários do seu setor.
                   </li>
                   <li>
-                    <strong className="text-slate-900 dark:text-gray-50">Menções</strong>: qualquer
-                    cargo pode mencionar qualquer usuário ou setor. O mencionado
-                    recebe notificação e pode visualizar a tarefa.
+                    <strong className="text-slate-900 dark:text-gray-50">
+                      Menções
+                    </strong>
+                    : qualquer cargo pode mencionar qualquer usuário ou setor. O
+                    mencionado recebe notificação e pode visualizar a tarefa.
                   </li>
                 </ul>
+              </div>
+            </div>
+          )}
+
+          {/* ═══════════════════════════════════════════════════════════════
+              LOCATIONS TAB — Admin/Manager/Coordinator
+          ═══════════════════════════════════════════════════════════════ */}
+          {tab === "locations" && canManageLocations && (
+            <div className="flex flex-col gap-6 max-w-[800px]">
+              {/* Contracts Section */}
+              <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-[14px] overflow-hidden">
+                <div className="flex justify-between items-center py-3 px-4 border-b border-slate-200 dark:border-gray-700 bg-slate-50 dark:bg-white/5">
+                  <span className="text-[13px] font-bold text-slate-900 dark:text-gray-50 flex items-center gap-2">
+                    <Briefcase size={14} className="text-primary" /> Contratos
+                  </span>
+                  <button
+                    onClick={handleAddContract}
+                    className="flex items-center gap-1.5 py-1 px-2.5 bg-primary text-white border-none rounded-md text-[11px] font-semibold cursor-pointer"
+                  >
+                    <Plus size={12} /> Novo
+                  </button>
+                </div>
+                <div className="divide-y divide-slate-100 dark:divide-gray-700 max-h-[300px] overflow-auto">
+                  {contracts.map((c) => (
+                    <div
+                      key={c.id}
+                      className="flex justify-between items-center py-2.5 px-4 hover:bg-slate-50 dark:hover:bg-white/5"
+                    >
+                      <span className="text-xs text-slate-700 dark:text-gray-300 font-medium">
+                        {c.name}
+                      </span>
+                      <button
+                        onClick={() => handleDeleteContract(c.id)}
+                        className="p-1.5 text-slate-400 hover:text-red-500 bg-transparent border-none cursor-pointer"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  ))}
+                  {contracts.length === 0 && (
+                    <div className="p-4 text-center text-xs text-slate-400">
+                      Nenhum contrato.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Cities & Neighborhoods Section */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Cities */}
+                <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-[14px] overflow-hidden">
+                  <div className="flex justify-between items-center py-3 px-4 border-b border-slate-200 dark:border-gray-700 bg-slate-50 dark:bg-white/5">
+                    <span className="text-[13px] font-bold text-slate-900 dark:text-gray-50 flex items-center gap-2">
+                      <Building2 size={14} className="text-primary" /> Cidades
+                    </span>
+                    <button
+                      onClick={handleAddCity}
+                      className="flex items-center gap-1.5 py-1 px-2.5 bg-primary text-white border-none rounded-md text-[11px] font-semibold cursor-pointer"
+                    >
+                      <Plus size={12} /> Nova
+                    </button>
+                  </div>
+                  <div className="divide-y divide-slate-100 dark:divide-gray-700 max-h-[300px] overflow-auto">
+                    {cities.map((city) => (
+                      <div
+                        key={city.id}
+                        className="flex justify-between items-center py-2.5 px-4 hover:bg-slate-50 dark:hover:bg-white/5"
+                      >
+                        <div className="flex flex-col">
+                          <span className="text-xs text-slate-700 dark:text-gray-300 font-medium">
+                            {city.name}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            {city._count?.neighborhoods || 0} bairros
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteCity(city.id)}
+                          className="p-1.5 text-slate-400 hover:text-red-500 bg-transparent border-none cursor-pointer"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    ))}
+                    {cities.length === 0 && (
+                      <div className="p-4 text-center text-xs text-slate-400">
+                        Nenhuma cidade.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Neighborhoods */}
+                <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-[14px] overflow-hidden">
+                  <div className="flex justify-between items-center py-3 px-4 border-b border-slate-200 dark:border-gray-700 bg-slate-50 dark:bg-white/5">
+                    <span className="text-[13px] font-bold text-slate-900 dark:text-gray-50 flex items-center gap-2">
+                      <MapPin size={14} className="text-primary" /> Bairros
+                    </span>
+                    <button
+                      onClick={handleAddNeighborhood}
+                      className="flex items-center gap-1.5 py-1 px-2.5 bg-primary text-white border-none rounded-md text-[11px] font-semibold cursor-pointer"
+                    >
+                      <Plus size={12} /> Novo
+                    </button>
+                  </div>
+                  <div className="divide-y divide-slate-100 dark:divide-gray-700 max-h-[300px] overflow-auto">
+                    {neighborhoods.map((n) => (
+                      <div
+                        key={n.id}
+                        className="flex justify-between items-center py-2.5 px-4 hover:bg-slate-50 dark:hover:bg-white/5"
+                      >
+                        <div className="flex flex-col">
+                          <span className="text-xs text-slate-700 dark:text-gray-300 font-medium">
+                            {n.name}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            {n.city?.name}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteNeighborhood(n.id)}
+                          className="p-1.5 text-slate-400 hover:text-red-500 bg-transparent border-none cursor-pointer"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    ))}
+                    {neighborhoods.length === 0 && (
+                      <div className="p-4 text-center text-xs text-slate-400">
+                        Nenhum bairro.
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           )}

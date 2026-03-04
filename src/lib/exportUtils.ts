@@ -1,10 +1,11 @@
+import { Task } from "@/types";
+import * as ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
 import type jsPDF from "jspdf";
-import type { Task } from "@/types";
 
 // Lazy-loaded to avoid 1MB+ upfront bundle cost
 const getJsPDF = () => import("jspdf").then((m) => m.default);
 const getAutoTable = () => import("jspdf-autotable").then((m) => m.default);
-const getXLSX = () => import("xlsx");
 
 // ─── Company Info ────────────────────────────────────────────────────────────
 const COMPANY = {
@@ -13,6 +14,29 @@ const COMPANY = {
   address: "R. Das Acacias, 227 - São Francisco, Cuiabá - MT, 78043-228",
   slogan: "Transformar e Desenvolver Territórios",
   reportTitle: "Relatório de Tarefas",
+};
+
+// ─── Colors & Styles ─────────────────────────────────────────────────────────
+const COLORS = {
+  headerGreen: "9BBF41",
+  bodyDark: "2F3341",
+  white: "FFFFFF",
+  borderDark: "2F3341",
+};
+
+const FONTS = {
+  header: {
+    name: "Cambria",
+    size: 12,
+    bold: true,
+    color: { argb: COLORS.white },
+  },
+  body: {
+    name: "Cambria",
+    size: 11,
+    italic: true,
+    color: { argb: COLORS.bodyDark },
+  },
 };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -604,203 +628,317 @@ const drawTimeline = (
   return curY;
 };
 
+// ─── EXCEL STYLING HELPERS ───────────────────────────────────────────────────
+const applyHeaderStyle = (cell: ExcelJS.Cell) => {
+  cell.fill = {
+    type: "pattern",
+    pattern: "solid",
+    fgColor: { argb: COLORS.headerGreen },
+  };
+  cell.font = FONTS.header;
+  cell.alignment = { vertical: "middle", horizontal: "center" };
+  cell.border = {
+    top: { style: "thin", color: { argb: COLORS.borderDark } },
+    left: { style: "thin", color: { argb: COLORS.borderDark } },
+    bottom: { style: "thin", color: { argb: COLORS.borderDark } },
+    right: { style: "thin", color: { argb: COLORS.borderDark } },
+  };
+};
+
+const applyBodyStyle = (cell: ExcelJS.Cell, isItalic = true) => {
+  cell.font = { ...FONTS.body, italic: isItalic };
+  cell.alignment = { vertical: "middle", horizontal: "left", wrapText: true };
+  cell.border = {
+    top: { style: "thin", color: { argb: COLORS.borderDark } },
+    left: { style: "thin", color: { argb: COLORS.borderDark } },
+    bottom: { style: "thin", color: { argb: COLORS.borderDark } },
+    right: { style: "thin", color: { argb: COLORS.borderDark } },
+  };
+};
+
+const autoWidth = (ws: ExcelJS.Worksheet) => {
+  ws.columns.forEach((column: any) => {
+    let maxLen = 0;
+    column.eachCell!({ includeEmpty: true }, (cell: any) => {
+      const len = cell.value ? String(cell.value).length : 0;
+      if (len > maxLen) maxLen = len;
+    });
+    column.width = Math.min(Math.max(maxLen + 2, 10), 50);
+  });
+};
+
 // ─── EXCEL EXPORT ─────────────────────────────────────────────────────────────
 export const exportToExcel = async (
   tasks: Task[],
   kpi?: ExportKPIs,
   currentUser?: { name?: string } | null,
   filterLabel?: string,
+  sourcePage?: "dashboard" | "kanban" | "cronograma",
 ) => {
-  const XLSX = await getXLSX();
-  const wb = XLSX.utils.book_new();
+  const wb = new ExcelJS.Workbook();
 
-  // ── Sheet 1: Resumo ──
-  if (kpi) {
-    const resumoData = [
-      ["GEOGIS GEOTÉCNOLOGIA — RELATÓRIO DE TAREFAS"],
-      [`Gerado em: ${new Date().toLocaleString("pt-BR")}`],
-      [`Gerado por: ${currentUser?.name || "Usuário não identificado"}`],
-      [`Filtros aplicados: ${filterLabel || "Nenhum"}`],
-      [],
-      ["INDICADORES GERAIS"],
-      ["Total de Tarefas", tasks.length],
-      ["Tarefas Concluídas", kpi.concludedCount],
-      [
-        "Taxa de Conclusão",
-        tasks.length
-          ? `${Math.round((kpi.concludedCount / tasks.length) * 100)}%`
-          : "0%",
-      ],
-      ["Em Atraso", kpi.delayedCount],
-      ["Tempo Médio de Execução", fmt(kpi.avgTime)],
-      [],
-      ["DISTRIBUIÇÃO POR PRIORIDADE"],
-      ["Alta", kpi.highPriorityCount],
-      ["Média", kpi.midPriorityCount],
-      ["Baixa", kpi.lowPriorityCount],
-      [],
-      ["DISTRIBUIÇÃO POR STATUS"],
-      ...kpi.pieData.map((d) => [d.name, d.value]),
-      [],
-      ["TOP SETORES (por conclusões)"],
-      ...kpi.sectorRank.map((s) => [s.name, s.v]),
-      [],
-      ["TOP COLABORADORES (por conclusões)"],
-      ...kpi.userRank.map((u) => [u.name, u.sector || "", u.v]),
-    ];
-    const wsResumo = XLSX.utils.aoa_to_sheet(resumoData);
-    wsResumo["!cols"] = [{ wch: 35 }, { wch: 20 }, { wch: 20 }];
-    XLSX.utils.book_append_sheet(wb, wsResumo, "Resumo");
+  // Tentar carregar o modelo do arquivo público para preservar formatação/logo
+  try {
+    const response = await fetch("/modelo_relatorio.xlsx");
+    const arrayBuffer = await response.arrayBuffer();
+    await wb.xlsx.load(arrayBuffer);
+  } catch (error) {
+    console.error(
+      "Erro ao carregar modelo_relatorio.xlsx, criando novo:",
+      error,
+    );
+    wb.addWorksheet("Resumo");
   }
 
-  // ── Sheet 2: Tarefas ──
-  const taskRows = tasks.map((t) => {
-    const state = getTaskState(t);
-    return {
-      ID: t.id,
-      Título: t.title,
-      Descrição: t.description || "—",
-      Tipo: t.type || "—",
-      Prioridade: t.priority || "—",
-      Status: t.status,
-      "Estado Atual": state ? state.label : "Sem Prazo",
-      Setor: getName(t.sector),
-      Responsável: getName(t.responsible),
-      Contrato: getName(t.contract),
-      Cidade: getName(t.city),
-      "Bairro/Núcleo": t.nucleus || "—",
-      Quadra: t.quadra || "—",
-      Lote: t.lote || "—",
-      "Data Criação": t.created || "—",
-      "Data Início": t.started || "—",
-      Prazo: t.deadline || "—",
-      "Data Conclusão": t.completed || "—",
-      "Tempo Execução": fmt(t.time_spent || 0),
-      Pausas: t.pauses?.length || 0,
-      Subtarefas: t.subtasks?.length || 0,
-    };
-  });
-  const wsTasks = XLSX.utils.json_to_sheet(taskRows);
-  wsTasks["!cols"] = [
-    { wch: 6 },
-    { wch: 35 },
-    { wch: 30 },
-    { wch: 18 },
-    { wch: 12 },
-    { wch: 14 },
-    { wch: 16 },
-    { wch: 16 },
-    { wch: 20 },
-    { wch: 20 },
-    { wch: 14 },
-    { wch: 16 },
-    { wch: 8 },
-    { wch: 8 },
-    { wch: 12 },
-    { wch: 12 },
-    { wch: 12 },
-    { wch: 14 },
-    { wch: 14 },
-    { wch: 8 },
-    { wch: 10 },
-  ];
-  XLSX.utils.book_append_sheet(wb, wsTasks, "Tarefas");
+  // ── 1. SHEET: RESUMO ──
+  // Pegamos a primeira aba que deve ser o resumo do modelo
+  const wsResumo = wb.getWorksheet(1) || wb.addWorksheet("Resumo");
 
-  // ── Sheet 3: Subtarefas ──
-  const subtaskRows: Record<string, unknown>[] = [];
-  tasks.forEach((t) => {
-    (t.subtasks || []).forEach((sub) => {
-      // Runtime subtasks may carry full task-like data; cast for safe access
-      const s = sub as unknown as Record<string, unknown>;
-      const subState = getTaskState(s as Partial<Task>);
-      subtaskRows.push({
-        ID: sub.id,
-        "Tarefa Pai (Título)": t.title,
-        "Tarefa Pai (ID)": t.id,
-        Título: sub.title,
-        Status: s.status || (sub.done ? "Concluído" : "A Fazer"),
-        "Estado Atual": subState ? subState.label : "Sem Prazo",
-        Setor:
-          getName(s.sector) !== "—" ? getName(s.sector) : getName(t.sector),
-        Responsável: getName(sub.responsible),
-        Prazo: (s.deadline as string) || t.deadline || "—",
-        Contrato: getName(s.contract) !== "—" ? getName(s.contract) : getName(t.contract),
-        Cidade: getName(s.city) !== "—" ? getName(s.city) : getName(t.city),
-        "Bairro/Núcleo": (s.nucleus as string) || t.nucleus || "—",
-        Quadra: (s.quadra as string) || t.quadra || "—",
-        Lote: (s.lote as string) || t.lote || "—",
-        "Tempo Execução": fmt((s.time_spent as number) || 0),
-        Concluída: sub.done ? "Sim" : "Não",
+  // Preencher dados básicos conforme endereços do modelo mapeado
+  wsResumo.getCell("C2").value = COMPANY.cnpj;
+  wsResumo.getCell("C4").value = COMPANY.address;
+  wsResumo.getCell("C5").value = COMPANY.address; // O modelo tem C5 igual
+  wsResumo.getCell("A5").value = COMPANY.slogan;
+
+  if (kpi) {
+    // Indicadores Gerais
+    wsResumo.getCell("B10").value = tasks.length;
+    wsResumo.getCell("B11").value = kpi.concludedCount;
+    wsResumo.getCell("B12").value = tasks.length
+      ? `${Math.round((kpi.concludedCount / tasks.length) * 100)}%`
+      : "0%";
+    wsResumo.getCell("B13").value = kpi.delayedCount;
+    wsResumo.getCell("B14").value = fmt(kpi.avgTime);
+
+    // Prioridade
+    wsResumo.getCell("B17").value = kpi.highPriorityCount;
+    wsResumo.getCell("B18").value = kpi.midPriorityCount;
+    wsResumo.getCell("B19").value = kpi.lowPriorityCount;
+
+    // Status (A partir da A22)
+    let sRow = 22;
+    kpi.pieData.forEach((d) => {
+      const r = wsResumo.getRow(sRow++);
+      r.getCell(1).value = d.name;
+      r.getCell(2).value = d.value;
+      // Manter estilo se possível ou aplicar o padrão
+      r.getCell(1).font = { name: "Cambria", size: 11, italic: true };
+    });
+
+    // Setores (A26...)
+    let secRow = 26;
+    kpi.sectorRank.slice(0, 5).forEach((s) => {
+      const r = wsResumo.getRow(secRow++);
+      r.getCell(1).value = s.name;
+      r.getCell(2).value = s.v;
+    });
+
+    // Colaboradores (A30...)
+    let userRow = 30;
+    kpi.userRank.slice(0, 5).forEach((u) => {
+      const r = wsResumo.getRow(userRow++);
+      r.getCell(1).value = u.name;
+      r.getCell(2).value = u.v;
+    });
+
+    // Metadados Rodapé
+    wsResumo.getCell("A33").value =
+      "Data de geração: " + new Date().toLocaleString("pt-BR");
+    wsResumo.getCell("A34").value =
+      "Gerado por: " + (currentUser?.name || "Usuário não identificado");
+    wsResumo.getCell("A35").value =
+      "Filtros aplicados: " + (filterLabel || "Nenhum filtro aplicado");
+  }
+
+  // ── 2. ABAS ADICIONAIS CONFORME PÁGINA ──
+
+  // PÁGINA: KANBAN -> Tarefas e Subtarefas
+  if (sourcePage === "kanban" || !sourcePage) {
+    const wsTasks = wb.addWorksheet("Tarefas");
+    const headers = [
+      "ID",
+      "Título",
+      "Tipo",
+      "Prioridade",
+      "Status",
+      "Estado",
+      "Setor",
+      "Responsável",
+      "Prazo",
+      "Tempo",
+    ];
+    const headerRow = wsTasks.getRow(1);
+    headers.forEach((h, i) => {
+      const cell = headerRow.getCell(i + 1);
+      cell.value = h;
+      applyHeaderStyle(cell);
+    });
+
+    tasks.forEach((t, idx) => {
+      const r = wsTasks.getRow(idx + 2);
+      const rowData = [
+        t.id,
+        t.title,
+        t.type || "—",
+        t.priority || "—",
+        t.status,
+        getTaskState(t)?.label || "Sem Prazo",
+        getName(t.sector),
+        getName(t.responsible),
+        t.deadline || "—",
+        fmt(t.time_spent || 0),
+      ];
+      rowData.forEach((val, i) => {
+        const cell = r.getCell(i + 1);
+        cell.value = val;
+        applyBodyStyle(cell);
       });
     });
-  });
-  const wsSubtasks = XLSX.utils.json_to_sheet(subtaskRows);
-  wsSubtasks["!cols"] = [
-    { wch: 6 },
-    { wch: 35 },
-    { wch: 12 },
-    { wch: 35 },
-    { wch: 14 },
-    { wch: 16 },
-    { wch: 16 },
-    { wch: 20 },
-    { wch: 12 },
-    { wch: 20 },
-    { wch: 14 },
-    { wch: 16 },
-    { wch: 8 },
-    { wch: 8 },
-    { wch: 14 },
-    { wch: 10 },
-  ];
-  XLSX.utils.book_append_sheet(wb, wsSubtasks, "Subtarefas");
+    autoWidth(wsTasks);
 
-  // ── Sheet 4: Cronograma ──
-  const scheduleRows = tasks
-    .filter((t) => t.created || t.deadline)
-    .sort((a, b) => {
-      const da = parseDateStr(a.created_at || a.created);
-      const db = parseDateStr(b.created_at || b.created);
-      return (da?.getTime() || 0) - (db?.getTime() || 0);
-    })
-    .map((t) => ({
-      ID: t.id,
-      Título: t.title,
-      Status: t.status,
-      "Estado Prazo": getTaskState(t)?.label || "Sem Prazo",
-      Setor: getName(t.sector),
-      Responsável: getName(t.responsible),
-      "Data Criação": t.created || "—",
-      "Data Início": t.started || "—",
-      Prazo: t.deadline || "—",
-      "Data Conclusão": t.completed || "—",
-      "Duração (dias)": (() => {
-        const s = parseDateStr(t.created_at || t.created);
-        const e = parseDateStr(t.deadline);
-        if (s && e) return Math.ceil((e.getTime() - s.getTime()) / 86400000);
-        return "—";
-      })(),
-    }));
-  const wsSched = XLSX.utils.json_to_sheet(scheduleRows);
-  wsSched["!cols"] = [
-    { wch: 6 },
-    { wch: 35 },
-    { wch: 14 },
-    { wch: 16 },
-    { wch: 16 },
-    { wch: 20 },
-    { wch: 12 },
-    { wch: 12 },
-    { wch: 12 },
-    { wch: 14 },
-    { wch: 14 },
-  ];
-  XLSX.utils.book_append_sheet(wb, wsSched, "Cronograma");
+    const wsSub = wb.addWorksheet("Subtarefas");
+    const subHeaders = [
+      "ID",
+      "Pai (Título)",
+      "Título",
+      "Status",
+      "Responsável",
+      "Prazo",
+      "Concluída",
+    ];
+    const subHeaderRow = wsSub.getRow(1);
+    subHeaders.forEach((h, i) => {
+      const cell = subHeaderRow.getCell(i + 1);
+      cell.value = h;
+      applyHeaderStyle(cell);
+    });
 
-  XLSX.writeFile(
-    wb,
-    `geotask_relatorio_${new Date().toISOString().split("T")[0]}.xlsx`,
-  );
+    let sIdx = 2;
+    tasks.forEach((t) => {
+      (t.subtasks || []).forEach((sub) => {
+        const r = wsSub.getRow(sIdx++);
+        const rowData = [
+          sub.id,
+          t.title,
+          sub.title,
+          sub.done ? "Concluído" : "A Fazer",
+          getName(sub.responsible),
+          (sub as any).deadline || "—",
+          sub.done ? "Sim" : "Não",
+        ];
+        rowData.forEach((val, i) => {
+          const cell = r.getCell(i + 1);
+          cell.value = val;
+          applyBodyStyle(cell);
+        });
+      });
+    });
+    autoWidth(wsSub);
+  }
+
+  // PÁGINA: CRONOGRAMA -> Cronograma
+  if (sourcePage === "cronograma") {
+    const wsCron = wb.addWorksheet("Cronograma");
+    const headers = [
+      "ID",
+      "Tarefa",
+      "Status",
+      "Início",
+      "Prazo",
+      "Conclusão",
+      "Responsável",
+    ];
+    const hRow = wsCron.getRow(1);
+    headers.forEach((h, i) => {
+      const cell = hRow.getCell(i + 1);
+      cell.value = h;
+      applyHeaderStyle(cell);
+    });
+
+    tasks.forEach((t, idx) => {
+      const r = wsCron.getRow(idx + 2);
+      const rowData = [
+        t.id,
+        t.title,
+        t.status,
+        t.started || "—",
+        t.deadline || "—",
+        t.completed || "—",
+        getName(t.responsible),
+      ];
+      rowData.forEach((val, i) => {
+        const cell = r.getCell(i + 1);
+        cell.value = val;
+        applyBodyStyle(cell);
+        // Colorir texto baseado no status
+        if (i === 2) {
+          // Coluna Status
+          if (t.status === "Concluído")
+            cell.font = { ...cell.font, color: { argb: "10B981" }, bold: true };
+          else if (t.status === "Pausado")
+            cell.font = { ...cell.font, color: { argb: "EF4444" }, bold: true };
+          else if (t.status === "Em Andamento")
+            cell.font = { ...cell.font, color: { argb: "F59E0B" }, bold: true };
+        }
+      });
+    });
+    autoWidth(wsCron);
+  }
+
+  // PÁGINA: DASHBOARD -> Próximas Tarefas
+  if (sourcePage === "dashboard") {
+    const wsNext = wb.addWorksheet("Próximas Tarefas");
+    const headers = [
+      "Data Prazo",
+      "Setor",
+      "Responsável",
+      "Tarefa",
+      "Status",
+      "Atraso/Tempo",
+    ];
+    const hRow = wsNext.getRow(1);
+    headers.forEach((h, i) => {
+      const cell = hRow.getCell(i + 1);
+      cell.value = h;
+      applyHeaderStyle(cell);
+    });
+
+    const nextTasks = tasks
+      .filter((t) => t.status !== "Concluído" && t.deadline)
+      .sort(
+        (a, b) =>
+          (parseDateStr(a.deadline)?.getTime() || 0) -
+          (parseDateStr(b.deadline)?.getTime() || 0),
+      )
+      .slice(0, 50);
+
+    nextTasks.forEach((t, idx) => {
+      const r = wsNext.getRow(idx + 2);
+      const state = getTaskState(t);
+      const rowData = [
+        t.deadline,
+        getName(t.sector),
+        getName(t.responsible),
+        t.title,
+        t.status,
+        state?.label || "—",
+      ];
+      rowData.forEach((val, i) => {
+        const cell = r.getCell(i + 1);
+        cell.value = val;
+        applyBodyStyle(cell);
+        if (i === 5 && state?.label === "Em Atraso") {
+          cell.font = { ...cell.font, color: { argb: "EF4444" }, bold: true };
+        }
+      });
+    });
+    autoWidth(wsNext);
+  }
+
+  // Finalização e Download
+  const buffer = await wb.xlsx.writeBuffer();
+  const fileName = `relatorio_geotask_${new Date().toISOString().split("T")[0]}.xlsx`;
+  saveAs(new Blob([buffer]), fileName);
 };
 
 // ─── PDF EXPORT ───────────────────────────────────────────────────────────────
@@ -813,7 +951,7 @@ export const exportToPDF = async (
 ) => {
   const footerMeta = {
     generatedBy: currentUser?.name || "",
-    filters: filterLabel || "Nenhum",
+    filters: filterLabel || "Nenhum filtro aplicado",
   };
   const jsPDF = await getJsPDF();
   const autoTable = await getAutoTable();
@@ -1105,7 +1243,9 @@ export const exportToPDF = async (
           getTaskState(sr as Partial<Task>)?.label || "—",
           getName(sub.responsible) !== "—" ? getName(sub.responsible) : "—",
           (sr.deadline as string) || "—",
-          getName(sr.contract) !== "—" ? getName(sr.contract) : getName(t.contract),
+          getName(sr.contract) !== "—"
+            ? getName(sr.contract)
+            : getName(t.contract),
           "—",
           fmt((sr.time_spent as number) || 0),
         ]);

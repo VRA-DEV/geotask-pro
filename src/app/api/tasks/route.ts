@@ -90,10 +90,13 @@ export async function GET(request: NextRequest) {
   try {
     const url = request.nextUrl;
     const page = Math.max(1, Number(url.searchParams.get("page")) || 1);
-    const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit")) || 0));
+    const limit = url.searchParams.get("limit")
+      ? Math.min(200, Math.max(1, Number(url.searchParams.get("limit"))))
+      : 0;
     const status = url.searchParams.get("status");
     const sectorId = Number(url.searchParams.get("sector_id")) || undefined;
-    const responsibleId = Number(url.searchParams.get("responsible_id")) || undefined;
+    const responsibleId =
+      Number(url.searchParams.get("responsible_id")) || undefined;
 
     // Build optional where clause
     const where: Prisma.TaskWhereInput = {

@@ -38,14 +38,12 @@ const DashboardPage = dynamic(
   () => import("@/components/dashboard/DashboardPage"),
   { loading: () => <DashboardSkeleton /> },
 );
-const KanbanPage = dynamic(
-  () => import("@/components/kanban/KanbanPage"),
-  { loading: () => <KanbanSkeleton /> },
-);
-const MindMapPage = dynamic(
-  () => import("@/components/mindmap/MindMapPage"),
-  { loading: () => <PageLoader /> },
-);
+const KanbanPage = dynamic(() => import("@/components/kanban/KanbanPage"), {
+  loading: () => <KanbanSkeleton />,
+});
+const MindMapPage = dynamic(() => import("@/components/mindmap/MindMapPage"), {
+  loading: () => <PageLoader />,
+});
 const CronogramaPage = dynamic(
   () => import("@/components/cronograma/CronogramaPage"),
   { loading: () => <TableSkeleton /> },
@@ -64,9 +62,7 @@ const TemplateModal = dynamic(
 const TaskDetailModal = dynamic(
   () => import("@/components/tasks/TaskDetailModal"),
 );
-const NewTaskModal = dynamic(
-  () => import("@/components/tasks/NewTaskModal"),
-);
+const NewTaskModal = dynamic(() => import("@/components/tasks/NewTaskModal"));
 
 // ── MAIN APP ──────────────────────────────────────────────────────────
 export default function GeoTask() {
@@ -74,15 +70,31 @@ export default function GeoTask() {
 
   // ── Zustand stores ──────────────────────────────────────────────────
   const {
-    user, loading: authLoading,
-    setUser, setLoading, logout, clearMustChangePassword,
+    user,
+    loading: authLoading,
+    setUser,
+    setLoading,
+    logout,
+    clearMustChangePassword,
   } = useAuthStore();
   const {
-    dark, page, sidebarOpen, settingsTab,
-    showNewTask, showMustChangePassword, showNotifPopover, showTemplateModal,
-    toggleDark, setPage, toggleSidebar, setSettingsTab,
-    setShowNewTask, setShowMustChangePassword,
-    setShowNotifPopover, toggleNotifPopover, setShowTemplateModal,
+    dark,
+    page,
+    sidebarOpen,
+    settingsTab,
+    showNewTask,
+    showMustChangePassword,
+    showNotifPopover,
+    showTemplateModal,
+    toggleDark,
+    setPage,
+    toggleSidebar,
+    setSettingsTab,
+    setShowNewTask,
+    setShowMustChangePassword,
+    setShowNotifPopover,
+    toggleNotifPopover,
+    setShowTemplateModal,
   } = useUIStore();
 
   // ── SWR hooks (cached data fetching) ────────────────────────────────
@@ -105,14 +117,18 @@ export default function GeoTask() {
   const mergedSectors = useMemo(() => {
     const combined = [...dbSectors];
     SECTORS.forEach((s) => {
-      if (!combined.some((ds: any) =>
-        (ds.name || ds).toLowerCase().trim() === s.toLowerCase().trim()))
-      {
+      if (
+        !combined.some(
+          (ds: any) =>
+            (ds.name || ds).toLowerCase().trim() === s.toLowerCase().trim(),
+        )
+      ) {
         combined.push({ id: s, name: s });
       }
     });
     return combined.sort((a: any, b: any) =>
-      String(a.name || a).localeCompare(String(b.name || b)));
+      String(a.name || a).localeCompare(String(b.name || b)),
+    );
   }, [dbSectors]);
 
   // ── Sync dark class on <html> for Tailwind dark: variants ──────────
@@ -124,7 +140,11 @@ export default function GeoTask() {
   useEffect(() => {
     const restoreSession = async () => {
       const saved = localStorage.getItem("geotask_user");
-      if (!saved) { setLoading(false); router.push("/login"); return; }
+      if (!saved) {
+        setLoading(false);
+        router.push("/login");
+        return;
+      }
       try {
         const parsed = JSON.parse(saved);
         if (!parsed?.id) throw new Error("invalid");
@@ -160,21 +180,38 @@ export default function GeoTask() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...newTask, created_by: user?.id }),
       });
-      if (res.ok) { setShowNewTask(false); mutateTasks(); }
-      else alert("Erro ao criar tarefa");
-    } catch (err) { console.error(err); alert("Erro ao criar tarefa"); }
+      if (res.ok) {
+        setShowNewTask(false);
+        mutateTasks();
+      } else alert("Erro ao criar tarefa");
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao criar tarefa");
+    }
   };
 
-  const handleUpdateTask = async (id: number, action: string, data: any = {}) => {
+  const handleUpdateTask = async (
+    id: number,
+    action: string,
+    data: any = {},
+  ) => {
     try {
-      if (action === "refresh") { mutateTasks(); return; }
+      if (action === "refresh") {
+        mutateTasks();
+        return;
+      }
       const res = await fetch("/api/tasks", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, action, user_id: user?.id, ...data }),
       });
-      if (res.ok) { mutateTasks(); setSelectedTask(null); }
-    } catch (err) { console.error(err); }
+      if (res.ok) {
+        mutateTasks();
+        setSelectedTask(null);
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const handleSaveTemplate = async (templateData: any) => {
@@ -200,8 +237,12 @@ export default function GeoTask() {
     return true;
   };
 
-  const canCreate = !!(user &&
-    ["Admin", "Gerente", "Gestor", "Coordenador"].includes(user.role?.name || ""));
+  const canCreate = !!(
+    user &&
+    ["Admin", "Gerente", "Gestor", "Coordenador"].includes(
+      user.role?.name || "",
+    )
+  );
 
   // ── Task visibility (role-based filtering) ──────────────────────────
   const isLiderado = user?.role?.name === "Liderado";
@@ -211,15 +252,21 @@ export default function GeoTask() {
 
   const visibleTasks = useMemo(() => {
     if (isLiderado && user) {
-      return tasks.filter((t: any) =>
-        t.responsible_id === user.id || t.responsible?.id === user.id ||
-        (t.subtasks || []).some((s: any) =>
-          s.responsible_id === user.id || s.responsible?.id === user.id));
+      return tasks.filter(
+        (t: any) =>
+          t.responsible_id === user.id ||
+          t.responsible?.id === user.id ||
+          (t.subtasks || []).some(
+            (s: any) =>
+              s.responsible_id === user.id || s.responsible?.id === user.id,
+          ),
+      );
     }
     if (isGestor) {
       return tasks.filter((t: any) => {
         const tSectorId = t.sector_id || t.sector?.id;
-        const tSectorName = typeof t.sector === "string" ? t.sector : t.sector?.name;
+        const tSectorName =
+          typeof t.sector === "string" ? t.sector : t.sector?.name;
         if (userSectorId && tSectorId) return tSectorId === userSectorId;
         if (userSectorName && tSectorName)
           return tSectorName.toLowerCase() === userSectorName.toLowerCase();
@@ -249,8 +296,12 @@ export default function GeoTask() {
     { id: "cronograma", label: "Cronograma", icon: Calendar },
     { id: "mindmap", label: "Mapa de Tarefas", icon: FileText },
     { id: "notifications", label: "Notificações", icon: Bell },
-    ...(canAccess("templates") ? [{ id: "templates", label: "Templates", icon: FileText }] : []),
-    ...(canAccess("settings") ? [{ id: "settings", label: "Configurações", icon: Settings }] : []),
+    ...(canAccess("templates")
+      ? [{ id: "templates", label: "Templates", icon: FileText }]
+      : []),
+    ...(canAccess("settings")
+      ? [{ id: "settings", label: "Configurações", icon: Settings }]
+      : []),
   ].filter(({ id }) => {
     if (id === "settings") return !!user;
     if (id === "dashboard") {
@@ -274,7 +325,10 @@ export default function GeoTask() {
         navItems={navItems}
         unreadCount={unreadCount}
         setPage={setPage}
-        onLogout={() => { logout(); router.push("/login"); }}
+        onLogout={() => {
+          logout();
+          router.push("/login");
+        }}
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -297,61 +351,146 @@ export default function GeoTask() {
         {/* ── PAGE CONTENT ──────────────────────────────────────────── */}
         <div className="flex-1 overflow-auto p-6">
           {page === "dashboard" && (
-            <DashboardPage T={T} tasks={visibleTasks} user={user} onSelect={setSelectedTask}
-              users={dbUsers} contracts={contracts} citiesNeighborhoods={citiesNeighborhoods} sectors={mergedSectors} />
+            <DashboardPage
+              T={T}
+              tasks={visibleTasks}
+              user={user}
+              onSelect={setSelectedTask}
+              users={dbUsers}
+              contracts={contracts}
+              citiesNeighborhoods={citiesNeighborhoods}
+              sectors={mergedSectors}
+            />
           )}
           {page === "kanban" && (
-            <KanbanPage T={T} tasks={visibleTasks} user={user} onSelect={setSelectedTask}
-              canCreate={canCreate} onNew={() => setShowNewTask(true)}
-              users={dbUsers} contracts={contracts} citiesNeighborhoods={citiesNeighborhoods} sectors={mergedSectors} />
+            <KanbanPage
+              T={T}
+              tasks={visibleTasks}
+              user={user}
+              onSelect={setSelectedTask}
+              canCreate={canCreate}
+              onNew={() => setShowNewTask(true)}
+              users={dbUsers}
+              contracts={contracts}
+              citiesNeighborhoods={citiesNeighborhoods}
+              sectors={mergedSectors}
+            />
           )}
           {page === "map" && (
             <div className="flex h-full items-center justify-center text-slate-500 dark:text-gray-400">
               Interface do Mapa em desenvolvimento.
             </div>
           )}
-          {page === "mindmap" && <MindMapPage tasks={visibleTasks} users={dbUsers} />}
+          {page === "mindmap" && (
+            <MindMapPage
+              T={T}
+              tasks={visibleTasks}
+              users={dbUsers}
+              contracts={contracts}
+              citiesNeighborhoods={citiesNeighborhoods}
+            />
+          )}
           {page === "cronograma" && (
-            <CronogramaPage T={T} tasks={visibleTasks} onSelect={setSelectedTask}
-              users={dbUsers} contracts={contracts} citiesNeighborhoods={citiesNeighborhoods} sectors={mergedSectors} />
+            <CronogramaPage
+              T={T}
+              tasks={visibleTasks}
+              onSelect={setSelectedTask}
+              users={dbUsers}
+              contracts={contracts}
+              citiesNeighborhoods={citiesNeighborhoods}
+              sectors={mergedSectors}
+            />
           )}
           {page === "templates" && canAccess("templates") && (
-            <TemplatesPage active={activeTemplate} setActive={setActiveTemplate} templates={templates}
-              onCreate={() => { setEditingTemplate(null); setShowTemplateModal(true); }}
-              onEdit={(tpl: any) => { setEditingTemplate(tpl); setShowTemplateModal(true); }}
-              onDelete={handleDeleteTemplate} />
+            <TemplatesPage
+              active={activeTemplate}
+              setActive={setActiveTemplate}
+              templates={templates}
+              onCreate={() => {
+                setEditingTemplate(null);
+                setShowTemplateModal(true);
+              }}
+              onEdit={(tpl: any) => {
+                setEditingTemplate(tpl);
+                setShowTemplateModal(true);
+              }}
+              onDelete={handleDeleteTemplate}
+            />
           )}
           {page === "settings" && canAccess("settings") && (
-            <SettingsPage T={T} tab={settingsTab} setTab={setSettingsTab} currentUser={user as any} />
+            <SettingsPage
+              T={T}
+              tab={settingsTab}
+              setTab={setSettingsTab}
+              currentUser={user as any}
+            />
           )}
           {page === "notifications" && (
-            <NotificationsPage dark={dark} notifications={notifications} tasks={tasks}
-              unreadCount={unreadCount} markRead={markRead} markAllRead={markAllRead} setSelectedTask={setSelectedTask} />
+            <NotificationsPage
+              dark={dark}
+              notifications={notifications}
+              tasks={tasks}
+              unreadCount={unreadCount}
+              markRead={markRead}
+              markAllRead={markAllRead}
+              setSelectedTask={setSelectedTask}
+            />
           )}
         </div>
       </div>
 
       {/* ── MODALS ─────────────────────────────────────────────────── */}
       {selectedTask && (
-        <TaskDetailModal T={T} task={selectedTask} user={user}
-          onClose={() => setSelectedTask(null)} onUpdate={handleUpdateTask}
-          users={dbUsers} contracts={contracts} citiesNeighborhoods={citiesNeighborhoods}
-          tasks={tasks} setSelectedTask={setSelectedTask} sectors={mergedSectors} />
+        <TaskDetailModal
+          T={T}
+          task={selectedTask}
+          user={user}
+          onClose={() => setSelectedTask(null)}
+          onUpdate={handleUpdateTask}
+          users={dbUsers}
+          contracts={contracts}
+          citiesNeighborhoods={citiesNeighborhoods}
+          tasks={tasks}
+          setSelectedTask={setSelectedTask}
+          sectors={mergedSectors}
+        />
       )}
       {showNewTask && (
-        <NewTaskModal T={T} onClose={() => setShowNewTask(false)} onSave={handleCreateTask}
-          users={dbUsers} contracts={contracts} citiesNeighborhoods={citiesNeighborhoods}
-          templates={templates} sectors={mergedSectors} />
+        <NewTaskModal
+          T={T}
+          onClose={() => setShowNewTask(false)}
+          onSave={handleCreateTask}
+          users={dbUsers}
+          contracts={contracts}
+          citiesNeighborhoods={citiesNeighborhoods}
+          templates={templates}
+          sectors={mergedSectors}
+        />
       )}
       {showMustChangePassword && user && (
-        <ChangePasswordModal isOpen={showMustChangePassword}
-          onClose={() => { setShowMustChangePassword(false); clearMustChangePassword(); }}
-          userId={user.id} userName={user.name} T={T} isAdmin={false} isMandatory={true} />
+        <ChangePasswordModal
+          isOpen={showMustChangePassword}
+          onClose={() => {
+            setShowMustChangePassword(false);
+            clearMustChangePassword();
+          }}
+          userId={user.id}
+          userName={user.name}
+          T={T}
+          isAdmin={false}
+          isMandatory={true}
+        />
       )}
       {showTemplateModal && (
-        <TemplateModal template={editingTemplate}
-          onClose={() => { setShowTemplateModal(false); setEditingTemplate(null); }}
-          onSave={handleSaveTemplate} sectors={mergedSectors.map((s: any) => s.name)} />
+        <TemplateModal
+          template={editingTemplate}
+          onClose={() => {
+            setShowTemplateModal(false);
+            setEditingTemplate(null);
+          }}
+          onSave={handleSaveTemplate}
+          sectors={mergedSectors.map((s: any) => s.name)}
+        />
       )}
     </div>
   );

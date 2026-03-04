@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -lh \"C:/Users/viniciusaraujo/Documents/GDrive/projects/GeoTask-Pro/geotask-pro\"/*.txt)",
+      "Bash(npm install bcryptjs zod swr zustand @types/bcryptjs)",
+      "Bash(npm uninstall ws dotenv)",
+      "Bash(npx prisma generate)",
+      "Bash(npx tsc --noEmit --pretty src/components/kanban/KanbanPage.tsx)",
+      "Bash(npx tsc --noEmit --pretty src/components/tasks/NewTaskModal.tsx)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(npx tsc --noEmit --pretty)",
+      "Bash(npx tsc --noEmit --pretty src/components/dashboard/DashboardPage.tsx)",
+      "Bash(npm run build)",
+      "Bash(npm install -D vitest @vitejs/plugin-react)",
+      "Bash(npx vitest run)",
+      "Bash(npm install --save-dev @types/pg)",
+      "Bash(npm uninstall @types/pg)",
+      "Bash(npx next build)",
+      "Bash(npx prisma db push)",
+      "Bash(git add .gitignore package.json package-lock.json prisma/schema.prisma tsconfig.json vitest.config.ts src/app/globals.css src/app/page.tsx src/app/error.tsx src/app/loading.tsx src/app/api/ src/app/components/SettingsPage.tsx src/components/ src/hooks/ src/lib/ src/middleware.ts src/stores/ src/types/)",
+      "Bash(git add dist-seed/seed.js migrate_reset_error.txt \"prismaschema.prisma\\\\xef\\\\x80\\\\xb73\" sector_grep.txt seed_error.txt seed_error_2.txt seed_error_3.txt seed_error_4.txt seed_error_5.txt src/app/oldpage.tsx tsc_output.txt tsc_output_2.txt)",
+      "Bash(git add dist-seed/seed.js migrate_reset_error.txt sector_grep.txt seed_error.txt seed_error_2.txt seed_error_3.txt seed_error_4.txt seed_error_5.txt src/app/oldpage.tsx tsc_output.txt tsc_output_2.txt)",
+      "Bash(git add -u \"prismaschema.prisma*\")",
+      "Bash(git commit:*)",
+      "Bash(git add src/app/globals.css src/components/mindmap/MindMapPage.tsx src/components/cronograma/CronogramaPage.tsx src/components/tasks/NewTaskModal.tsx src/components/dashboard/DashboardPage.tsx src/app/page.tsx)",
+      "Bash(git add src/app/page.tsx src/components/AIReportModal.tsx src/components/cronograma/CronogramaPage.tsx src/components/dashboard/DashboardPage.tsx src/components/kanban/KanbanPage.tsx src/components/mindmap/MindMapPage.tsx src/components/tasks/NewTaskModal.tsx src/components/tasks/TaskDetailModal.tsx src/lib/exportUtils.ts src/lib/helpers.ts src/types/index.ts)",
+      "Bash(npm test)"
+    ]
+  }
+}

@@ -1,197 +1,45 @@
 "use client";
 
-import {
-  Check,
-  ChevronDown,
-  ChevronUp,
-  FileText,
-  Filter,
-  Search,
-} from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { TaskFilters } from "@/components/shared/TaskFilters";
+import { exportToExcel, getKpiData, type ExportKPIs } from "@/lib/exportUtils";
+import type {
+  CitiesNeighborhoods,
+  Sector,
+  Task,
+  ThemeColors,
+  User,
+} from "@/types";
+import { FileText } from "lucide-react";
+import { useState } from "react";
 import { DateRange } from "react-day-picker";
-import { TASK_TYPES } from "@/lib/constants";
-import { exportToExcel, exportToPDF, getKpiData, type ExportKPIs } from "@/lib/exportUtils";
-import { DatePicker } from "@/app/components/DatePicker";
-import type { Task, User, Sector, ThemeColors, CitiesNeighborhoods } from "@/types";
 
 // ── ExportButtons (inline) ───────────────────────────────────────
-const ExportButtons = ({ filtered, kpi, users, user, filterLabel }: { filtered: Task[]; kpi: ExportKPIs; users: User[]; user?: User; filterLabel?: string }) => (
+const ExportButtons = ({
+  filtered,
+  kpi,
+  users,
+  user,
+  filterLabel,
+}: {
+  filtered: Task[];
+  kpi: ExportKPIs;
+  users: User[];
+  user?: User;
+  filterLabel?: string;
+}) => (
   <div className="flex items-center gap-2">
     <button
-      onClick={() => exportToExcel(filtered, kpi, user, filterLabel)}
+      onClick={() =>
+        exportToExcel(filtered, kpi, user, filterLabel, "cronograma")
+      }
       className="flex items-center gap-1 rounded-lg border-none bg-emerald-500 px-3 py-1.5 text-[11px] font-semibold text-white transition-[filter] duration-100 cursor-pointer hover:brightness-90"
     >
       <FileText size={13} /> EXCEL
     </button>
-    <button
-      onClick={() => exportToPDF(filtered, kpi, users, user, filterLabel)}
-      className="flex items-center gap-1 rounded-lg border-none bg-red-500 px-3 py-1.5 text-[11px] font-semibold text-white transition-[filter] duration-100 cursor-pointer hover:brightness-90"
-    >
-      <FileText size={13} /> PDF
-    </button>
   </div>
 );
 
-// ── MultiSelect (inline) ─────────────────────────────────────────
-function MultiSelect({
-  val = [],
-  onChange,
-  opts,
-  placeholder = "",
-}: {
-  val: string[];
-  onChange: (v: string[]) => void;
-  opts: string[];
-  placeholder?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
-      ) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const toggle = (opt: string) => {
-    if (val.includes(opt)) {
-      onChange(val.filter((x) => x !== opt));
-    } else {
-      onChange([...val, opt]);
-    }
-  };
-
-  return (
-    <div ref={containerRef} className="relative">
-      <div
-        onClick={() => setOpen(!open)}
-        className={`flex min-w-[140px] max-w-[200px] cursor-pointer items-center justify-between rounded-lg px-2.5 py-1.5 text-xs border ${
-          val.length > 0
-            ? "border-primary text-primary"
-            : "border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400"
-        } bg-white dark:bg-gray-800`}
-      >
-        <span className="truncate">
-          {val.length === 0
-            ? placeholder
-            : val.length === 1
-              ? val[0]
-              : `${val.length} selecionados`}
-        </span>
-        <ChevronDown size={14} />
-      </div>
-
-      {open && (
-        <div className="absolute top-full left-0 z-[9999] mt-1 min-w-[180px] max-h-[300px] overflow-y-auto rounded-lg p-1.5 shadow-[0_10px_30px_rgba(0,0,0,0.15)] bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700">
-          {opts.map((o: string | { name?: string; label?: string; id?: string | number; value?: string | number }, i: number) => {
-            const label = typeof o === "object" ? o.name || o.label : o;
-            const value = String(typeof o === "object" ? o.id || o.value || "" : o);
-            const selected = val.includes(value);
-            const key =
-              typeof o === "object"
-                ? o.id || o.name || `mopt-${i}`
-                : `mopt-${o}-${i}`;
-
-            return (
-              <div
-                key={key}
-                onClick={() => toggle(value)}
-                className={`flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-slate-900 dark:text-gray-50 hover:bg-slate-100 dark:hover:bg-gray-700 ${
-                  selected ? "bg-primary/[0.07]" : "bg-transparent"
-                }`}
-              >
-                <div
-                  className={`flex h-3.5 w-3.5 items-center justify-center rounded-sm border ${
-                    selected
-                      ? "border-primary bg-primary"
-                      : "border-slate-500 dark:border-gray-400 bg-transparent"
-                  }`}
-                >
-                  {selected && <Check size={10} color="white" />}
-                </div>
-                <span>{label}</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── FilterSelect (inline) ────────────────────────────────────────
-function FilterSelect({
-  T,
-  val,
-  onChange,
-  opts,
-  placeholder = "",
-  label = "",
-}: { T: ThemeColors; val: string; onChange: (v: string) => void; opts: { label: string; value: string }[]; placeholder?: string; label?: string }) {
-  return (
-    <select
-      value={val}
-      onChange={(e) => onChange(e.target.value)}
-      className={`max-w-[170px] cursor-pointer rounded-lg px-2.5 py-1.5 text-xs outline-none border ${
-        val
-          ? "border-primary text-primary"
-          : "border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400"
-      } bg-white dark:bg-gray-800`}
-    >
-      <option value="">{placeholder || label}</option>
-      {opts.map((o: string | { name?: string; label?: string; id?: string | number; value?: string | number }, i: number) => {
-        const label = typeof o === "object" ? o.name || o.label : o;
-        const value = typeof o === "object" ? o.id || o.value : o;
-        const key =
-          typeof o === "object"
-            ? o.id || o.name || `fopt-${i}`
-            : `fopt-${o}-${i}`;
-        return (
-          <option key={key} value={value}>
-            {label}
-          </option>
-        );
-      })}
-    </select>
-  );
-}
-
-// ── DateRangePicker (inline) ─────────────────────────────────────
-function DateRangePicker({ date, setDate, label, T }: { date: DateRange | undefined; setDate: (d: DateRange | undefined) => void; label: string; T: ThemeColors }) {
-  return (
-    <div className="flex flex-col gap-1">
-      <label className="text-[11px] font-bold text-slate-500 dark:text-gray-400">
-        {label}
-      </label>
-      <div className="flex gap-2">
-        <div className="flex-1">
-          <DatePicker
-            T={T}
-            date={date?.from}
-            setDate={(d) => setDate({ ...date, from: d })}
-            label=""
-          />
-        </div>
-        <div className="flex-1">
-          <DatePicker
-            T={T}
-            date={date?.to}
-            setDate={(d) => setDate({ from: date?.from, to: d })}
-            label=""
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
+// Shared components used from TaskFilters.tsx
 
 // ── CronogramaPage ───────────────────────────────────────────────
 interface CronogramaPageProps {
@@ -239,9 +87,13 @@ export default function CronogramaPage({
     const sectorVal =
       t.sector && typeof t.sector === "object" ? t.sector.name : t.sector || "";
     if (fSector.length > 0 && !fSector.includes(sectorVal)) return false;
-    const contractVal = t.contract && typeof t.contract === "object" ? t.contract.name : t.contract || "";
+    const contractVal =
+      t.contract && typeof t.contract === "object"
+        ? t.contract.name
+        : t.contract || "";
     if (fContract && contractVal !== fContract) return false;
-    const cityVal = t.city && typeof t.city === "object" ? t.city.name : t.city || "";
+    const cityVal =
+      t.city && typeof t.city === "object" ? t.city.name : t.city || "";
     if (fCity && cityVal !== fCity) return false;
     if (fNeighbor && t.nucleus !== fNeighbor) return false;
     if (fPriority && t.priority !== fPriority) return false;
@@ -313,165 +165,32 @@ export default function CronogramaPage({
         />
       </div>
 
-      {/* Filters */}
-      <div className="mb-5">
-        <div className="mb-2.5 flex gap-2.5">
-          <div className="flex flex-1 items-center gap-2.5 rounded-lg px-3 bg-slate-100 dark:bg-gray-700 border border-slate-200 dark:border-gray-700">
-            <Search size={16} className="text-slate-500 dark:text-gray-400" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar tarefa..."
-              className="w-full border-none bg-transparent py-2.5 text-[13px] outline-none text-slate-900 dark:text-gray-50"
-            />
-          </div>
-          <button
-            onClick={() => setFiltersOpen(!filtersOpen)}
-            className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-4 text-[13px] font-semibold border ${
-              filtersOpen
-                ? "bg-primary border-primary text-white"
-                : "bg-white dark:bg-gray-800 border-slate-200 dark:border-gray-700 text-slate-900 dark:text-gray-50"
-            }`}
-          >
-            <Filter size={14} />
-            Filtros
-            {activeAdvancedFilters > 0 && (
-              <span
-                className={`ml-0.5 rounded-[10px] px-[5px] py-px text-[10px] ${
-                  filtersOpen
-                    ? "bg-white text-primary"
-                    : "bg-primary text-white"
-                }`}
-              >
-                {activeAdvancedFilters}
-              </span>
-            )}
-            {filtersOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-          </button>
-        </div>
-
-        {filtersOpen && (
-          <div className="grid grid-cols-4 gap-3 rounded-xl p-4 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700">
-            {[
-              {
-                l: "Setor",
-                v: fSector,
-                s: setFSector,
-                o: sectors.map((s: Sector | string) =>
-                  typeof s === "object" ? s.name : s,
-                ),
-                isMulti: true,
-              },
-              {
-                l: "Prioridade",
-                v: fPriority,
-                s: setFPriority,
-                o: ["Baixa", "Média", "Alta", "Urgente"].map((p) => ({
-                  label: p,
-                  value: p,
-                })),
-              },
-              {
-                l: "Tipo",
-                v: fType,
-                s: setFType,
-                o: TASK_TYPES.map((t) => ({ label: t, value: t })),
-              },
-              {
-                l: "Contrato",
-                v: fContract,
-                s: setFContract,
-                o: contracts.map((c: string) => ({
-                  label: c,
-                  value: c,
-                })),
-              },
-              {
-                l: "Cidade",
-                v: fCity,
-                s: setFCity,
-                o: Object.keys(citiesNeighborhoods).map((c) => ({
-                  label: c,
-                  value: c,
-                })),
-              },
-              {
-                l: "Bairro / Núcleo",
-                v: fNeighbor,
-                s: setFNeighbor,
-                o: cityNeighborhoods.map((n: string) => ({
-                  label: n,
-                  value: n,
-                })),
-                disabled: !fCity,
-              },
-              {
-                l: "Prazo de Entrega",
-                v: fDateFrom,
-                s: setFDateFrom,
-                type: "date-range",
-              },
-              {
-                l: "Data de Criação",
-                v: fDateTo,
-                s: setFDateTo,
-                type: "date-range",
-              },
-            ].map((f, i) => {
-              /* eslint-disable @typescript-eslint/no-explicit-any */
-              const fa = f as Record<string, any>;
-              return (
-                <div key={i}>
-                  {fa.type === "date-range" ? (
-                    <DateRangePicker date={fa.v as DateRange | undefined} setDate={fa.s} label={fa.l as string} T={T} />
-                  ) : (
-                    <>
-                      <label className="mb-1 block text-[11px] font-bold text-slate-500 dark:text-gray-400">
-                        {fa.l as string}
-                      </label>
-                      {fa.isMulti ? (
-                        <MultiSelect
-                          val={fa.v as string[]}
-                          onChange={fa.s}
-                          opts={fa.o as string[]}
-                          placeholder={fa.l as string}
-                        />
-                      ) : (
-                        <select
-                          value={fa.v as string}
-                          onChange={(e) => fa.s(e.target.value)}
-                          disabled={!!fa.disabled}
-                          className={`w-full rounded-lg p-2 text-[13px] border ${
-                            fa.disabled
-                              ? "border-slate-200 dark:border-gray-700 bg-slate-50 dark:bg-gray-900 text-slate-500 dark:text-gray-400"
-                              : "border-slate-200 dark:border-gray-700 bg-slate-100 dark:bg-gray-700 text-slate-900 dark:text-gray-50"
-                          }`}
-                        >
-                          <option value="">Todos</option>
-                          {(fa.o as { label: string; value: string }[] | undefined)?.map((opt: { label: string; value: string }) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </>
-                  )}
-                </div>
-              );
-              /* eslint-enable @typescript-eslint/no-explicit-any */
-            })}
-            <div className="col-span-full mt-2 flex justify-end">
-              <button
-                onClick={clearAll}
-                className="cursor-pointer border-none bg-transparent px-4 py-2 text-[13px] font-semibold text-red-500"
-              >
-                Limpar Filtros
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+      <TaskFilters
+        T={T}
+        search={search}
+        setSearch={setSearch}
+        sector={fSector}
+        setSector={setFSector}
+        priority={fPriority}
+        setPriority={setFPriority}
+        type={fType}
+        setType={setFType}
+        contract={fContract}
+        setContract={setFContract}
+        city={fCity}
+        setCity={setFCity}
+        neighbor={fNeighbor}
+        setNeighbor={setFNeighbor}
+        dateFrom={fDateFrom}
+        setDateFrom={setFDateFrom}
+        dateTo={fDateTo}
+        setDateTo={setFDateTo}
+        contracts={contracts}
+        citiesNeighborhoods={citiesNeighborhoods}
+        onClear={clearAll}
+        totalTasks={tasks.length}
+        filteredTasks={filtered.length}
+      />
 
       <div className="mb-4 flex flex-wrap gap-4 rounded-[10px] px-3.5 py-2.5 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700">
         {evts.map((e) => (
@@ -480,7 +199,9 @@ export default function CronogramaPage({
               className="h-[9px] w-[9px] rounded-full"
               style={{ background: e.c }}
             />
-            <span className="text-[11px] text-slate-500 dark:text-gray-400">{e.l}</span>
+            <span className="text-[11px] text-slate-500 dark:text-gray-400">
+              {e.l}
+            </span>
           </div>
         ))}
       </div>
@@ -552,27 +273,38 @@ export default function CronogramaPage({
                       Histórico de Pausas
                     </div>
                     <div className="flex gap-2">
-                      {t.pauses.map((p: { started_at: string; ended_at?: string }, pi: number) => (
-                        <div
-                          key={pi}
-                          className="whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] text-slate-500 dark:text-gray-400 bg-slate-100 dark:bg-gray-700"
-                        >
-                          {new Date(p.started_at).toLocaleDateString("pt-BR", {
-                            day: "2-digit",
-                            month: "2-digit",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}{" "}
-                          {p.ended_at
-                            ? new Date(p.ended_at).toLocaleDateString("pt-BR", {
+                      {t.pauses.map(
+                        (
+                          p: { started_at: string; ended_at?: string },
+                          pi: number,
+                        ) => (
+                          <div
+                            key={pi}
+                            className="whitespace-nowrap rounded px-1.5 py-0.5 text-[10px] text-slate-500 dark:text-gray-400 bg-slate-100 dark:bg-gray-700"
+                          >
+                            {new Date(p.started_at).toLocaleDateString(
+                              "pt-BR",
+                              {
                                 day: "2-digit",
                                 month: "2-digit",
                                 hour: "2-digit",
                                 minute: "2-digit",
-                              })
-                            : "Agora"}
-                        </div>
-                      ))}
+                              },
+                            )}{" "}
+                            {p.ended_at
+                              ? new Date(p.ended_at).toLocaleDateString(
+                                  "pt-BR",
+                                  {
+                                    day: "2-digit",
+                                    month: "2-digit",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  },
+                                )
+                              : "Agora"}
+                          </div>
+                        ),
+                      )}
                     </div>
                   </div>
                 </>

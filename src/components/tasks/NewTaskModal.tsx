@@ -1,20 +1,20 @@
 "use client";
 
-import { Check, Link, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
 import { DatePicker } from "@/app/components/DatePicker";
 import { FormField } from "@/components/ui/FormField";
 import { FormInput, FormTextarea } from "@/components/ui/FormInput";
 import { FormSelect } from "@/components/ui/FormSelect";
-import { TASK_TYPES, PRIORITIES } from "@/lib/constants";
+import { PRIORITIES, TASK_TYPES } from "@/lib/constants";
 import { type ThemeColors, parseDateStr } from "@/lib/helpers";
 import type {
-  User,
+  CitiesNeighborhoods,
   Sector,
   Template,
   TemplateTask,
-  CitiesNeighborhoods,
+  User,
 } from "@/types";
+import { Check, Link, Plus, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 // ── Local types for form state ───────────────────────────────────────
 
@@ -132,7 +132,8 @@ export default function NewTaskModal({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [selectedTemplate, setSelectedTemplate] = useState("");
 
-  const set = (k: string, v: string) => setForm((prev) => ({ ...prev, [k]: v }));
+  const set = (k: string, v: string) =>
+    setForm((prev) => ({ ...prev, [k]: v }));
 
   const applyTemplate = (tplId: string) => {
     setSelectedTemplate(tplId);
@@ -148,7 +149,9 @@ export default function NewTaskModal({
       typeof tpl.sector === "object" ? tpl.sector : null;
     const templateSectorName: string | undefined = templateSectorObj
       ? templateSectorObj.name
-      : typeof tpl.sector === "string" ? tpl.sector : undefined;
+      : typeof tpl.sector === "string"
+        ? tpl.sector
+        : undefined;
     const templateSectorId = templateSectorObj
       ? templateSectorObj.id
       : tpl.sector_id;
@@ -188,7 +191,9 @@ export default function NewTaskModal({
         ...(firstTask?.subtasks || []).map((s: EnrichedTemplateSubtask) => {
           // Priority: subtask's own sector -> main task's sector
           const sVal =
-            (typeof s.sector === "object" ? s.sector?.id || s.sector?.name : s.sector) || s.sector_id;
+            (typeof s.sector === "object"
+              ? s.sector?.id || s.sector?.name
+              : s.sector) || s.sector_id;
           const fs = sectors.find(
             (sec: Sector) =>
               String(sec.id) === String(sVal) ||
@@ -199,7 +204,10 @@ export default function NewTaskModal({
           );
 
           // Priority: subtask's own responsible -> main task's responsible
-          const sResp = (typeof s.responsible === "object" ? s.responsible?.name : s.responsible) || responsible;
+          const sResp =
+            (typeof s.responsible === "object"
+              ? s.responsible?.name
+              : s.responsible) || responsible;
 
           return {
             id: Date.now() + Math.random(),
@@ -215,12 +223,15 @@ export default function NewTaskModal({
           } as SubtaskDraft;
         }),
         // Include subsequent tasks as subtasks (legacy behavior)
-        ...(tpl.tasks || []).slice(1).map((t: TemplateTask) => ({
-          id: Date.now() + Math.random(),
-          title: t.title,
-          sector: foundSector ? String(foundSector.id) : "",
-          responsible,
-        } as SubtaskDraft)),
+        ...(tpl.tasks || []).slice(1).map(
+          (t: TemplateTask) =>
+            ({
+              id: Date.now() + Math.random(),
+              title: t.title,
+              sector: foundSector ? String(foundSector.id) : "",
+              responsible,
+            }) as SubtaskDraft,
+        ),
       ],
     }));
   };
@@ -354,9 +365,7 @@ export default function NewTaskModal({
         {/* Template selector */}
         <div
           className={`px-[22px] py-2.5 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2.5 shrink-0 ${
-            selectedTemplate
-              ? "bg-primary/[0.07]"
-              : "bg-white dark:bg-gray-900"
+            selectedTemplate ? "bg-primary/[0.07]" : "bg-white dark:bg-gray-900"
           }`}
         >
           <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 whitespace-nowrap">
@@ -433,10 +442,10 @@ export default function NewTaskModal({
                   T={T}
                   value={form.title}
                   onChange={(v) => set("title", v)}
-                  placeholder="Ex: Vistoria de regulariza\u00E7\u00E3o"
+                  placeholder="Ex: Vistoria de regularização"
                 />
               </FormField>
-              <FormField label="Descri\u00E7\u00E3o">
+              <FormField label="Descrição">
                 <FormTextarea
                   T={T}
                   value={form.description}
@@ -511,7 +520,7 @@ export default function NewTaskModal({
                   placeholder="Selecione a cidade..."
                 />
               </FormField>
-              <FormField label="Bairro / N\u00FAcleo">
+              <FormField label="Bairro / Núcleo">
                 <FormSelect
                   T={T}
                   val={form.nucleus}
@@ -618,7 +627,7 @@ export default function NewTaskModal({
             <>
               <div className="bg-primary/[0.07] border border-primary/20 rounded-[10px] p-3">
                 <div className="text-[11px] font-bold text-primary mb-1.5 uppercase">
-                  {"\u2139\uFE0F"} Heran\u00E7a autom\u00E1tica
+                  {"\u2139\uFE0F"} Herança automática
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {[
@@ -636,7 +645,8 @@ export default function NewTaskModal({
                       {k}:{" "}
                       <b className="text-gray-900 dark:text-gray-50">
                         {typeof v === "object"
-                          ? (v as Record<string, string>).name || JSON.stringify(v)
+                          ? (v as Record<string, string>).name ||
+                            JSON.stringify(v)
                           : v}
                       </b>
                     </span>
@@ -666,9 +676,7 @@ export default function NewTaskModal({
                             String(sec.name).toLowerCase().trim() ===
                               String(sVal).toLowerCase().trim(),
                         );
-                        return found
-                          ? found.name
-                          : sVal || "—";
+                        return found ? found.name : sVal || "—";
                       })()}
                       {s.responsible
                         ? ` \u00B7 ${(() => {
@@ -706,7 +714,11 @@ export default function NewTaskModal({
                     <FormInput
                       T={T}
                       value={subForm.title || ""}
-                      onChange={(v) => setSubForm((f: SubForm | null) => f ? ({ ...f, title: v }) : f)}
+                      onChange={(v) =>
+                        setSubForm((f: SubForm | null) =>
+                          f ? { ...f, title: v } : f,
+                        )
+                      }
                       placeholder="T\u00EDtulo da subtarefa"
                     />
                   </FormField>
@@ -715,7 +727,9 @@ export default function NewTaskModal({
                       T={T}
                       value={subForm.description || ""}
                       onChange={(v) =>
-                        setSubForm((f: SubForm | null) => f ? ({ ...f, description: v }) : f)
+                        setSubForm((f: SubForm | null) =>
+                          f ? { ...f, description: v } : f,
+                        )
                       }
                       rows={2}
                       placeholder="Descri\u00E7\u00E3o (opcional)"
@@ -727,11 +741,15 @@ export default function NewTaskModal({
                         T={T}
                         val={subForm.sector || ""}
                         onChange={(v) =>
-                          setSubForm((f: SubForm | null) => f ? ({
-                            ...f,
-                            sector: v,
-                            responsible: "",
-                          }) : f)
+                          setSubForm((f: SubForm | null) =>
+                            f
+                              ? {
+                                  ...f,
+                                  sector: v,
+                                  responsible: "",
+                                }
+                              : f,
+                          )
                         }
                         opts={sectors}
                       />
@@ -741,7 +759,9 @@ export default function NewTaskModal({
                         T={T}
                         val={subForm.responsible || ""}
                         onChange={(v) =>
-                          setSubForm((f: SubForm | null) => f ? ({ ...f, responsible: v }) : f)
+                          setSubForm((f: SubForm | null) =>
+                            f ? { ...f, responsible: v } : f,
+                          )
                         }
                         opts={subSectorUsers.map((u: User) => u.name)}
                         placeholder={
@@ -803,7 +823,7 @@ export default function NewTaskModal({
               onClick={next}
               className="px-[22px] py-[9px] bg-primary text-white border-none rounded-lg text-[13px] font-semibold cursor-pointer"
             >
-              Pr\u00F3ximo {"\u2192"}
+              Próximo {"\u2192"}
             </button>
           ) : (
             <button
@@ -812,21 +832,23 @@ export default function NewTaskModal({
                 const respUser = users.find(
                   (u: User) => u.name === form.responsible,
                 );
-                const resolvedSubtasks = (form.subtasks || []).map((s: SubtaskDraft) => {
-                  const subUser = users.find(
-                    (u: User) => u.name === s.responsible,
-                  );
-                  // Handle sector_id or sector name
-                  const sId = !isNaN(Number(s.sector))
-                    ? Number(s.sector)
-                    : null;
-                  return {
-                    ...s,
-                    responsible_id: subUser?.id ?? null,
-                    sector_id: sId,
-                    sector: sId ? undefined : s.sector,
-                  };
-                });
+                const resolvedSubtasks = (form.subtasks || []).map(
+                  (s: SubtaskDraft) => {
+                    const subUser = users.find(
+                      (u: User) => u.name === s.responsible,
+                    );
+                    // Handle sector_id or sector name
+                    const sId = !isNaN(Number(s.sector))
+                      ? Number(s.sector)
+                      : null;
+                    return {
+                      ...s,
+                      responsible_id: subUser?.id ?? null,
+                      sector_id: sId,
+                      sector: sId ? undefined : s.sector,
+                    };
+                  },
+                );
 
                 const sectorId = !isNaN(Number(form.sector))
                   ? Number(form.sector)
@@ -838,7 +860,7 @@ export default function NewTaskModal({
                   today.setHours(0, 0, 0, 0);
                   const deadlineDate = parseDateStr(form.deadline);
                   if (deadlineDate && deadlineDate < today) {
-                    alert("O prazo n\u00E3o pode ser menor que hoje.");
+                    alert("O prazo não pode ser menor que hoje.");
                     return;
                   }
                 }

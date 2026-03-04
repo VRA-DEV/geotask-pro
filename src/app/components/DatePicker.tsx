@@ -79,18 +79,12 @@ export function DatePicker({
       </label>
       <div
         onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-2 h-10 px-3 rounded-xl border cursor-pointer transition-all hover:border-slate-300 dark:hover:border-gray-600"
         style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "6px 10px",
           background: T.card,
-          border: `1px solid ${T.border}`,
-          borderRadius: 8,
-          cursor: "pointer",
-          fontSize: 13,
+          borderColor: T.border,
           color: date ? T.text : T.sub,
-          minWidth: 140,
+          fontSize: 13,
         }}
       >
         <CalendarIcon size={14} color={T.sub} />

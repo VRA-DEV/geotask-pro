@@ -1,5 +1,17 @@
 "use client";
 
+import { DatePicker } from "@/app/components/DatePicker";
+import { PRIO_COLOR, STATUS_COLOR } from "@/lib/constants";
+import { exportToExcel, getKpiData } from "@/lib/exportUtils";
+import { fmtTime, getTaskState, parseDate, sectorDisplay } from "@/lib/helpers";
+import type {
+  CitiesNeighborhoods,
+  Sector,
+  Subtask,
+  Task,
+  ThemeColors,
+  User as UserType,
+} from "@/types";
 import {
   Building2,
   Calendar,
@@ -7,35 +19,13 @@ import {
   ChevronDown,
   Clock,
   FileText,
-  Filter,
   MapPin,
   Plus,
-  Search,
   User,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { DateRange } from "react-day-picker";
-import { DatePicker } from "@/app/components/DatePicker";
-import { exportToExcel, exportToPDF, getKpiData } from "@/lib/exportUtils";
-import {
-  STATUS_COLOR,
-  PRIO_COLOR,
-  TASK_TYPES,
-  PRIORITIES,
-  SECTORS,
-} from "@/lib/constants";
-import { fmtTime, getTaskState, sectorDisplay, parseDate } from "@/lib/helpers";
-import type {
-  User as UserType,
-  Subtask,
-  Sector,
-  ThemeColors,
-  CitiesNeighborhoods,
-  Task,
-  Contract,
-  City,
-  Neighborhood,
-} from "@/types";
+import { TaskFilters } from "../shared/TaskFilters";
 
 // ── KanbanTask: extends shared Task with runtime alias ──
 interface KanbanTask extends Task {
@@ -83,7 +73,14 @@ interface KanbanPageProps {
 
 // ── Inline helper components ────────────────────────────────────
 
-type FilterOption = string | { id?: string | number; name?: string; label?: string; value?: string | number };
+type FilterOption =
+  | string
+  | {
+      id?: string | number;
+      name?: string;
+      label?: string;
+      value?: string | number;
+    };
 
 function MultiSelect({
   val = [],
@@ -146,7 +143,9 @@ function MultiSelect({
         <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg shadow-[0_10px_30px_rgba(0,0,0,0.15)] z-[9999] p-1.5 min-w-[180px] max-h-[300px] overflow-y-auto">
           {opts.map((o: FilterOption, i: number) => {
             const label = typeof o === "object" ? o.name || o.label : o;
-            const value = String(typeof o === "object" ? o.id || o.value || "" : o);
+            const value = String(
+              typeof o === "object" ? o.id || o.value || "" : o,
+            );
             const selected = val.includes(value);
             const key =
               typeof o === "object"
@@ -243,19 +242,19 @@ function DateRangePicker({ date, setDate, label, T }: DateRangePickerProps) {
   );
 }
 
-const ExportButtons = ({ filtered, kpi, users, user, filterLabel }: ExportButtonsProps) => (
+const ExportButtons = ({
+  filtered,
+  kpi,
+  users,
+  user,
+  filterLabel,
+}: ExportButtonsProps) => (
   <div className="flex gap-2 items-center">
     <button
-      onClick={() => exportToExcel(filtered, kpi, user, filterLabel)}
-      className="bg-emerald-500 text-white border-none px-3 py-1.5 rounded-lg text-[11px] font-semibold cursor-pointer flex items-center gap-1 transition-[filter] duration-100 hover:brightness-90"
+      onClick={() => exportToExcel(filtered, kpi, user, filterLabel, "kanban")}
+      className="bg-emerald-500 text-white border-none px-3 py-1.5 rounded-lg text-[11px] h-8 font-semibold cursor-pointer flex items-center gap-1 transition-[filter] duration-100 hover:brightness-90"
     >
       <FileText size={13} /> EXCEL
-    </button>
-    <button
-      onClick={() => exportToPDF(filtered, kpi, users, user, filterLabel)}
-      className="bg-red-500 text-white border-none px-3 py-1.5 rounded-lg text-[11px] font-semibold cursor-pointer flex items-center gap-1 transition-[filter] duration-100 hover:brightness-90"
-    >
-      <FileText size={13} /> PDF
     </button>
   </div>
 );
@@ -296,9 +295,13 @@ export default function KanbanPage({
         ? t.sector?.name
         : t.sector || "";
     if (fSector.length > 0 && !fSector.includes(sectorVal)) return false;
-    const contractVal = t.contract && typeof t.contract === "object" ? t.contract.name : t.contract || "";
+    const contractVal =
+      t.contract && typeof t.contract === "object"
+        ? t.contract.name
+        : t.contract || "";
     if (fContract && contractVal !== fContract) return false;
-    const cityVal = t.city && typeof t.city === "object" ? t.city.name : t.city || "";
+    const cityVal =
+      t.city && typeof t.city === "object" ? t.city.name : t.city || "";
     if (fCity && cityVal !== fCity) return false;
     if (fNeighbor && t.nucleus !== fNeighbor) return false;
     if (fPriority && t.priority !== fPriority) return false;
@@ -353,7 +356,7 @@ export default function KanbanPage({
   return (
     <div>
       {/* Header */}
-      <div className="flex justify-between items-center mb-3.5">
+      <div className="flex justify-between items-start mb-4">
         <div>
           <h1 className="m-0 text-[22px] font-bold text-slate-900 dark:text-gray-50">
             Quadro de Tarefas
@@ -371,7 +374,7 @@ export default function KanbanPage({
           {canCreate && (
             <button
               onClick={onNew}
-              className="flex items-center gap-1.5 px-4 py-2.5 bg-primary text-white border-none rounded-lg text-[13px] font-semibold cursor-pointer"
+              className="flex items-center h-8 gap-1.5 px-4 py-2.5 bg-primary text-white border-none rounded-lg text-[13px] font-semibold cursor-pointer"
             >
               <Plus size={15} />
               Nova Tarefa
@@ -380,135 +383,32 @@ export default function KanbanPage({
         </div>
       </div>
 
-      {/* Barra de filtros */}
-      <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl p-3 mb-4">
-        {/* Linha 1: busca + botão expandir */}
-        <div className="flex gap-2 items-center flex-wrap">
-          <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-gray-700 rounded-lg px-2.5 py-1.5 flex-[1_1_180px] max-w-[260px]">
-            <Search size={13} className="text-slate-500 dark:text-gray-400" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar tarefa..."
-              className="bg-transparent border-none outline-none text-xs text-slate-900 dark:text-gray-50 w-full"
-            />
-          </div>
-          <MultiSelect
-            val={fSector}
-            onChange={setFSector}
-            opts={SECTORS}
-            placeholder="Setores"
-          />
-          <FilterSelect
-            val={fContract}
-            onChange={(v: string) => {
-              setFContract(v);
-              setFCity("");
-              setFNeighbor("");
-            }}
-            opts={contracts}
-            placeholder="Todos contratos"
-          />
-          <FilterSelect
-            val={fCity}
-            onChange={(v: string) => {
-              setFCity(v);
-              setFNeighbor("");
-            }}
-            opts={Object.keys(citiesNeighborhoods).sort()}
-            placeholder="Todas cidades"
-          />
-          <button
-            onClick={() => setFiltersOpen((o) => !o)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer border ${
-              filtersOpen || activeAdvancedFilters
-                ? "bg-primary/[0.07] border-primary text-primary"
-                : "bg-transparent border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400"
-            }`}
-          >
-            <Filter size={12} /> Mais filtros{" "}
-            {activeAdvancedFilters > 0 && (
-              <span className="bg-primary text-white rounded-full w-4 h-4 text-[10px] flex items-center justify-center">
-                {activeAdvancedFilters}
-              </span>
-            )}
-          </button>
-          {(search || totalActiveFilters > 0) && (
-            <button
-              onClick={clearAll}
-              className="px-3 py-1.5 bg-red-50 border border-red-200 rounded-lg text-xs font-semibold text-red-500 cursor-pointer"
-            >
-              ✕ Limpar
-            </button>
-          )}
-        </div>
-
-        {/* Linha 2: filtros extras (expansível) */}
-        {filtersOpen && (
-          <div className="flex gap-2 items-end flex-wrap mt-2.5 pt-2.5 border-t border-slate-200 dark:border-gray-700">
-            <div>
-              <div className="text-[10px] font-bold text-slate-500 dark:text-gray-400 mb-1">
-                BAIRRO / NUCLEO
-              </div>
-              <select
-                value={fNeighbor}
-                onChange={(e) => setFNeighbor(e.target.value)}
-                className={`px-2.5 py-1.5 rounded-lg border text-xs outline-none cursor-pointer max-w-[200px] bg-white dark:bg-gray-800 ${
-                  fNeighbor
-                    ? "border-primary text-primary"
-                    : "border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400"
-                }`}
-              >
-                <option value="">
-                  {fCity ? "Todos bairros" : "Selecione cidade primeiro"}
-                </option>
-                {cityNeighborhoods.map((n: string) => (
-                  <option key={n}>{n}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <div className="text-[10px] font-bold text-slate-500 dark:text-gray-400 mb-1">
-                PRIORIDADE
-              </div>
-              <FilterSelect
-                val={fPriority}
-                onChange={setFPriority}
-                opts={PRIORITIES}
-                placeholder="Todas"
-              />
-            </div>
-            <div>
-              <div className="text-[10px] font-bold text-slate-500 dark:text-gray-400 mb-1">
-                TIPO DE TAREFA
-              </div>
-              <FilterSelect
-                val={fType}
-                onChange={setFType}
-                opts={TASK_TYPES}
-                placeholder="Todos"
-              />
-            </div>
-            {/* DatePicker replaced directly below */}
-            <div>
-              <DateRangePicker
-                date={fDateFrom}
-                setDate={setFDateFrom}
-                label="Prazo de Entrega"
-                T={T}
-              />
-            </div>
-            <div>
-              <DateRangePicker
-                date={fDateTo}
-                setDate={setFDateTo}
-                label="Data de Criação"
-                T={T}
-              />
-            </div>
-          </div>
-        )}
-      </div>
+      <TaskFilters
+        T={T}
+        search={search}
+        setSearch={setSearch}
+        sector={fSector}
+        setSector={setFSector}
+        priority={fPriority}
+        setPriority={setFPriority}
+        type={fType}
+        setType={setFType}
+        contract={fContract}
+        setContract={setFContract}
+        city={fCity}
+        setCity={setFCity}
+        neighbor={fNeighbor}
+        setNeighbor={setFNeighbor}
+        dateFrom={fDateFrom}
+        setDateFrom={setFDateFrom}
+        dateTo={fDateTo}
+        setDateTo={setFDateTo}
+        contracts={contracts}
+        citiesNeighborhoods={citiesNeighborhoods}
+        onClear={clearAll}
+        totalTasks={tasks.length}
+        filteredTasks={filtered.length}
+      />
 
       {/* Colunas */}
       <div className="flex gap-3.5 overflow-x-auto pb-2">
@@ -547,8 +447,9 @@ export default function KanbanPage({
                           <span>
                             de:{" "}
                             <b>
-                              {tasks.find((p: KanbanTask) => p.id === t.parent_id)
-                                ?.title || "..."}
+                              {tasks.find(
+                                (p: KanbanTask) => p.id === t.parent_id,
+                              )?.title || "..."}
                             </b>
                           </span>
                         </div>
@@ -609,7 +510,9 @@ export default function KanbanPage({
                         </span>
                         <span className="text-[11px] text-slate-500 dark:text-gray-400 flex items-center gap-1">
                           <MapPin size={9} />
-                          {typeof t.contract === "object" ? t.contract?.name : t.contract}
+                          {typeof t.contract === "object"
+                            ? t.contract?.name
+                            : t.contract}
                         </span>
                         {t.city && (
                           <span className="text-[11px] text-slate-500 dark:text-gray-400 flex items-center gap-1 pl-[13px]">
@@ -627,7 +530,10 @@ export default function KanbanPage({
                       {t.deadline && (
                         <div className="text-[10px] text-slate-500 dark:text-gray-400 flex items-center gap-[3px] mb-1.5">
                           <Calendar size={9} />
-                          Prazo: <b className="text-slate-900 dark:text-gray-50">{t.deadline}</b>
+                          Prazo:{" "}
+                          <b className="text-slate-900 dark:text-gray-50">
+                            {t.deadline}
+                          </b>
                         </div>
                       )}
                       {(t.subtasks?.length ?? 0) > 0 && (
@@ -635,8 +541,11 @@ export default function KanbanPage({
                           <div className="flex justify-between text-[10px] text-slate-500 dark:text-gray-400 mb-[3px]">
                             <span>Subtarefas</span>
                             <span>
-                              {t.subtasks!.filter((s: Subtask) => s.done).length}/
-                              {t.subtasks!.length}
+                              {
+                                t.subtasks!.filter((s: Subtask) => s.done)
+                                  .length
+                              }
+                              /{t.subtasks!.length}
                             </span>
                           </div>
                           <div className="h-[3px] bg-slate-200 dark:bg-gray-700 rounded">

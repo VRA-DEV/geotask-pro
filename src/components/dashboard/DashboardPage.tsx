@@ -1,14 +1,7 @@
 "use client";
 
-import {
-  Check,
-  ChevronDown,
-  Eye,
-  FileText,
-  Filter,
-  Search,
-} from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Eye, FileText } from "lucide-react";
+import { useState } from "react";
 import { DateRange } from "react-day-picker";
 import {
   Bar,
@@ -22,6 +15,8 @@ import {
   YAxis,
 } from "recharts";
 
+import AIReportModal from "@/components/AIReportModal";
+import { TaskFilters } from "@/components/shared/TaskFilters";
 import {
   PRIO_COLOR,
   PRIORITIES,
@@ -29,11 +24,15 @@ import {
   STATUS_COLOR,
   TASK_TYPES,
 } from "@/lib/constants";
-import { getTaskState, parseDate, parseDateStr } from "@/lib/helpers";
-import { exportToExcel, exportToPDF, getKpiData, type ExportKPIs } from "@/lib/exportUtils";
-import AIReportModal from "@/components/AIReportModal";
-import { DatePicker } from "@/app/components/DatePicker";
-import type { User, Sector, ThemeColors, CitiesNeighborhoods, Subtask, Task, Contract, City, Neighborhood } from "@/types";
+import { exportToExcel, getKpiData, type ExportKPIs } from "@/lib/exportUtils";
+import { getTaskState, parseDate } from "@/lib/helpers";
+import type {
+  CitiesNeighborhoods,
+  Sector,
+  Task,
+  ThemeColors,
+  User,
+} from "@/types";
 
 // ── DashboardTask: extends the shared Task type with extra runtime aliases ──
 interface DashboardTask extends Task {
@@ -42,7 +41,14 @@ interface DashboardTask extends Task {
 }
 
 // ── Filter option type (supports both strings and objects with name/id/label/value) ──
-type FilterOption = string | { id?: string | number; name?: string; label?: string; value?: string | number };
+type FilterOption =
+  | string
+  | {
+      id?: string | number;
+      name?: string;
+      label?: string;
+      value?: string | number;
+    };
 
 // ── Sector/User rank entry types ──
 interface SectorDataEntry {
@@ -66,201 +72,26 @@ interface ExportButtonsProps {
   filterLabel: string;
 }
 
-const ExportButtons = ({ filtered, kpi, users, user, filterLabel }: ExportButtonsProps) => (
+const ExportButtons = ({
+  filtered,
+  kpi,
+  users,
+  user,
+  filterLabel,
+}: ExportButtonsProps) => (
   <div className="flex gap-2 items-center">
     <button
-      onClick={() => exportToExcel(filtered, kpi, user, filterLabel)}
+      onClick={() =>
+        exportToExcel(filtered, kpi, user, filterLabel, "dashboard")
+      }
       className="bg-emerald-500 text-white border-none px-3 py-1.5 rounded-lg text-[11px] font-semibold cursor-pointer flex items-center gap-1 transition-[filter] duration-100 hover:brightness-90"
     >
       <FileText size={13} /> EXCEL
     </button>
-    <button
-      onClick={() => exportToPDF(filtered, kpi, users, user, filterLabel)}
-      className="bg-red-500 text-white border-none px-3 py-1.5 rounded-lg text-[11px] font-semibold cursor-pointer flex items-center gap-1 transition-[filter] duration-100 hover:brightness-90"
-    >
-      <FileText size={13} /> PDF
-    </button>
   </div>
 );
 
-interface FilterSelectProps {
-  val: string;
-  onChange: (v: string) => void;
-  opts: FilterOption[];
-  placeholder?: string;
-  label?: string;
-}
-
-function FilterSelect({
-  val,
-  onChange,
-  opts,
-  placeholder = "",
-  label = "",
-}: FilterSelectProps) {
-  return (
-    <select
-      value={val}
-      onChange={(e) => onChange(e.target.value)}
-      className={`px-2.5 py-1.5 rounded-lg text-xs outline-none cursor-pointer max-w-[170px] bg-white dark:bg-gray-800 ${
-        val
-          ? "border border-primary text-primary"
-          : "border border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400"
-      }`}
-    >
-      <option value="">{placeholder || label}</option>
-      {opts.map((o: FilterOption, i: number) => {
-        const label = typeof o === "object" ? o.name || o.label : o;
-        const value = typeof o === "object" ? o.id || o.value : o;
-        const key =
-          typeof o === "object"
-            ? o.id || o.name || `fopt-${i}`
-            : `fopt-${o}-${i}`;
-        return (
-          <option key={key} value={value}>
-            {label}
-          </option>
-        );
-      })}
-    </select>
-  );
-}
-
-interface DateRangePickerProps {
-  date: DateRange | undefined;
-  setDate: (d: DateRange | undefined) => void;
-  label: string;
-  T: ThemeColors;
-}
-
-function DateRangePicker({ date, setDate, label, T }: DateRangePickerProps) {
-  return (
-    <div className="flex flex-col gap-1">
-      <label className="text-[11px] font-bold text-slate-500 dark:text-gray-400">
-        {label}
-      </label>
-      <div className="flex gap-2">
-        <div className="flex-1">
-          <DatePicker
-            T={T}
-            date={date?.from}
-            setDate={(d: Date | undefined) => setDate({ from: d, to: date?.to })}
-            label=""
-          />
-        </div>
-        <div className="flex-1">
-          <DatePicker
-            T={T}
-            date={date?.to}
-            setDate={(d: Date | undefined) => setDate({ from: date?.from, to: d })}
-            label=""
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MultiSelect({
-  val = [],
-  onChange,
-  opts,
-  placeholder = "",
-}: {
-  val: string[];
-  onChange: (v: string[]) => void;
-  opts: string[];
-  placeholder?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
-      ) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const toggle = (opt: string) => {
-    if (val.includes(opt)) {
-      onChange(val.filter((x) => x !== opt));
-    } else {
-      onChange([...val, opt]);
-    }
-  };
-
-  return (
-    <div ref={containerRef} className="relative">
-      <div
-        onClick={() => setOpen(!open)}
-        className={`px-2.5 py-1.5 rounded-lg text-xs cursor-pointer min-w-[140px] max-w-[200px] flex justify-between items-center bg-white dark:bg-gray-800 ${
-          val.length > 0
-            ? "border border-primary text-primary"
-            : "border border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400"
-        }`}
-      >
-        <span className="whitespace-nowrap overflow-hidden text-ellipsis">
-          {val.length === 0
-            ? placeholder
-            : val.length === 1
-              ? val[0]
-              : `${val.length} selecionados`}
-        </span>
-        <ChevronDown size={14} />
-      </div>
-
-      {open && (
-        <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg shadow-[0_10px_30px_rgba(0,0,0,0.15)] z-[9999] p-1.5 min-w-[180px] max-h-[300px] overflow-y-auto">
-          {opts.map((o: string, i: number) => {
-            const label = o;
-            const value = o;
-            const selected = val.includes(value);
-            const key = `mopt-${o}-${i}`;
-
-            return (
-              <div
-                key={key}
-                onClick={() => toggle(value)}
-                className="px-2.5 py-1.5 rounded-md text-xs text-slate-900 dark:text-gray-50 cursor-pointer flex items-center gap-2 hover:bg-white dark:hover:bg-gray-900"
-                style={{
-                  background: selected ? "#98af3b11" : undefined,
-                }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = selected
-                    ? "#98af3b22"
-                    : "")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.background = selected
-                    ? "#98af3b11"
-                    : "")
-                }
-              >
-                <div
-                  className={`w-3.5 h-3.5 rounded-[3px] flex items-center justify-center ${
-                    selected
-                      ? "border border-primary bg-primary"
-                      : "border border-slate-500 dark:border-gray-400 bg-transparent"
-                  }`}
-                >
-                  {selected && <Check size={10} color="white" />}
-                </div>
-                <span>{label}</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
+// Shared components used from TaskFilters.tsx
 
 // ── Main component ───────────────────────────────────────────
 
@@ -310,9 +141,13 @@ export default function DashboardPage({
       !(t.description || "").toLowerCase().includes(txt)
     )
       return false;
-    const contractVal = t.contract && typeof t.contract === "object" ? t.contract.name : t.contract || "";
+    const contractVal =
+      t.contract && typeof t.contract === "object"
+        ? t.contract.name
+        : t.contract || "";
     if (fContract && contractVal !== fContract) return false;
-    const cityVal = t.city && typeof t.city === "object" ? t.city.name : t.city || "";
+    const cityVal =
+      t.city && typeof t.city === "object" ? t.city.name : t.city || "";
     if (fCity && cityVal !== fCity) return false;
     if (fNeighbor && t.nucleus !== fNeighbor) return false;
     if (fStatus && t.status !== fStatus) return false;
@@ -383,14 +218,18 @@ export default function DashboardPage({
 
   // KPIs
   const total = filtered.length;
-  const concluded = filtered.filter((t: DashboardTask) => t.status === "Conclu\u00EDdo");
+  const concluded = filtered.filter(
+    (t: DashboardTask) => t.status === "Conclu\u00EDdo",
+  );
   const concludedForAvg = concluded.filter(
     (t: DashboardTask) => !t.subtasks || t.subtasks.length === 0,
   );
   const avgTime = concludedForAvg.length
     ? Math.round(
-        concludedForAvg.reduce((a: number, t: DashboardTask) => a + (t.time || 0), 0) /
-          concludedForAvg.length,
+        concludedForAvg.reduce(
+          (a: number, t: DashboardTask) => a + (t.time || 0),
+          0,
+        ) / concludedForAvg.length,
       )
     : 0;
   const byType = TASK_TYPES.map((tp) => ({
@@ -501,7 +340,9 @@ export default function DashboardPage({
       }).length;
       const atrasadas = filtered.filter((t: DashboardTask) => {
         const d = parseDate(t.deadline);
-        return d && d < weekStart && t.status !== "Conclu\u00EDdo" ? true : false;
+        return d && d < weekStart && t.status !== "Conclu\u00EDdo"
+          ? true
+          : false;
       }).length;
       const concluidas = filtered.filter((t: DashboardTask) => {
         if (!t.completed_at) return false;
@@ -524,7 +365,7 @@ export default function DashboardPage({
             Dashboard
           </h1>
           <p className="mt-1 mb-0 text-[13px] text-slate-500 dark:text-gray-400">
-            Ol&aacute;, {user.name.split(" ")[0]}! Veja o resumo das atividades.
+            Olá, {user.name.split(" ")[0]}! Veja o resumo das atividades.
           </p>
         </div>
         <div className="flex gap-2.5 items-center">
@@ -542,9 +383,9 @@ export default function DashboardPage({
                 fType && `Tipo: ${fType}`,
                 fPriority && `Prioridade: ${fPriority}`,
                 fSector.length > 0 && `Setores: ${fSector.join(", ")}`,
-                fUser && `Respons\u00E1vel: ${fUser}`,
+                fUser && `Responsável: ${fUser}`,
                 (fDateFrom?.from || fDateFrom?.to) && "Filtro de Prazo",
-                (fDateTo?.from || fDateTo?.to) && "Filtro de Cria\u00E7\u00E3o",
+                (fDateTo?.from || fDateTo?.to) && "Filtro de Criação",
               ]
                 .filter(Boolean)
                 .join(" | ") || "Nenhum"
@@ -561,128 +402,37 @@ export default function DashboardPage({
         </div>
       </div>
 
-      {/* -- FILTROS -- */}
-      <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl p-3 mb-5">
-        <div className="flex gap-2 flex-wrap items-center">
-          {/* busca */}
-          <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-gray-700 rounded-lg px-2.5 py-1.5 flex-[1_1_180px] max-w-[240px]">
-            <Search size={12} className="text-slate-500 dark:text-gray-400" />
-            <input
-              value={fSearch}
-              onChange={(e) => setFSearch(e.target.value)}
-              placeholder="Buscar t\u00EDtulo ou descri\u00E7\u00E3o..."
-              className="bg-transparent border-none outline-none text-xs text-slate-900 dark:text-gray-50 w-full"
-            />
-          </div>
-          <FilterSelect
-            val={fStatus}
-            onChange={setFStatus}
-            opts={["A Fazer", "Em Andamento", "Pausado", "Conclu\u00EDdo"]}
-            placeholder="Todos status"
-          />
-          <MultiSelect
-            val={fSector}
-            onChange={setFSector}
-            opts={SECTORS}
-            placeholder="Setores"
-          />
-          <FilterSelect
-            val={fPriority}
-            onChange={setFPriority}
-            opts={PRIORITIES}
-            placeholder="Todas prioridades"
-          />
-          <button
-            onClick={() => setFiltersOpen((o) => !o)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer ${
-              filtersOpen || activeAdvancedFilters
-                ? "bg-primary/5 border border-primary text-primary"
-                : "bg-transparent border border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400"
-            }`}
-          >
-            <Filter size={12} /> Mais filtros
-            {activeAdvancedFilters > 0 && (
-              <span className="bg-primary text-white rounded-full w-4 h-4 text-[10px] flex items-center justify-center">
-                {activeAdvancedFilters}
-              </span>
-            )}
-          </button>
-          {(fSearch || totalActiveFilters > 0) && (
-            <button
-              onClick={clearAll}
-              className="px-3 py-1.5 bg-red-50 border border-red-200 rounded-lg text-xs font-semibold text-red-500 cursor-pointer"
-            >
-              ✕ Limpar
-            </button>
-          )}
-        </div>
-        {filtersOpen && (
-          <div className="flex gap-2 flex-wrap items-end mt-2.5 pt-2.5 border-t border-slate-200 dark:border-gray-700">
-            {([
-              [
-                "CONTRATO",
-                fContract,
-                setFContract,
-                contracts,
-                "Todos contratos",
-              ],
-              [
-                "CIDADE",
-                fCity,
-                (v: string) => {
-                  setFCity(v);
-                  setFNeighbor("");
-                },
-                Object.keys(citiesNeighborhoods).sort(),
-                "Todas cidades",
-              ],
-              [
-                "BAIRRO",
-                fNeighbor,
-                setFNeighbor,
-                cityNeighborhoods,
-                fCity ? "Todos bairros" : "Cidade primeiro",
-              ],
-              ["TIPO", fType, setFType, TASK_TYPES, "Todos tipos"],
-              [
-                "RESPONS\u00C1VEL",
-                fUser,
-                setFUser,
-                users.map((u: User) => u.name),
-                "Todos",
-              ],
-            ] as [string, string, (v: string) => void, string[], string][]).map(([label, val, onChange, opts, ph]) => (
-              <div key={label}>
-                <div className="text-[10px] font-bold text-slate-500 dark:text-gray-400 mb-1">
-                  {label}
-                </div>
-                <FilterSelect
-                  val={val}
-                  onChange={onChange}
-                  opts={opts}
-                  placeholder={ph}
-                />
-              </div>
-            ))}
-            <div>
-              <DateRangePicker
-                T={T}
-                date={fDateFrom}
-                setDate={setFDateFrom}
-                label="Prazo de Entrega"
-              />
-            </div>
-            <div>
-              <DateRangePicker
-                T={T}
-                date={fDateTo}
-                setDate={setFDateTo}
-                label="Data de Cria\u00E7\u00E3o"
-              />
-            </div>
-          </div>
-        )}
-      </div>
+      <TaskFilters
+        T={T}
+        search={fSearch}
+        setSearch={setFSearch}
+        status={fStatus}
+        setStatus={setFStatus}
+        sector={fSector}
+        setSector={setFSector}
+        priority={fPriority}
+        setPriority={setFPriority}
+        type={fType}
+        setType={setFType}
+        contract={fContract}
+        setContract={setFContract}
+        city={fCity}
+        setCity={setFCity}
+        neighbor={fNeighbor}
+        setNeighbor={setFNeighbor}
+        responsible={fUser}
+        setResponsible={setFUser}
+        dateFrom={fDateFrom}
+        setDateFrom={setFDateFrom}
+        dateTo={fDateTo}
+        setDateTo={setFDateTo}
+        users={users}
+        contracts={contracts}
+        citiesNeighborhoods={citiesNeighborhoods}
+        onClear={clearAll}
+        totalTasks={tasks.length}
+        filteredTasks={filtered.length}
+      />
 
       {/* -- KPIs -- */}
       <div className="grid grid-cols-5 gap-3.5 mb-5">
@@ -731,7 +481,9 @@ export default function DashboardPage({
           </div>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 overflow-y-auto max-h-[100px]">
             {byType.length === 0 && (
-              <div className="text-xs text-slate-500 dark:text-gray-400">&mdash;</div>
+              <div className="text-xs text-slate-500 dark:text-gray-400">
+                &mdash;
+              </div>
             )}
             {byType.map((tp) => (
               <div
@@ -741,7 +493,7 @@ export default function DashboardPage({
                 <span className="text-slate-500 dark:text-gray-400 whitespace-nowrap overflow-hidden text-ellipsis">
                   {tp.name}
                 </span>
-                <span className="font-bold text-slate-900 dark:text-gray-50 bg-slate-200 dark:bg-gray-700 rounded-full px-2 py-[1px] text-[10px]">
+                <span className="font-bold text-slate-900 dark:text-gray-50 bg-slate-200 dark:bg-gray-700 rounded-full px-2 py-px text-[10px]">
                   {tp.val}
                 </span>
               </div>
@@ -800,16 +552,15 @@ export default function DashboardPage({
           </ResponsiveContainer>
           <div className="flex flex-col gap-1 mt-1">
             {pieData.map((d) => (
-              <div
-                key={d.name}
-                className="flex justify-between text-[11px]"
-              >
+              <div key={d.name} className="flex justify-between text-[11px]">
                 <div className="flex items-center gap-1.5">
                   <div
                     className="w-2 h-2 rounded-full"
                     style={{ background: STATUS_COLOR[d.name] }}
                   />
-                  <span className="text-slate-500 dark:text-gray-400">{d.name}</span>
+                  <span className="text-slate-500 dark:text-gray-400">
+                    {d.name}
+                  </span>
                 </div>
                 <span className="font-bold text-slate-900 dark:text-gray-50">
                   {d.value}
@@ -866,10 +617,7 @@ export default function DashboardPage({
           </ResponsiveContainer>
           <div className="flex flex-col gap-1 mt-1">
             {sectorData.map((d, i) => (
-              <div
-                key={d.name}
-                className="flex justify-between text-[11px]"
-              >
+              <div key={d.name} className="flex justify-between text-[11px]">
                 <div className="flex items-center gap-1.5">
                   <div
                     className="w-2 h-2 rounded-full"
@@ -886,9 +634,13 @@ export default function DashboardPage({
                       ][i % 8],
                     }}
                   />
-                  <span className="text-slate-500 dark:text-gray-400">{d.name}</span>
+                  <span className="text-slate-500 dark:text-gray-400">
+                    {d.name}
+                  </span>
                 </div>
-                <span className="font-bold text-slate-900 dark:text-gray-50">{d.v}</span>
+                <span className="font-bold text-slate-900 dark:text-gray-50">
+                  {d.v}
+                </span>
               </div>
             ))}
           </div>
@@ -903,15 +655,15 @@ export default function DashboardPage({
             Por Setor
           </div>
           {sectorRank.length === 0 && (
-            <div className="text-[11px] text-slate-500 dark:text-gray-400 mb-2">&mdash;</div>
+            <div className="text-[11px] text-slate-500 dark:text-gray-400 mb-2">
+              &mdash;
+            </div>
           )}
           {sectorRank.slice(0, 3).map((r, i) => (
-            <div
-              key={r.name}
-              className="flex items-center gap-2 mb-1.5"
-            >
+            <div key={r.name} className="flex items-center gap-2 mb-1.5">
               <span className="text-[13px]">
-                {["\uD83E\uDD47", "\uD83E\uDD48", "\uD83E\uDD49"][i] || "\u00B7"}
+                {["\uD83E\uDD47", "\uD83E\uDD48", "\uD83E\uDD49"][i] ||
+                  "\u00B7"}
               </span>
               <span className="text-[11px] text-slate-500 dark:text-gray-400 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
                 {r.name}
@@ -933,15 +685,15 @@ export default function DashboardPage({
             Por Usu&aacute;rio
           </div>
           {userRank.length === 0 && (
-            <div className="text-[11px] text-slate-500 dark:text-gray-400">&mdash;</div>
+            <div className="text-[11px] text-slate-500 dark:text-gray-400">
+              &mdash;
+            </div>
           )}
           {userRank.slice(0, 3).map((r: UserRankEntry, i: number) => (
-            <div
-              key={r.name}
-              className="flex items-center gap-2 mb-1.5"
-            >
+            <div key={r.name} className="flex items-center gap-2 mb-1.5">
               <span className="text-[13px]">
-                {["\uD83E\uDD47", "\uD83E\uDD48", "\uD83E\uDD49"][i] || "\u00B7"}
+                {["\uD83E\uDD47", "\uD83E\uDD48", "\uD83E\uDD49"][i] ||
+                  "\u00B7"}
               </span>
               <span className="text-[11px] text-slate-500 dark:text-gray-400 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
                 {r.name}
@@ -1144,7 +896,9 @@ export default function DashboardPage({
                   : t.contract || "\u2014"}
               </div>
               <div className="text-[11px] text-slate-500 dark:text-gray-400 overflow-hidden text-ellipsis whitespace-nowrap">
-                {typeof t.city === "object" ? (t.city as { name?: string })?.name : t.city || "\u2014"}
+                {typeof t.city === "object"
+                  ? (t.city as { name?: string })?.name
+                  : t.city || "\u2014"}
               </div>
               <div className="text-[11px] text-slate-500 dark:text-gray-400 overflow-hidden text-ellipsis whitespace-nowrap">
                 {typeof t.nucleus === "object" && t.nucleus !== null
@@ -1154,7 +908,9 @@ export default function DashboardPage({
               <div className="text-[11px] text-slate-500 dark:text-gray-400">
                 {t.quadra || "\u2014"}
               </div>
-              <div className="text-[11px] text-slate-500 dark:text-gray-400">{t.lote || "\u2014"}</div>
+              <div className="text-[11px] text-slate-500 dark:text-gray-400">
+                {t.lote || "\u2014"}
+              </div>
               <button
                 onClick={() => onSelect(t)}
                 className="bg-primary/5 border border-primary/20 rounded-[7px] px-2 py-1.5 cursor-pointer flex items-center justify-center"
