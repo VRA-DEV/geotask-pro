@@ -1,32 +1,34 @@
 "use client";
 
+import { getPermissions } from "@/lib/permissions";
 import { CheckCircle, Eye, Pause, Play, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { DatePicker } from "@/app/components/DatePicker";
-import {
-  PRIO_COLOR,
-  PRIORITIES,
-  SECTORS,
-  STATUS_COLOR,
-  TASK_TYPES,
-} from "@/lib/constants";
-import {
-  fmtTime,
-  getTaskState,
-  parseDateStr,
-  sectorDisplay,
-} from "@/lib/helpers";
-import type { Task, User, Sector, Subtask, ThemeColors, CitiesNeighborhoods } from "@/types";
+import { SECTORS, STATUS_COLOR } from "@/lib/constants";
+import { getTaskState, parseDateStr } from "@/lib/helpers";
+import type {
+  CitiesNeighborhoods,
+  Sector,
+  Subtask,
+  Task,
+  ThemeColors,
+  User,
+} from "@/types";
 
 interface TaskDetailModalProps {
   T: ThemeColors;
   task: Task;
   user: User;
   onClose: () => void;
-  onUpdate: (id: number, action: string, data: Record<string, unknown>) => Promise<void>;
+  onUpdate: (
+    id: number,
+    action: string,
+    data: Record<string, unknown>,
+  ) => Promise<void>;
   users?: User[];
   contracts?: string[];
+  taskTypes?: { id: number; name: string; sector_id?: number | null }[];
   citiesNeighborhoods?: CitiesNeighborhoods;
   sectors?: (Sector | string)[];
   tasks?: Task[];
@@ -58,6 +60,7 @@ export default function TaskDetailModal({
   onUpdate,
   users = [],
   contracts = [],
+  taskTypes = [],
   citiesNeighborhoods = {},
   sectors = [],
   tasks = [],
@@ -105,6 +108,52 @@ export default function TaskDetailModal({
     });
   }, [form.sector, users]);
 
+  const filteredTaskTypes = useMemo(() => {
+    // Helper para gerar os grupos
+    const buildGroups = (types: any[]) => {
+      const groups: Record<string, string[]> = { Geral: [] };
+      types.forEach((t) => {
+        if (!t.sector_id) {
+          groups.Geral.push(t.name);
+        } else {
+          const sec = sectors.find((s: any) => s.id === t.sector_id);
+          const secName =
+            sec && typeof sec === "object" && "name" in sec
+              ? sec.name
+              : "Outros";
+          if (!groups[secName]) groups[secName] = [];
+          groups[secName].push(t.name);
+        }
+      });
+      return Object.entries(groups)
+        .filter(([_, opts]) => opts.length > 0)
+        .map(([label, options]) => ({ label, options }));
+    };
+
+    if (!form.sector) return buildGroups(taskTypes);
+
+    const sec = sectors.find(
+      (s: any) =>
+        String(s.id) === String(form.sector) ||
+        (typeof s === "object" &&
+          s !== null &&
+          s.name &&
+          String(s.name).toLowerCase() === String(form.sector).toLowerCase()) ||
+        (typeof s === "string" &&
+          s.toLowerCase() === String(form.sector).toLowerCase()),
+    );
+
+    if (!sec) return buildGroups(taskTypes);
+
+    const secId = typeof sec === "object" ? sec.id : null;
+    if (!secId) return buildGroups(taskTypes);
+
+    const allowed = taskTypes.filter(
+      (t: any) => !t.sector_id || t.sector_id === secId,
+    );
+    return buildGroups(allowed);
+  }, [form.sector, taskTypes, sectors]);
+
   const subFilteredUsers = useMemo(() => {
     if (!newSubtask.sector) return [];
     return users.filter((u: User) => {
@@ -142,6 +191,14 @@ export default function TaskDetailModal({
     }
   }, [tab, t.id]);
 
+  const formatDatetimeLocal = (isoStr?: string | null) => {
+    if (!isoStr) return "";
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return "";
+    const pad = (n: number) => n.toString().padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
   const handleAddSubtask = async () => {
     if (!newSubtask.title.trim() || !newSubtask.sector) {
       alert("Preencha Título e Setor.");
@@ -174,7 +231,8 @@ export default function TaskDetailModal({
         const data = await res.json();
         setNewSubtask({
           title: "",
-          sector: (typeof t.sector === "object" ? t.sector?.name : t.sector) || "",
+          sector:
+            (typeof t.sector === "object" ? t.sector?.name : t.sector) || "",
           responsible_id: "",
           description: "",
         });
@@ -187,7 +245,9 @@ export default function TaskDetailModal({
           sector_id: Number(newSubtask.sector) || null,
           responsible_id: Number(newSubtask.responsible_id) || null,
           responsible: newSubtask.responsible_id
-            ? users.find((u: User) => u.id === Number(newSubtask.responsible_id)) ?? null
+            ? (users.find(
+                (u: User) => u.id === Number(newSubtask.responsible_id),
+              ) ?? null)
             : null,
         };
         setForm((prev) => ({
@@ -229,7 +289,11 @@ export default function TaskDetailModal({
   // Permission Logic
   const canEdit = (field: string) => {
     // Admin, Gestor, Coordenador, Gerente can edit everything
-    if (["Admin", "Gestor", "Coordenador", "Gerente"].includes(user.role?.name || ""))
+    if (
+      ["Admin", "Gestor", "Coordenador", "Gerente"].includes(
+        user.role?.name || "",
+      )
+    )
       return true;
 
     // Liderado/Others restrictions
@@ -257,7 +321,9 @@ export default function TaskDetailModal({
           })
           .slice(0, 5);
         setMentionSuggestions(
-          matches.map((s: Sector | string) => `#${typeof s === "string" ? s : s.name}`),
+          matches.map(
+            (s: Sector | string) => `#${typeof s === "string" ? s : s.name}`,
+          ),
         );
       } else {
         const matches = users
@@ -406,12 +472,12 @@ export default function TaskDetailModal({
                   f: "priority",
                   o: ["Alta", "Média", "Baixa"],
                 },
-                { l: "Tipo", f: "type", o: TASK_TYPES },
+                { l: "Tipo", f: "type", o: [], groups: filteredTaskTypes },
                 {
                   l: "Setor",
                   f: "sector",
                   o: sectors.map((s: Sector | string) =>
-                    typeof s === "object" ? s.name : s,
+                    typeof s === "object" && s !== null ? s.name : String(s),
                   ),
                 },
                 {
@@ -428,19 +494,38 @@ export default function TaskDetailModal({
                 { l: "Quadra", f: "quadra" },
                 { l: "Lote", f: "lote" },
                 { l: "Prazo", f: "deadline", type: "date-picker" },
-              ].map(({ l, f, o, type }) => {
-                const formRec = form as unknown as Record<string, string | null | undefined>;
-                const disabled = !canEdit(
+                { l: "Início real", f: "started_at", type: "datetime-local" },
+                {
+                  l: "Conclusão real",
+                  f: "completed_at",
+                  type: "datetime-local",
+                },
+              ].map(({ l, f, o, type, groups }) => {
+                const formRec = form as unknown as Record<
+                  string,
+                  string | null | undefined
+                >;
+                let disabled = !canEdit(
                   f === "responsible_id" ? "responsible" : f,
                 );
+
+                // Only users with "edit_retroactive_dates" capability can view/edit 'started_at' and 'completed_at'
+                if (f === "started_at" || f === "completed_at") {
+                  const appPerms = getPermissions(user);
+                  if (!appPerms.tasks.edit_retroactive_dates) return null;
+                  disabled = false;
+                }
+
                 return (
                   <div key={f} className="mb-3">
                     <div className="text-[11px] font-bold text-slate-500 dark:text-gray-400 mb-1">
                       {l.toUpperCase()}
                     </div>
-                    {o ? (
+                    {o && !groups ? (
                       <select
-                        value={(form as Record<string, unknown>)[f] as string || ""}
+                        value={
+                          ((form as Record<string, unknown>)[f] as string) || ""
+                        }
                         disabled={disabled}
                         onChange={(e) => {
                           const v = e.target.value;
@@ -459,21 +544,54 @@ export default function TaskDetailModal({
                         }`}
                       >
                         <option value="">Selecione...</option>
-                        {o.map((opt: string | { value: string | number; label: string }) => {
-                          const val =
-                            typeof opt === "object" && opt !== null
-                              ? opt.value
-                              : opt;
-                          const lab =
-                            typeof opt === "object" && opt !== null
-                              ? opt.label
-                              : opt;
-                          return (
-                            <option key={val} value={val}>
-                              {lab}
-                            </option>
-                          );
-                        })}
+                        {o.map(
+                          (
+                            opt:
+                              | string
+                              | { value: string | number; label: string },
+                          ) => {
+                            const val =
+                              typeof opt === "object" && opt !== null
+                                ? opt.value
+                                : opt;
+                            const lab =
+                              typeof opt === "object" && opt !== null
+                                ? opt.label
+                                : opt;
+                            return (
+                              <option key={val} value={val}>
+                                {lab}
+                              </option>
+                            );
+                          },
+                        )}
+                      </select>
+                    ) : groups ? (
+                      <select
+                        value={
+                          ((form as Record<string, unknown>)[f] as string) || ""
+                        }
+                        disabled={disabled}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setForm((prev) => ({ ...prev, [f]: v }));
+                        }}
+                        className={`w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-gray-700 text-[13px] appearance-none ${
+                          disabled
+                            ? "bg-slate-100 dark:bg-gray-900 text-slate-500 dark:text-gray-400"
+                            : "bg-slate-100 dark:bg-gray-700 text-slate-900 dark:text-gray-50"
+                        }`}
+                      >
+                        <option value="">Selecione...</option>
+                        {groups.map((g: any, i: number) => (
+                          <optgroup key={`group-${i}`} label={g.label}>
+                            {g.options.map((optLabel: string) => (
+                              <option key={optLabel} value={optLabel}>
+                                {optLabel}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ))}
                       </select>
                     ) : (
                       <div className="w-full">
@@ -489,6 +607,24 @@ export default function TaskDetailModal({
                             }
                             label=""
                             openDirection="up"
+                          />
+                        ) : type === "datetime-local" ? (
+                          <input
+                            type="datetime-local"
+                            value={formatDatetimeLocal(formRec[f])}
+                            disabled={disabled}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setForm({
+                                ...form,
+                                [f]: v ? new Date(v).toISOString() : null,
+                              });
+                            }}
+                            className={`w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-gray-700 text-[13px] ${
+                              disabled
+                                ? "bg-slate-100 dark:bg-gray-900 text-slate-500 dark:text-gray-400"
+                                : "bg-slate-100 dark:bg-gray-700 text-slate-900 dark:text-gray-50"
+                            }`}
                           />
                         ) : (
                           <input
@@ -602,7 +738,10 @@ export default function TaskDetailModal({
                         }
                       }}
                     >
-                      <Eye size={18} className="text-slate-500 dark:text-gray-400" />
+                      <Eye
+                        size={18}
+                        className="text-slate-500 dark:text-gray-400"
+                      />
                     </button>
                   </div>
                 ))}
@@ -772,9 +911,7 @@ export default function TaskDetailModal({
           {tab === "historico" && (
             <div className="flex flex-col gap-3">
               <div className="mb-5 p-4 bg-slate-100 dark:bg-gray-900 rounded-xl flex items-center justify-between relative">
-                <div
-                  className="absolute left-10 right-10 top-6 h-0.5 z-0 bg-slate-200 dark:bg-gray-700"
-                />
+                <div className="absolute left-10 right-10 top-6 h-0.5 z-0 bg-slate-200 dark:bg-gray-700" />
                 {[
                   { label: "Criação", date: t.created },
                   { label: "Início", date: t.started },
@@ -782,24 +919,27 @@ export default function TaskDetailModal({
                   { label: "Conclusão", date: t.completed },
                 ]
                   .filter((e) => e.date)
-                  .map((evt: { label: string; date: string | null | undefined }, idx: number) => (
-                    <div
-                      key={idx}
-                      className="z-[1] flex flex-col items-center gap-1.5"
-                    >
+                  .map(
+                    (
+                      evt: { label: string; date: string | null | undefined },
+                      idx: number,
+                    ) => (
                       <div
-                        className="w-2.5 h-2.5 rounded-full bg-primary ring-4 ring-white dark:ring-gray-800"
-                      />
-                      <div className="text-center">
-                        <div className="text-[10px] font-bold text-slate-500 dark:text-gray-400 uppercase">
-                          {evt.label}
-                        </div>
-                        <div className="text-[11px] font-semibold text-slate-900 dark:text-gray-50">
-                          {evt.date}
+                        key={idx}
+                        className="z-[1] flex flex-col items-center gap-1.5"
+                      >
+                        <div className="w-2.5 h-2.5 rounded-full bg-primary ring-4 ring-white dark:ring-gray-800" />
+                        <div className="text-center">
+                          <div className="text-[10px] font-bold text-slate-500 dark:text-gray-400 uppercase">
+                            {evt.label}
+                          </div>
+                          <div className="text-[11px] font-semibold text-slate-900 dark:text-gray-50">
+                            {evt.date}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ),
+                  )}
               </div>
               {loadingHistory && (
                 <div className="text-center text-slate-500 dark:text-gray-400 text-xs">

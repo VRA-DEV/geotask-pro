@@ -4,8 +4,9 @@ import { DatePicker } from "@/app/components/DatePicker";
 import { FormField } from "@/components/ui/FormField";
 import { FormInput, FormTextarea } from "@/components/ui/FormInput";
 import { FormSelect } from "@/components/ui/FormSelect";
-import { PRIORITIES, TASK_TYPES } from "@/lib/constants";
+import { PRIORITIES } from "@/lib/constants";
 import { type ThemeColors, parseDateStr } from "@/lib/helpers";
+import { getPermissions } from "@/lib/permissions";
 import type {
   CitiesNeighborhoods,
   Sector,
@@ -94,7 +95,9 @@ interface NewTaskModalProps {
   onClose: () => void;
   onSave: (data: Record<string, unknown>) => void;
   users?: User[];
+  user?: User | null;
   contracts?: string[];
+  taskTypes?: { id: number; name: string }[];
   citiesNeighborhoods?: CitiesNeighborhoods;
   templates?: EnrichedTemplate[];
   sectors?: Sector[];
@@ -104,8 +107,10 @@ export default function NewTaskModal({
   T,
   onClose,
   onSave,
+  user,
   users = [],
   contracts = [],
+  taskTypes = [],
   citiesNeighborhoods = {},
   templates = [],
   sectors = [],
@@ -275,6 +280,44 @@ export default function NewTaskModal({
       return uSName === fSName || uSid === fSid;
     });
   }, [subForm, users]);
+
+  const filteredTaskTypes = useMemo(() => {
+    const appPerms = getPermissions(user);
+
+    // Helper para gerar os grupos
+    const buildGroups = (types: any[]) => {
+      const groups: Record<string, string[]> = { Geral: [] };
+      types.forEach((t) => {
+        if (!t.sector_id) {
+          groups.Geral.push(t.name);
+        } else {
+          const sec = sectors.find((s: any) => s.id === t.sector_id);
+          const secName = sec ? sec.name : "Outros";
+          if (!groups[secName]) groups[secName] = [];
+          groups[secName].push(t.name);
+        }
+      });
+      return Object.entries(groups)
+        .filter(([_, opts]) => opts.length > 0)
+        .map(([label, options]) => ({ label, options }));
+    };
+
+    if (appPerms.tasks.view_all_sectors) return buildGroups(taskTypes);
+
+    if (!form.sector) return buildGroups(taskTypes);
+
+    const sec = sectors.find(
+      (s: any) =>
+        String(s.id) === String(form.sector) ||
+        String(s.name).toLowerCase() === String(form.sector).toLowerCase(),
+    );
+    if (!sec) return buildGroups(taskTypes);
+
+    const allowed = taskTypes.filter(
+      (t: any) => !t.sector_id || t.sector_id === sec.id,
+    );
+    return buildGroups(allowed);
+  }, [form.sector, taskTypes, sectors, user]);
 
   const STEPS = [
     "\u{1F4CB} Dados",
@@ -468,7 +511,8 @@ export default function NewTaskModal({
                     T={T}
                     val={form.type}
                     onChange={(v) => set("type", v)}
-                    opts={TASK_TYPES}
+                    opts={[]}
+                    groups={filteredTaskTypes}
                     err={errors.type}
                   />
                 </FormField>

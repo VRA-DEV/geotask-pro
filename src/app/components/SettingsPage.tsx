@@ -13,7 +13,7 @@ import {
   User as UserIcon,
   Users,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useSWRConfig } from "swr";
 import { ChangePasswordModal } from "./ChangePasswordModal";
 import { RoleModal } from "./RoleModal";
@@ -57,6 +57,13 @@ interface Contract {
   name: string;
 }
 
+interface TaskType {
+  id: number;
+  name: string;
+  sector_id: number | null;
+  Sector?: Sector;
+}
+
 interface City {
   id: number;
   name: string;
@@ -79,21 +86,44 @@ interface SettingsPageProps {
   currentUser?: User;
 }
 
-// ─── Permission labels ────────────────────────────────────────────────────────
+import { getPermissions } from "@/lib/permissions";
 
-const PERMISSION_LEVELS: {
-  value: PermissionLevel;
-  label: string;
-  color: string;
-}[] = [
-  { value: "full", label: "Acesso completo", color: "#22c55e" },
-  { value: "sector", label: "Vis. por Setor", color: "#f59e0b" },
-  { value: "view", label: "Vis. geral", color: "#3b82f6" },
-  { value: "none", label: "Sem acesso", color: "#ef4444" },
+// ─── Permission Groups ───────────────────────────────────────────────────────
+
+const PERMISSION_GROUPS = [
+  {
+    category: "Acesso de Páginas",
+    key: "pages",
+    items: [
+      { id: "dashboard", label: "Dashboard" },
+      { id: "kanban", label: "Quadro de Tarefas" },
+      { id: "cronograma", label: "Cronograma" },
+      { id: "mindmap", label: "Mapa de Tarefas" },
+      { id: "templates", label: "Templates" },
+      { id: "settings", label: "Configurações" },
+    ],
+  },
+  {
+    category: "Ações de Tarefas",
+    key: "tasks",
+    items: [
+      { id: "create", label: "Criar Nova Tarefa" },
+      { id: "edit_all", label: "Editar Qualquer Campo" },
+      { id: "edit_retroactive_dates", label: "Editar Datas Retroativas" },
+      { id: "view_all_sectors", label: "Visualizar Todos os Setores" },
+    ],
+  },
+  {
+    category: "Administração",
+    key: "settings",
+    items: [
+      { id: "manage_users", label: "Gerenciar Usuários" },
+      { id: "manage_roles", label: "Gerenciar Cargos" },
+      { id: "manage_locations", label: "Gerenciar Cidades e Contratos" },
+      { id: "manage_task_types", label: "Gerenciar Tipos de Tarefas" },
+    ],
+  },
 ];
-
-// These modules use granular access levels
-const PERMISSION_MODULES = ["Kanban", "Dashboard", "Templates", "Criar tarefa"];
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -107,6 +137,7 @@ export function SettingsPage({
   const [roles, setRoles] = useState<Role[]>([]);
   const [sectors, setSectors] = useState<Sector[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
+  const [taskTypes, setTaskTypes] = useState<TaskType[]>([]);
   const [cities, setCities] = useState<City[]>([]);
   const [neighborhoods, setNeighborhoods] = useState<Neighborhood[]>([]);
   const [loading, setLoading] = useState(false);
@@ -150,6 +181,7 @@ export function SettingsPage({
         proms.push(fetch("/api/users").then((r) => r.json()));
         proms.push(fetch("/api/roles").then((r) => r.json()));
         proms.push(fetch("/api/sectors").then((r) => r.json()));
+        proms.push(fetch("/api/task-types").then((r) => r.json()));
       }
       if (canManageLocations) {
         proms.push(fetch("/api/contracts").then((r) => r.json()));
@@ -163,6 +195,7 @@ export function SettingsPage({
         setUsers(results[idx++]);
         setRoles(results[idx++]);
         setSectors(results[idx++]);
+        setTaskTypes(results[idx++]);
       }
       if (canManageLocations) {
         setContracts(results[idx++]);
@@ -256,6 +289,24 @@ export function SettingsPage({
     }
   };
 
+  const handleEditContract = async (id: number, currentName: string) => {
+    const newName = prompt("Editar nome do contrato:", currentName);
+    if (!newName || newName === currentName) return;
+    try {
+      const res = await fetch("/api/contracts", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, name: newName }),
+      });
+      if (res.ok) {
+        fetchData();
+        mutate("/api/lookups");
+      } else alert((await res.json()).error || "Erro ao editar contrato");
+    } catch {
+      alert("Erro ao editar contrato");
+    }
+  };
+
   const handleDeleteContract = async (id: number) => {
     if (!confirm("Excluir este contrato?")) return;
     try {
@@ -284,6 +335,24 @@ export function SettingsPage({
       } else alert("Erro ao criar cidade");
     } catch {
       alert("Erro ao criar cidade");
+    }
+  };
+
+  const handleEditCity = async (id: number, currentName: string) => {
+    const newName = prompt("Editar nome da cidade:", currentName);
+    if (!newName || newName === currentName) return;
+    try {
+      const res = await fetch("/api/cities", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, name: newName }),
+      });
+      if (res.ok) {
+        fetchData();
+        mutate("/api/lookups");
+      } else alert((await res.json()).error || "Erro ao editar cidade");
+    } catch {
+      alert("Erro ao editar cidade");
     }
   };
 
@@ -325,6 +394,24 @@ export function SettingsPage({
     }
   };
 
+  const handleEditNeighborhood = async (id: number, currentName: string) => {
+    const newName = prompt("Editar nome do bairro:", currentName);
+    if (!newName || newName === currentName) return;
+    try {
+      const res = await fetch("/api/neighborhoods", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, name: newName }),
+      });
+      if (res.ok) {
+        fetchData();
+        mutate("/api/lookups");
+      } else alert((await res.json()).error || "Erro ao editar bairro");
+    } catch {
+      alert("Erro ao editar bairro");
+    }
+  };
+
   const handleDeleteNeighborhood = async (id: number) => {
     if (!confirm("Excluir este bairro?")) return;
     try {
@@ -340,19 +427,77 @@ export function SettingsPage({
     }
   };
 
-  const handleSetPermission = async (
+  const handleAddTaskType = async () => {
+    const name = prompt("Nome do novo tipo de tarefa:");
+    if (!name) return;
+
+    const sectorNames = [
+      "0. Geral (Todos os Setores)",
+      ...sectors.map((s, i) => `${i + 1}. ${s.name}`),
+    ].join("\n");
+
+    let sectorInput = prompt(
+      `Para qual setor será este tipo de tarefa? (Digite o número)\n${sectorNames}`,
+    );
+
+    let sectorId: number | null = null;
+    if (sectorInput && sectorInput !== "0") {
+      const selectedIndex = parseInt(sectorInput, 10) - 1;
+      if (
+        !isNaN(selectedIndex) &&
+        selectedIndex >= 0 &&
+        selectedIndex < sectors.length
+      ) {
+        sectorId = sectors[selectedIndex].id;
+      } else {
+        return alert("Opção de setor inválida");
+      }
+    }
+
+    try {
+      const res = await fetch("/api/task-types", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, sector_id: sectorId }),
+      });
+      if (res.ok) {
+        fetchData();
+        mutate("/api/lookups");
+      } else alert((await res.json()).error || "Erro ao criar tipo de tarefa");
+    } catch {
+      alert("Erro ao criar tipo de tarefa");
+    }
+  };
+
+  const handleDeleteTaskType = async (id: number) => {
+    if (!confirm("Excluir este Tipo de Tarefa?")) return;
+    try {
+      const res = await fetch(`/api/task-types?id=${id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        fetchData();
+        mutate("/api/lookups");
+      } else alert((await res.json()).error || "Erro ao excluir");
+    } catch {
+      alert("Erro ao excluir");
+    }
+  };
+
+  const handleTogglePermission = async (
     roleId: number,
-    module: string,
-    level: PermissionLevel,
+    groupKey: string,
+    itemId: string,
   ) => {
     const roleIndex = roles.findIndex((r) => r.id === roleId);
     if (roleIndex === -1) return;
     const role = roles[roleIndex];
 
-    const newPerms: RolePermissions = {
-      ...(role.permissions || {}),
-      [module]: level,
-    };
+    const currentPerms: any = getPermissions({ role } as any);
+    const newValue = !currentPerms[groupKey][itemId];
+
+    const newPerms: any = { ...currentPerms };
+    newPerms[groupKey][itemId] = newValue;
 
     // Optimistic update
     const updated = [...roles];
@@ -380,6 +525,7 @@ export function SettingsPage({
     { id: "users", l: "Usuários", icon: Users },
     { id: "roles", l: "Cargos", icon: Briefcase },
     { id: "sectors", l: "Setores", icon: Building2 },
+    { id: "task-types", l: "Tipos de Tarefa", icon: Settings },
     { id: "locations", l: "Localidades", icon: MapPin },
     { id: "permissions", l: "Permissões", icon: Settings },
   ];
@@ -763,39 +909,75 @@ export function SettingsPage({
           )}
 
           {/* ═══════════════════════════════════════════════════════════════
+              TASK TYPES TAB — Admin only
+          ═══════════════════════════════════════════════════════════════ */}
+          {tab === "task-types" && isAdmin && (
+            <div className="flex flex-col gap-2">
+              <div className="flex justify-between items-center mb-4">
+                <span className="text-[13px] font-semibold text-slate-900 dark:text-gray-50">
+                  Tipos de Tarefa Dinâmicos
+                </span>
+                <button
+                  onClick={handleAddTaskType}
+                  className="flex items-center gap-[5px] py-1.5 px-3 bg-primary text-white border-none rounded-lg text-xs font-semibold cursor-pointer"
+                >
+                  <Plus size={12} />
+                  Novo Tipo
+                </button>
+              </div>
+
+              {taskTypes.map((tt) => (
+                <div
+                  key={tt.id}
+                  className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl py-3 px-4 flex justify-between items-center"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-[34px] h-[34px] bg-sky-100 rounded-lg flex items-center justify-center">
+                      <Settings size={16} color="#0284c7" />
+                    </div>
+                    <div>
+                      <div className="text-[13px] font-semibold text-slate-900 dark:text-gray-50">
+                        {tt.name}
+                      </div>
+                      <div className="text-[11px] text-slate-500 dark:text-gray-400">
+                        {tt.Sector
+                          ? `Setor: ${tt.Sector.name}`
+                          : "Geral (Todos os Setores)"}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => handleDeleteTaskType(tt.id)}
+                      className="bg-red-50 border-none rounded-md p-[5px] cursor-pointer"
+                    >
+                      <Trash2 size={13} color="#ef4444" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {taskTypes.length === 0 && (
+                <div className="py-6 px-4 text-center text-slate-500 dark:text-gray-400 text-[13px]">
+                  Nenhum tipo de tarefa cadastrado.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ═══════════════════════════════════════════════════════════════
               PERMISSIONS TAB — Admin only
           ═══════════════════════════════════════════════════════════════ */}
           {tab === "permissions" && isAdmin && (
             <div className="flex flex-col gap-4">
-              {/* Legend */}
-              <div className="flex gap-3 flex-wrap bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-[10px] py-2.5 px-4">
-                <span className="text-xs font-semibold text-slate-500 dark:text-gray-400 mr-1">
-                  Legenda:
-                </span>
-                {PERMISSION_LEVELS.map((pl) => (
-                  <span
-                    key={pl.value}
-                    className="text-xs flex items-center gap-[5px]"
-                  >
-                    <span
-                      className="inline-block w-[9px] h-[9px] rounded-full"
-                      style={{ background: pl.color }}
-                    />
-                    <span className="text-slate-900 dark:text-gray-50">
-                      {pl.label}
-                    </span>
-                  </span>
-                ))}
-              </div>
-
-              {/* Permissions table */}
               <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-[14px] overflow-auto">
                 <div className="py-3.5 px-4 border-b border-slate-200 dark:border-gray-700">
                   <div className="text-[13px] font-semibold text-slate-900 dark:text-gray-50">
-                    Permissões por Cargo
+                    Permissões Avançadas por Cargo (RBAC)
                   </div>
                   <div className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">
-                    As alterações são salvas automaticamente.
+                    As alterações são salvas automaticamente e assumidas em
+                    tempo real.
                   </div>
                 </div>
 
@@ -803,7 +985,7 @@ export function SettingsPage({
                   <thead>
                     <tr className="border-b border-slate-200 dark:border-gray-700">
                       <th className="py-2.5 px-4 text-left text-[11px] font-bold text-slate-500 dark:text-gray-400 sticky left-0 bg-white dark:bg-gray-800">
-                        Módulo
+                        Capacidade
                       </th>
                       {roles.map((r) => (
                         <th
@@ -816,54 +998,59 @@ export function SettingsPage({
                     </tr>
                   </thead>
                   <tbody>
-                    {PERMISSION_MODULES.map((mod, i) => (
-                      <tr
-                        key={mod}
-                        className={
-                          i < PERMISSION_MODULES.length - 1
-                            ? "border-b border-slate-200 dark:border-gray-700"
-                            : ""
-                        }
-                      >
-                        <td className="py-2.5 px-4 text-[13px] font-medium text-slate-900 dark:text-gray-50 sticky left-0 bg-white dark:bg-gray-800">
-                          {mod}
-                        </td>
-                        {roles.map((r) => {
-                          const perms: RolePermissions =
-                            (r.permissions as RolePermissions) || {};
-                          const currentLevel: PermissionLevel =
-                            (perms[mod] as PermissionLevel) || "none";
-                          const levelInfo = PERMISSION_LEVELS.find(
-                            (pl) => pl.value === currentLevel,
-                          );
-
-                          return (
-                            <td key={r.id} className="py-2 px-3.5 text-center">
-                              <select
-                                value={currentLevel}
-                                onChange={(e) =>
-                                  handleSetPermission(
-                                    r.id,
-                                    mod,
-                                    e.target.value as PermissionLevel,
-                                  )
-                                }
-                                className="py-1 px-2 rounded-md bg-slate-100 dark:bg-gray-700 text-[11px] font-semibold cursor-pointer outline-none"
-                                style={{
-                                  border: `1.5px solid ${levelInfo?.color || "#e2e8f0"}`,
-                                  color: levelInfo?.color || "#0f172a",
-                                }}
-                              >
-                                {PERMISSION_LEVELS.map((pl) => (
-                                  <option key={pl.value} value={pl.value}>
-                                    {pl.label}
-                                  </option>
-                                ))}
-                              </select>
+                    {PERMISSION_GROUPS.map((group) => (
+                      <React.Fragment key={group.key}>
+                        {/* Group Header */}
+                        <tr className="bg-slate-50 dark:bg-gray-900/50">
+                          <td
+                            className="py-2 px-4 text-[11px] font-bold text-slate-700 dark:text-gray-300 uppercase tracking-wider sticky left-0"
+                            colSpan={roles.length + 1}
+                          >
+                            {group.category}
+                          </td>
+                        </tr>
+                        {/* Items */}
+                        {group.items.map((item, i) => (
+                          <tr
+                            key={item.id}
+                            className={
+                              i < group.items.length - 1
+                                ? "border-b border-slate-100 dark:border-gray-800"
+                                : ""
+                            }
+                          >
+                            <td className="py-2.5 px-4 text-[13px] font-medium text-slate-900 dark:text-gray-50 sticky left-0 bg-white dark:bg-gray-800">
+                              {item.label}
                             </td>
-                          );
-                        })}
-                      </tr>
+                            {roles.map((r) => {
+                              const p: any = getPermissions({ role: r } as any);
+                              const isChecked = !!p[group.key][item.id];
+
+                              // Don't let users edit God-mode Admin roles completely if it's destructive,
+                              // but for now, they can edit anything.
+                              return (
+                                <td
+                                  key={r.id}
+                                  className="py-2 px-3.5 text-center"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    onChange={() =>
+                                      handleTogglePermission(
+                                        r.id,
+                                        group.key,
+                                        item.id,
+                                      )
+                                    }
+                                    className="w-4 h-4 cursor-pointer accent-primary border-slate-300 rounded"
+                                  />
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </React.Fragment>
                     ))}
                   </tbody>
                 </table>
@@ -935,12 +1122,20 @@ export function SettingsPage({
                       <span className="text-xs text-slate-700 dark:text-gray-300 font-medium">
                         {c.name}
                       </span>
-                      <button
-                        onClick={() => handleDeleteContract(c.id)}
-                        className="p-1.5 text-slate-400 hover:text-red-500 bg-transparent border-none cursor-pointer"
-                      >
-                        <Trash2 size={13} />
-                      </button>
+                      <div className="flex gap-1.5 align-center">
+                        <button
+                          onClick={() => handleEditContract(c.id, c.name)}
+                          className="p-1.5 text-slate-400 hover:text-primary bg-transparent border-none cursor-pointer"
+                        >
+                          <Edit size={13} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteContract(c.id)}
+                          className="p-1.5 text-slate-400 hover:text-red-500 bg-transparent border-none cursor-pointer"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     </div>
                   ))}
                   {contracts.length === 0 && (
@@ -980,12 +1175,20 @@ export function SettingsPage({
                             {city._count?.neighborhoods || 0} bairros
                           </span>
                         </div>
-                        <button
-                          onClick={() => handleDeleteCity(city.id)}
-                          className="p-1.5 text-slate-400 hover:text-red-500 bg-transparent border-none cursor-pointer"
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                        <div className="flex gap-1.5 align-center">
+                          <button
+                            onClick={() => handleEditCity(city.id, city.name)}
+                            className="p-1.5 text-slate-400 hover:text-primary bg-transparent border-none cursor-pointer"
+                          >
+                            <Edit size={13} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCity(city.id)}
+                            className="p-1.5 text-slate-400 hover:text-red-500 bg-transparent border-none cursor-pointer"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       </div>
                     ))}
                     {cities.length === 0 && (
@@ -1023,12 +1226,20 @@ export function SettingsPage({
                             {n.city?.name}
                           </span>
                         </div>
-                        <button
-                          onClick={() => handleDeleteNeighborhood(n.id)}
-                          className="p-1.5 text-slate-400 hover:text-red-500 bg-transparent border-none cursor-pointer"
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                        <div className="flex gap-1.5 align-center">
+                          <button
+                            onClick={() => handleEditNeighborhood(n.id, n.name)}
+                            className="p-1.5 text-slate-400 hover:text-primary bg-transparent border-none cursor-pointer"
+                          >
+                            <Edit size={13} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteNeighborhood(n.id)}
+                            className="p-1.5 text-slate-400 hover:text-red-500 bg-transparent border-none cursor-pointer"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       </div>
                     ))}
                     {neighborhoods.length === 0 && (

@@ -1,5 +1,6 @@
 "use client";
 
+import { AppPermissions, getPermissions } from "@/lib/permissions";
 import {
   Bell,
   Calendar,
@@ -100,7 +101,12 @@ export default function GeoTask() {
   // ── SWR hooks (cached data fetching) ────────────────────────────────
   const { tasks, mutate: mutateTasks } = useTasks();
   const { users: dbUsers } = useUsers();
-  const { contracts, sectors: dbSectors, citiesNeighborhoods } = useLookups();
+  const {
+    contracts,
+    sectors: dbSectors,
+    citiesNeighborhoods,
+    taskTypes,
+  } = useLookups();
   const { templates, saveTemplate, deleteTemplate } = useTemplates();
   const { notifications, unreadCount, markRead, markAllRead } =
     useNotifications(user?.id ?? null);
@@ -181,8 +187,8 @@ export default function GeoTask() {
         body: JSON.stringify({ ...newTask, created_by: user?.id }),
       });
       if (res.ok) {
+        await mutateTasks();
         setShowNewTask(false);
-        mutateTasks();
       } else alert("Erro ao criar tarefa");
     } catch (err) {
       console.error(err);
@@ -197,7 +203,7 @@ export default function GeoTask() {
   ) => {
     try {
       if (action === "refresh") {
-        mutateTasks();
+        await mutateTasks();
         return;
       }
       const res = await fetch("/api/tasks", {
@@ -206,7 +212,7 @@ export default function GeoTask() {
         body: JSON.stringify({ id, action, user_id: user?.id, ...data }),
       });
       if (res.ok) {
-        mutateTasks();
+        await mutateTasks();
         setSelectedTask(null);
       }
     } catch (err) {
@@ -231,18 +237,15 @@ export default function GeoTask() {
   };
 
   // ── Permissions ─────────────────────────────────────────────────────
-  const canAccess = (p: string) => {
+  const appPerms = getPermissions(user);
+
+  const canAccess = (p: keyof AppPermissions["pages"] | "notifications") => {
     if (!user) return false;
-    if (p === "templates" && user.role?.name === "Liderado") return false;
-    return true;
+    if (p === "notifications") return true;
+    return appPerms.pages[p as keyof AppPermissions["pages"]];
   };
 
-  const canCreate = !!(
-    user &&
-    ["Admin", "Gerente", "Gestor", "Coordenador"].includes(
-      user.role?.name || "",
-    )
-  );
+  const canCreate = appPerms.tasks.create;
 
   // ── Task visibility (role-based filtering) ──────────────────────────
   const isLiderado = user?.role?.name === "Liderado";
@@ -287,33 +290,15 @@ export default function GeoTask() {
   if (!user) return null;
 
   // ── Nav items (role-filtered) ───────────────────────────────────────
-  const roleName = user.role?.name || "";
-  const rolePerms: any = (user as any)?.role?.permissions || {};
-
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "kanban", label: "Quadro de Tarefas", icon: Layers },
     { id: "cronograma", label: "Cronograma", icon: Calendar },
     { id: "mindmap", label: "Mapa de Tarefas", icon: FileText },
     { id: "notifications", label: "Notificações", icon: Bell },
-    ...(canAccess("templates")
-      ? [{ id: "templates", label: "Templates", icon: FileText }]
-      : []),
-    ...(canAccess("settings")
-      ? [{ id: "settings", label: "Configurações", icon: Settings }]
-      : []),
-  ].filter(({ id }) => {
-    if (id === "settings") return !!user;
-    if (id === "dashboard") {
-      if (roleName === "Liderado") return false;
-      if (rolePerms["Dashboard"] === "none") return false;
-    }
-    if (id === "templates") {
-      if (roleName === "Liderado") return false;
-      if (rolePerms["Templates"] === "none") return false;
-    }
-    return true;
-  });
+    { id: "templates", label: "Templates", icon: FileText },
+    { id: "settings", label: "Configurações", icon: Settings },
+  ].filter(({ id }) => canAccess(id as any));
 
   // ── RENDER ──────────────────────────────────────────────────────────
   return (
@@ -360,6 +345,7 @@ export default function GeoTask() {
               contracts={contracts}
               citiesNeighborhoods={citiesNeighborhoods}
               sectors={mergedSectors}
+              taskTypes={taskTypes}
             />
           )}
           {page === "kanban" && (
@@ -374,6 +360,7 @@ export default function GeoTask() {
               contracts={contracts}
               citiesNeighborhoods={citiesNeighborhoods}
               sectors={mergedSectors}
+              taskTypes={taskTypes}
             />
           )}
           {page === "map" && (
@@ -453,6 +440,7 @@ export default function GeoTask() {
           tasks={tasks}
           setSelectedTask={setSelectedTask}
           sectors={mergedSectors}
+          taskTypes={taskTypes}
         />
       )}
       {showNewTask && (
@@ -460,11 +448,13 @@ export default function GeoTask() {
           T={T}
           onClose={() => setShowNewTask(false)}
           onSave={handleCreateTask}
+          user={user}
           users={dbUsers}
           contracts={contracts}
           citiesNeighborhoods={citiesNeighborhoods}
           templates={templates}
           sectors={mergedSectors}
+          taskTypes={taskTypes}
         />
       )}
       {showMustChangePassword && user && (

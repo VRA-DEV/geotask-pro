@@ -17,13 +17,7 @@ import {
 
 import AIReportModal from "@/components/AIReportModal";
 import { TaskFilters } from "@/components/shared/TaskFilters";
-import {
-  PRIO_COLOR,
-  PRIORITIES,
-  SECTORS,
-  STATUS_COLOR,
-  TASK_TYPES,
-} from "@/lib/constants";
+import { PRIO_COLOR, PRIORITIES, SECTORS, STATUS_COLOR } from "@/lib/constants";
 import { exportToExcel, getKpiData, type ExportKPIs } from "@/lib/exportUtils";
 import { getTaskState, parseDate } from "@/lib/helpers";
 import type {
@@ -104,6 +98,7 @@ interface DashboardPageProps {
   onSelect: (task: DashboardTask) => void;
   users?: User[];
   contracts?: string[];
+  taskTypes?: { id: number; name: string }[];
   citiesNeighborhoods?: CitiesNeighborhoods;
   sectors?: Sector[];
 }
@@ -115,6 +110,7 @@ export default function DashboardPage({
   onSelect,
   users = [],
   contracts = [],
+  taskTypes = [],
   citiesNeighborhoods = {},
   sectors = [],
 }: DashboardPageProps) {
@@ -232,10 +228,12 @@ export default function DashboardPage({
         ) / concludedForAvg.length,
       )
     : 0;
-  const byType = TASK_TYPES.map((tp) => ({
-    name: tp,
-    val: filtered.filter((t: DashboardTask) => t.type === tp).length,
-  })).filter((x) => x.val > 0);
+  const byType = taskTypes
+    .map((tp) => ({
+      name: tp.name,
+      val: filtered.filter((t: DashboardTask) => t.type === tp.name).length,
+    }))
+    .filter((x) => x.val > 0);
   const byPriority = PRIORITIES.map((p) => ({
     name: p,
     val: filtered.filter((t: DashboardTask) => t.priority === p).length,
@@ -428,6 +426,8 @@ export default function DashboardPage({
         setDateTo={setFDateTo}
         users={users}
         contracts={contracts}
+        taskTypes={taskTypes}
+        sectors={sectors}
         citiesNeighborhoods={citiesNeighborhoods}
         onClear={clearAll}
         totalTasks={tasks.length}

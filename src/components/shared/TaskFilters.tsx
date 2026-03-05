@@ -1,9 +1,9 @@
 "use client";
 
-import { PRIORITIES, SECTORS, TASK_TYPES } from "@/lib/constants";
+import { PRIORITIES, SECTORS } from "@/lib/constants";
 import type { CitiesNeighborhoods, ThemeColors, User } from "@/types";
 import { Filter, Search, X } from "lucide-react";
-import { useState } from "react";
+import React, { useState } from "react";
 import { DateRange } from "react-day-picker";
 import { DateRangePicker, FilterSelect, MultiSelect } from "./FilterInputs";
 
@@ -33,6 +33,8 @@ interface TaskFiltersProps {
   setDateTo: (v: DateRange | undefined) => void;
   users?: User[];
   contracts?: string[];
+  taskTypes?: { id: number; name: string; sector_id?: number | null }[];
+  sectors?: { id?: number | string; name: string }[];
   citiesNeighborhoods?: CitiesNeighborhoods;
   onClear: () => void;
   totalTasks: number;
@@ -65,6 +67,8 @@ export function TaskFilters({
   setDateTo,
   users = [],
   contracts = [],
+  taskTypes = [],
+  sectors = [],
   citiesNeighborhoods = {},
   onClear,
   totalTasks,
@@ -73,6 +77,22 @@ export function TaskFilters({
   const [isOpen, setIsOpen] = useState(false);
 
   const cityNeighborhoods = city ? citiesNeighborhoods[city] || [] : [];
+  const sectorOptions =
+    sectors.length > 0 ? sectors.map((s) => s.name) : SECTORS;
+
+  // Derive which task types to show based on selected sectors
+  const visibleTaskTypes = React.useMemo(() => {
+    if (!sector || sector.length === 0) return taskTypes.map((t) => t.name);
+
+    return taskTypes
+      .filter((t) => {
+        if (!t.sector_id) return true; // General tasks are always visible
+        const matchSector = sectors.find((s) => s.id === t.sector_id);
+        if (!matchSector) return true; // If we can't find it, don't hide
+        return sector.includes(matchSector.name);
+      })
+      .map((t) => t.name);
+  }, [taskTypes, sector, sectors]);
 
   const activeCount = [
     status,
@@ -128,7 +148,7 @@ export function TaskFilters({
               label="Setores"
               val={sector}
               onChange={setSector}
-              opts={SECTORS}
+              opts={sectorOptions}
               placeholder="Todos"
             />
           </div>
@@ -207,7 +227,7 @@ export function TaskFilters({
             label="Tipo"
             val={type}
             onChange={setType}
-            opts={TASK_TYPES}
+            opts={visibleTaskTypes}
             placeholder="Todos"
           />
           {setResponsible && (

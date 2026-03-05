@@ -61,3 +61,31 @@ export async function DELETE(req: Request) {
     );
   }
 }
+
+export async function PUT(req: Request) {
+  try {
+    const { id, name } = await req.json();
+    if (!id || !name) {
+      return NextResponse.json(
+        { error: "ID e Nome são obrigatórios" },
+        { status: 400 },
+      );
+    }
+    const neighborhood = await prisma.neighborhood.update({
+      where: { id: Number(id) },
+      data: { name },
+    });
+    return NextResponse.json(neighborhood);
+  } catch (error: any) {
+    if (error.code === "P2002") {
+      return NextResponse.json(
+        { error: "Já existe um bairro com este nome" },
+        { status: 400 },
+      );
+    }
+    return NextResponse.json(
+      { error: "Erro ao atualizar bairro" },
+      { status: 500 },
+    );
+  }
+}

@@ -85,6 +85,29 @@ async function notifyManagers(
   }
 }
 
+function parseBackendDate(d: any): Date | null {
+  if (!d) return null;
+  if (d instanceof Date) return isNaN(d.getTime()) ? null : d;
+
+  const dStr = String(d).trim();
+  if (!dStr || dStr.toLowerCase() === "null" || dStr === "undefined")
+    return null;
+
+  // Handles DD/MM/YYYY
+  if (dStr.includes("/")) {
+    const parts = dStr.split("/");
+    if (parts.length === 3) {
+      const [day, month, year] = parts.map(Number);
+      const parsed = new Date(year, month - 1, day);
+      return isNaN(parsed.getTime()) ? null : parsed;
+    }
+  }
+
+  // Fallback to native (ISO, etc.)
+  const fallback = new Date(dStr);
+  return isNaN(fallback.getTime()) ? null : fallback;
+}
+
 // GET /api/tasks?page=1&limit=50&status=A+Fazer&sector_id=3
 export async function GET(request: NextRequest) {
   try {
@@ -314,18 +337,7 @@ export async function POST(req: Request) {
       nucleus,
       quadra: quadra || "",
       lote: lote || "",
-      deadline: deadline
-        ? (() => {
-            const dStr = String(deadline);
-            if (dStr.includes("/")) {
-              const [d, m, y] = dStr.split("/");
-              const parsed = new Date(`${y}-${m}-${d}`);
-              return isNaN(parsed.getTime()) ? null : parsed;
-            }
-            const parsed = new Date(dStr);
-            return isNaN(parsed.getTime()) ? null : parsed;
-          })()
-        : null,
+      deadline: parseBackendDate(deadline),
       link: link || "",
       created_by_id: createdById,
       parent_id: parentId,
@@ -467,10 +479,13 @@ async function logHistory(
   const maskedField = FIELD_NAMES[field] || field;
 
   const formatValue = (v: any) => {
-    if (v instanceof Date) return v.toLocaleDateString("pt-BR");
+    if (v instanceof Date) {
+      if (isNaN(v.getTime())) return "";
+      return v.toLocaleDateString("pt-BR");
+    }
     if (typeof v === "object" && v !== null) return JSON.stringify(v);
     const s = String(v || "");
-    return s === "null" || s === "undefined" ? "" : s;
+    return s === "null" || s === "undefined" || s === "Invalid Date" ? "" : s;
   };
 
   const ov = formatValue(oldValue);
@@ -595,72 +610,150 @@ export async function PATCH(req: Request) {
         }
       }
 
+      // Handle retroactive date changes
+      const updatedStarted =
+        data.started_at !== undefined ? data.started_at : data.started;
+      const updatedCompleted =
+        data.completed_at !== undefined ? data.completed_at : data.completed;
+
+      if (updatedStarted !== undefined || updatedCompleted !== undefined) {
+        let newStarted = task.started_at;
+        let newCompleted = task.completed_at;
+
+        if (updatedStarted !== undefined) {
+          const s = updatedStarted ? new Date(updatedStarted) : null;
+          if (s?.getTime() !== task.started_at?.getTime()) {
+            await logHistory(task.id, userId, "started_at", task.started_at, s);
+            updateData.started_at = s;
+            newStarted = s;
+          }
+        }
+
+        if (updatedCompleted !== undefined) {
+          const c = updatedCompleted ? new Date(updatedCompleted) : null;
+          if (c?.getTime() !== task.completed_at?.getTime()) {
+            await logHistory(
+              task.id,
+              userId,
+              "completed_at",
+              task.completed_at,
+              c,
+            );
+            updateData.completed_at = c;
+            newCompleted = c;
+          }
+        }
+
+        // Recalculate time_spent if both are valid dates
+        if (
+          newStarted &&
+          newCompleted &&
+          !isNaN(newStarted.getTime()) &&
+          !isNaN(newCompleted.getTime())
+        ) {
+          const diffMs = newCompleted.getTime() - newStarted.getTime();
+          if (diffMs > 0) {
+            const newTimeSpent = Math.floor(diffMs / 1000); // in seconds
+            updateData.time_spent = newTimeSpent;
+          }
+        }
+      }
+
       if (data.sector !== undefined) {
         const sId = await resolveSectorId(data.sector);
-        await logHistory(task.id, userId, "sector_id", task.sector_id, sId);
-        updateData.sector_id = sId;
+        if (sId !== task.sector_id) {
+          await logHistory(task.id, userId, "sector_id", task.sector_id, sId);
+          updateData.sector_id = sId;
+        }
       }
 
       if (data.responsible_id !== undefined) {
-        const rId = data.responsible_id ? Number(data.responsible_id) : null;
-        await logHistory(
-          task.id,
-          userId,
-          "responsible_id",
-          task.responsible_id,
-          rId,
-        );
-        updateData.responsible_id = rId;
+        const rId =
+          data.responsible_id && !isNaN(Number(data.responsible_id))
+            ? Number(data.responsible_id)
+            : null;
 
-        // Notify the newly assigned responsible (if it changed and is not null)
-        if (rId && rId !== task.responsible_id) {
-          let changerName = "Alguém";
-          if (userId) {
-            const changer = await prisma.user.findUnique({
-              where: { id: userId },
-            });
-            if (changer) changerName = changer.name;
-          }
-          const ds = new Date().toLocaleDateString();
-          const ts = new Date().toLocaleTimeString().slice(0, 5);
-          await notifyUser(
-            rId,
-            "task_assigned",
-            "Nova Atribuição",
-            `${changerName} atribuiu a tarefa "${task.title}" a você em ${ds} às ${ts}h.`,
+        if (rId !== task.responsible_id) {
+          await logHistory(
             task.id,
+            userId,
+            "responsible_id",
+            task.responsible_id,
+            rId,
           );
+          updateData.responsible_id = rId;
+
+          // Notify the newly assigned responsible
+          if (rId) {
+            let changerName = "Alguém";
+            if (userId) {
+              const changer = await prisma.user.findUnique({
+                where: { id: userId },
+              });
+              if (changer) changerName = changer.name;
+            }
+            const ds = new Date().toLocaleDateString();
+            const ts = new Date().toLocaleTimeString().slice(0, 5);
+            await notifyUser(
+              rId,
+              "task_assigned",
+              "Nova Atribuição",
+              `${changerName} atribuiu a tarefa "${task.title}" a você em ${ds} às ${ts}h.`,
+              task.id,
+            );
+          }
         }
       }
 
       if (data.contract !== undefined) {
-        const c = await prisma.contract.findUnique({
-          where: { name: data.contract },
-        });
-        if (c) {
+        const contractName = String(data.contract || "").trim();
+        let cId: number | null = null;
+
+        if (contractName && contractName !== "Selecione...") {
+          const c = await prisma.contract.findFirst({
+            where: { name: { equals: contractName, mode: "insensitive" } },
+          });
+          if (c) cId = c.id;
+        }
+
+        if (cId !== task.contract_id) {
           await logHistory(
             task.id,
             userId,
             "contract_id",
             task.contract_id,
-            c.id,
+            cId,
           );
-          updateData.contract_id = c.id;
+          updateData.contract_id = cId;
         }
       }
 
       if (data.city !== undefined) {
-        const c = await prisma.city.findUnique({ where: { name: data.city } });
-        if (c) {
-          await logHistory(task.id, userId, "city_id", task.city_id, c.id);
-          updateData.city_id = c.id;
+        const cityName = String(data.city || "").trim();
+        let cityId: number | null = null;
+
+        if (cityName && cityName !== "Selecione...") {
+          const c = await prisma.city.findFirst({
+            where: { name: { equals: cityName, mode: "insensitive" } },
+          });
+          if (c) cityId = c.id;
+        }
+
+        if (cityId !== task.city_id) {
+          await logHistory(task.id, userId, "city_id", task.city_id, cityId);
+          updateData.city_id = cityId;
         }
       }
 
       if (data.deadline !== undefined) {
-        const d = data.deadline ? new Date(data.deadline) : null;
-        await logHistory(task.id, userId, "deadline", task.deadline, d);
-        updateData.deadline = d;
+        const d = parseBackendDate(data.deadline);
+        const oldD = task.deadline ? new Date(task.deadline) : null;
+
+        // Compare timestamps to avoid unnecessary updates if same date
+        if (d?.getTime() !== oldD?.getTime()) {
+          await logHistory(task.id, userId, "deadline", task.deadline, d);
+          updateData.deadline = d;
+        }
       }
 
       await prisma.task.update({ where: { id: Number(id) }, data: updateData });

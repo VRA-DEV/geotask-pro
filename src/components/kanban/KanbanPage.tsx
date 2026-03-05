@@ -69,6 +69,7 @@ interface KanbanPageProps {
   contracts?: string[];
   citiesNeighborhoods?: CitiesNeighborhoods;
   sectors?: Sector[];
+  taskTypes?: any[];
 }
 
 // ── Inline helper components ────────────────────────────────────
@@ -271,6 +272,7 @@ export default function KanbanPage({
   contracts = [],
   citiesNeighborhoods = {},
   sectors = [],
+  taskTypes = [],
 }: KanbanPageProps) {
   const [search, setSearch] = useState("");
   const [fSector, setFSector] = useState<string[]>([]);
@@ -404,6 +406,8 @@ export default function KanbanPage({
         dateTo={fDateTo}
         setDateTo={setFDateTo}
         contracts={contracts}
+        taskTypes={taskTypes}
+        sectors={sectors}
         citiesNeighborhoods={citiesNeighborhoods}
         onClear={clearAll}
         totalTasks={tasks.length}

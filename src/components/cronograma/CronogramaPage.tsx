@@ -50,6 +50,7 @@ interface CronogramaPageProps {
   contracts?: string[];
   citiesNeighborhoods?: CitiesNeighborhoods;
   sectors?: (Sector | string)[];
+  taskTypes?: any[];
 }
 
 export default function CronogramaPage({
@@ -60,6 +61,7 @@ export default function CronogramaPage({
   contracts = [],
   citiesNeighborhoods = {},
   sectors = [],
+  taskTypes = [],
 }: CronogramaPageProps) {
   const [search, setSearch] = useState("");
   const [fSector, setFSector] = useState<string[]>([]);
@@ -186,6 +188,8 @@ export default function CronogramaPage({
         dateTo={fDateTo}
         setDateTo={setFDateTo}
         contracts={contracts}
+        taskTypes={taskTypes}
+        sectors={sectors as any}
         citiesNeighborhoods={citiesNeighborhoods}
         onClear={clearAll}
         totalTasks={tasks.length}

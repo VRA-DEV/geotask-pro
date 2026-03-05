@@ -7,13 +7,24 @@ export function FormSelect({
   val,
   onChange,
   opts,
+  groups,
   placeholder = "",
   err = "",
 }: {
   T: ThemeColors;
   val: string;
   onChange: (v: string) => void;
-  opts: Array<string | { id?: number | string; name?: string; label?: string; value?: string }>;
+  opts?: Array<
+    | string
+    | { id?: number | string; name?: string; label?: string; value?: string }
+  >;
+  groups?: Array<{
+    label: string;
+    options: Array<
+      | string
+      | { id?: number | string; name?: string; label?: string; value?: string }
+    >;
+  }>;
   placeholder?: string;
   err?: string;
 }) {
@@ -34,17 +45,40 @@ export function FormSelect({
       }}
     >
       <option value="">{placeholder || "Selecionar..."}</option>
-      {opts.map((o, i) => {
-        const label = typeof o === "object" ? o.name || o.label : o;
-        const value = typeof o === "object" ? o.id || o.value : o;
-        const key =
-          typeof o === "object" ? o.id || o.name || `opt-${i}` : `opt-${o}-${i}`;
-        return (
-          <option key={key} value={String(value)}>
-            {String(label)}
-          </option>
-        );
-      })}
+
+      {opts &&
+        opts.map((o, i) => {
+          const label = typeof o === "object" ? o.name || o.label : o;
+          const value = typeof o === "object" ? o.id || o.value : o;
+          const key =
+            typeof o === "object"
+              ? o.id || o.name || `opt-${i}`
+              : `opt-${o}-${i}`;
+          return (
+            <option key={key} value={String(value)}>
+              {String(label)}
+            </option>
+          );
+        })}
+
+      {groups &&
+        groups.map((g: any, i: number) => (
+          <optgroup key={`group-${i}`} label={g.label}>
+            {g.options.map((o: any, j: number) => {
+              const label = typeof o === "object" ? o.name || o.label : o;
+              const value = typeof o === "object" ? o.id || o.value : o;
+              const key =
+                typeof o === "object"
+                  ? o.id || o.name || `opt-${j}`
+                  : `opt-${o}-${j}`;
+              return (
+                <option key={key} value={String(value)}>
+                  {String(label)}
+                </option>
+              );
+            })}
+          </optgroup>
+        ))}
     </select>
   );
 }

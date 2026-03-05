@@ -54,3 +54,31 @@ export async function DELETE(req: Request) {
     );
   }
 }
+
+export async function PUT(req: Request) {
+  try {
+    const { id, name } = await req.json();
+    if (!id || !name) {
+      return NextResponse.json(
+        { error: "ID e Nome são obrigatórios" },
+        { status: 400 },
+      );
+    }
+    const contract = await prisma.contract.update({
+      where: { id: Number(id) },
+      data: { name },
+    });
+    return NextResponse.json(contract);
+  } catch (error: any) {
+    if (error.code === "P2002") {
+      return NextResponse.json(
+        { error: "Já existe um contrato com este nome" },
+        { status: 400 },
+      );
+    }
+    return NextResponse.json(
+      { error: "Erro ao atualizar contrato" },
+      { status: 500 },
+    );
+  }
+}

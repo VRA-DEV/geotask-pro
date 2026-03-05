@@ -53,3 +53,31 @@ export async function DELETE(req: Request) {
     );
   }
 }
+
+export async function PUT(req: Request) {
+  try {
+    const { id, name } = await req.json();
+    if (!id || !name) {
+      return NextResponse.json(
+        { error: "ID e Nome são obrigatórios" },
+        { status: 400 },
+      );
+    }
+    const city = await prisma.city.update({
+      where: { id: Number(id) },
+      data: { name },
+    });
+    return NextResponse.json(city);
+  } catch (error: any) {
+    if (error.code === "P2002") {
+      return NextResponse.json(
+        { error: "Já existe uma cidade com este nome" },
+        { status: 400 },
+      );
+    }
+    return NextResponse.json(
+      { error: "Erro ao atualizar cidade" },
+      { status: 500 },
+    );
+  }
+}

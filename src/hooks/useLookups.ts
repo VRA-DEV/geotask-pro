@@ -12,6 +12,7 @@ export function useLookups() {
   return {
     contracts: data?.contracts || [],
     sectors: data?.sectors || [],
+    taskTypes: data?.task_types || [],
     citiesNeighborhoods: data?.cities_neighborhoods || {},
     isLoading,
     error,
