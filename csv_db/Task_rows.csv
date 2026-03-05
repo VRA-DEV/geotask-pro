@@ -1,0 +1,41 @@
+id,title,description,type,status,priority,responsible_id,contract_id,city_id,neighborhood_id,nucleus,quadra,lote,deadline,link,created_by_id,created_at,updated_at,started_at,paused_at,completed_at,time_spent,parent_id,sector_id
+1,Frente 1 - Meta I e II - Receita,"572 lotes 
+",Nova Tarefa,A Fazer,Alta,5,16,51,,,,,2026-03-20 00:00:00,,4,2026-03-03 19:26:47.836,2026-03-05 00:28:16.271,,,,0,,9
+2,Frente 1 - Meta 1.1 a 5.1 - Receita,500 lotes,Nova Tarefa,A Fazer,Alta,5,18,52,,,,,2026-03-20 00:00:00,,6,2026-03-03 21:03:50.371,2026-03-05 00:27:58.407,,,,0,,9
+3,Frente 1 - Meta 1.1.1 a 2.3.1,2.500 lotes,Nova Tarefa,A Fazer,Alta,5,19,48,,,,,2026-03-30 00:00:00,,6,2026-03-03 21:23:22.806,2026-03-05 00:28:36.987,,,,0,,9
+4,Frente 2 - Resposta contestação contrato 120/2025,1095/2026,Nova Tarefa,A Fazer,Alta,5,17,65,,,,,2026-03-04 04:00:00,,6,2026-03-04 18:12:52.531,2026-03-04 18:12:52.531,,,,0,,9
+5,Frente 2 - Senhor dos Passos II,Adaptação de CRF,Nova Tarefa,A Fazer,Alta,5,14,48,,Jardim Alvorada - Loteamento Senhor dos Passos II,,,2026-03-06 04:00:00,,6,2026-03-04 18:14:55.486,2026-03-04 18:14:55.486,,,,0,,9
+6,Frente 2 - Senhor dos Passos IV,Adaptação de CRF,Nova Tarefa,A Fazer,Alta,5,14,,,,,,2026-03-06 04:00:00,,6,2026-03-04 18:17:12.352,2026-03-04 19:24:29.469,,,,0,,9
+7,Frente 2 - Alteração Termo de Compromisso São Jorge,"Deverá compor itens a serem enviados a Prefeitura de Tangará da Serra, após definição de projeto, o qual está em análise do Grupo LPCD.
+Ocorre, porém, que ajuste no Termo já poderá ser feito e enviado para análise do Grupo.",Nova Tarefa,A Fazer,Alta,5,17,65,,,,,2026-03-06 04:00:00,,6,2026-03-04 18:21:10.076,2026-03-04 19:24:49.535,,,,0,,9
+8,Frente 2 - O.S. Complementar VRC II,,Nova Tarefa,A Fazer,Alta,6,19,48,,,,,2026-03-06 04:00:00,,6,2026-03-04 18:22:57.967,2026-03-04 19:25:19.577,,,,0,,6
+9,Frente 2 - Alterações gerais Juruena,Seguir e-mail/Ata com alusão à notificação.,Nova Tarefa,A Fazer,Alta,5,16,50,,,,,2026-03-06 04:00:00,,6,2026-03-04 18:28:15.458,2026-03-04 19:25:30.846,,,,0,,9
+10,Frente 2 - Resposta ofício 038/2026/PGM/Juína,Resposta ao Ofício nº 038/PGM/JUINA/2026.,Nova Tarefa,A Fazer,Baixa,10,16,51,,,,,2026-03-06 00:00:00,,6,2026-03-04 18:31:12.939,2026-03-05 12:57:53.169,,,,0,,10
+11,Frente 2 - Resposta ofício 044/Juína,Ofício de resposta ao cartório de Juína.,Nova Tarefa,A Fazer,Baixa,3,16,51,,Palmiteira,,,2026-03-06 00:00:00,,6,2026-03-04 18:33:22.586,2026-03-05 12:56:13.327,,,,0,,7
+12,"Frente 2 - Nota de Exigência 175/2025 ",,Nota Devolutiva,A Fazer,Alta,5,11,67,,Centro,,,2026-03-06 04:00:00,,6,2026-03-04 18:34:46.954,2026-03-04 19:27:52.106,,,,0,,9
+13,Frente 2 - Envio de itens ao cartório de Chapada,Materiais de CRF,Nova Tarefa,A Fazer,Alta,5,14,43,,Altos da Chapada,,,2026-03-06 04:00:00,,6,2026-03-04 18:35:57.203,2026-03-04 19:27:26.139,,,,0,,9
+14,Frente 2 - Reunião de Trabalho por vídeoconferência,Alinhamento e tomada de decisões.,Nova Tarefa,A Fazer,Média,5,18,52,,Vale do Reginaldo - 1ª Etapa,,,2026-03-06 00:00:00,,6,2026-03-04 18:37:14.086,2026-03-05 13:09:09.118,,,,0,,9
+15,Frente 2 - Reunião Comissão de Assuntos Fundiários,"Alinhamento mensal entre empresa, Prefeitura, Cartório e Comissão.",Nova Tarefa,Concluído,Média,6,11,67,,Centro,,,2026-03-06 04:00:00,,6,2026-03-04 18:39:29.436,2026-03-04 20:49:27.151,2026-03-04 20:01:28.5,,2026-03-04 20:49:27.151,2878,,6
+16,Frente 2 - Reunião de Alinhamento com MP/VG,Despachar projetos.,Nova Tarefa,A Fazer,Média,5,12,68,,,,,2026-03-06 04:00:00,,6,2026-03-04 18:41:27.028,2026-03-04 19:26:16.575,,,,0,,9
+17,Frente 2 - Envio de itens ao cartório de Comodoro,Itens de CRF de Comodoro e Nova Lacerda,Nova Tarefa,A Fazer,Alta,3,11,45,,,,,2026-03-06 00:00:00,,6,2026-03-04 18:42:38.31,2026-03-05 13:02:05.434,,,,0,,7
+18,Frente 2 - Reunião de alinhamento,"Necessário coletar todas as evidências que justifiquem o problema que estamos vivenciando em Campo Novo:
+1 - Evidências dos pedidos;
+2 - Contexto das alterações;
+3 - Devolutivas contrárias aos acordos;
+
+Deixar claro que fizemos (mostrar evidências) das titulações em cima de títulos que possuem casa única em cima de matrícula única, demonstrando que o passivo remanescente são 1. oriundos de lotes que não possuem matrícula aberta e 2. lotes desdobrados, ex.: há uma matrícula aberta e no solo duas casas.",Nova Tarefa,A Fazer,Alta,5,10,40,,,,,2026-03-10 04:00:00,,6,2026-03-04 19:22:01.922,2026-03-04 19:22:01.922,,,,0,,9
+19,Frente 2 - Ajustes de itens CRF Vila Bela,"Ajustes em CRF e mapas
+
+Quanto a CRF:
+1. Considerar área da câmara como beneficiário;
+2. Considerar entidades religiosas como beneficiários.
+3. Patrimônio histórico",Nova Tarefa,Em Andamento,Alta,5,11,67,,Centro,,,2026-03-05 04:00:00,,6,2026-03-04 21:14:37.689,2026-03-05 12:54:00.89,2026-03-05 12:54:00.889,,,0,,9
+20,"Frente 2 - Revisões de notificações e editais ","Documentos (modelos) e procedimento de A a Z, prazos etc.
+Todos os contratos/modelo padrão.",Nova Tarefa,A Fazer,Alta,10,11,,,,,,2026-03-13 00:00:00,,6,2026-03-04 22:26:11.097,2026-03-05 13:00:16.278,,,,0,,10
+21,Frente 2 - Solicitação de BCI,"Nos relatórios 2.2.1 passar a colocar BCI igual de Maceió daqui pra frente, junto com documentos antigos de referência (imagens de mapas e matrículas etc).
+Em todos os estudos solicitar BCIs aos municípios ou por intermédio do INTERMAT.",Vistoria,A Fazer,Alta,5,19,,,,,,2026-03-13 04:00:00,,6,2026-03-04 23:05:27.898,2026-03-04 23:05:27.898,,,,0,,9
+22,Patrimônio Histórico,Patrimônio histórico - Verificar como adicionar a informação na CRF>,Nova Tarefa,A Fazer,Alta,10,11,67,,Centro,,,2026-03-06 04:00:00,,5,2026-03-05 12:50:42.209,2026-03-05 12:53:39.17,,,,0,19,10
+23,Alteração CRF e Projeto Urbanístico - Vila Bela,"1. Considerar área da câmara como beneficiário;
+2. Considerar entidades religiosas como beneficiários.",Nova Tarefa,Em Andamento,Alta,3,11,67,,Centro,,,2026-03-06 04:00:00,,5,2026-03-05 12:51:37.488,2026-03-05 12:53:58.884,2026-03-05 12:53:58.884,,,0,19,7
+24,Item 05 - Correção de suposto erro material,Correção do suposto erro material cometido na quadra 08 lote 21 do bairro Primavera de Juruena.,Nova Tarefa,A Fazer,Média,10,16,50,,,,,2026-03-06 00:00:00,,5,2026-03-05 13:18:47.254,2026-03-05 13:20:32.854,,,,0,9,10
+25,Item 06 - Corração de memorial descritivo,,Nova Tarefa,A Fazer,Média,3,16,50,,,,,2026-03-06 00:00:00,,5,2026-03-05 13:20:20.843,2026-03-05 13:20:50.151,,,,0,9,7

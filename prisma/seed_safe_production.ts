@@ -305,41 +305,83 @@ async function main() {
   // 1. Roles
   console.log("🎭 Seeding Roles...");
   for (const r of ROLES) {
-    await prisma.role.upsert({
-      where: { name: r },
-      update: {},
-      create: { name: r },
-    });
+    try {
+      const existing = await prisma.role.findUnique({ where: { name: r } });
+      if (!existing) {
+        await prisma.role.create({ data: { name: r } });
+        console.log(`   + Created role: ${r}`);
+      } else {
+        console.log(`   - Role already exists: ${r}`);
+      }
+    } catch (err: any) {
+      if (err.code === "P2002") {
+        console.warn(`   ⚠️ Conflict on role "${r}", skipping...`);
+      } else {
+        throw err;
+      }
+    }
   }
 
   // 2. Sectors
   console.log("🏢 Seeding Sectors...");
   for (const s of SECTORS) {
-    await prisma.sector.upsert({
-      where: { name: s },
-      update: {},
-      create: { name: s },
-    });
+    try {
+      const existing = await prisma.sector.findUnique({ where: { name: s } });
+      if (!existing) {
+        await prisma.sector.create({ data: { name: s } });
+        console.log(`   + Created sector: ${s}`);
+      } else {
+        console.log(`   - Sector already exists: ${s}`);
+      }
+    } catch (err: any) {
+      if (err.code === "P2002") {
+        console.warn(`   ⚠️ Conflict on sector "${s}", skipping...`);
+      } else {
+        throw err;
+      }
+    }
   }
 
   // 3. Task Types
   console.log("📝 Seeding Task Types...");
   for (const type of TASK_TYPES) {
-    await prisma.taskType.upsert({
-      where: { name: type },
-      update: {},
-      create: { name: type, sector_id: null },
-    });
+    try {
+      const existing = await prisma.taskType.findUnique({
+        where: { name: type },
+      });
+      if (!existing) {
+        await prisma.taskType.create({ data: { name: type, sector_id: null } });
+        console.log(`   + Created task type: ${type}`);
+      } else {
+        console.log(`   - Task type already exists: ${type}`);
+      }
+    } catch (err: any) {
+      if (err.code === "P2002") {
+        console.warn(`   ⚠️ Conflict on task type "${type}", skipping...`);
+      } else {
+        throw err;
+      }
+    }
   }
 
   // 4. Contracts
   console.log("📄 Seeding Contracts...");
   for (const name of CONTRACTS_LIST) {
-    await prisma.contract.upsert({
-      where: { name },
-      update: {},
-      create: { name },
-    });
+    try {
+      const existing = await prisma.contract.findUnique({ where: { name } });
+      if (!existing) {
+        await prisma.contract.create({ data: { name } });
+        console.log(`   + Created contract: ${name}`);
+      } else {
+        console.log(`   - Contract already exists: ${name}`);
+      }
+    } catch (err: any) {
+      if (err.code === "P2002") {
+        console.warn(`   ⚠️ Conflict on contract "${name}", skipping...`);
+      } else {
+        throw err;
+      }
+    }
   }
 
   // 5. Cities & Neighborhoods
@@ -347,11 +389,27 @@ async function main() {
   for (const [cityName, neighborhoods] of Object.entries(
     CITIES_NEIGHBORHOODS,
   )) {
-    const city = await prisma.city.upsert({
-      where: { name: cityName },
-      update: {},
-      create: { name: cityName },
-    });
+    let city;
+    try {
+      city = await prisma.city.findUnique({ where: { name: cityName } });
+      if (!city) {
+        city = await prisma.city.create({ data: { name: cityName } });
+        console.log(`   + Created city: ${cityName}`);
+      } else {
+        console.log(`   - City already exists: ${cityName}`);
+      }
+    } catch (err: any) {
+      if (err.code === "P2002") {
+        console.warn(
+          `   ⚠️ Conflict on city "${cityName}", fetching existing...`,
+        );
+        city = await prisma.city.findUnique({ where: { name: cityName } });
+      } else {
+        throw err;
+      }
+    }
+
+    if (!city) continue;
 
     for (const neighborhoodName of neighborhoods) {
       const existing = await prisma.neighborhood.findFirst({

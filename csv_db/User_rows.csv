@@ -1,0 +1,12 @@
+id,name,email,password_hash,avatar,created_at,active,must_change_password,role_id,sector_id
+1,Vinicios Araújo,admin@admin.com,$2b$10$FHoS.JRvLwHjnpMGapE/0.67fI8XWPWm4Hrfdelvkt4hhb0V2zsPG,VA,2026-03-02 13:27:14.528,true,false,1,5
+2,Camila Vitória dos Santos Cazzo,camilavitoria@geogis.com.br,Lalu2126,CV,2026-03-02 13:39:09.573,true,false,3,2
+3,Gabriel Bicudo Teixeira Cabestré,gabrielbicudo@geogis.com.br,Geogis2026,GB,2026-03-02 13:39:11.282,true,true,3,7
+4,Gabriel Vinicius Caldas SIlva,gabrielcaldas@geogis.com.br,$2b$10$hovjtp0wbRopvQZXJGus8uvb2hcY2RqGtpmLBErnontmIOWmhoL8y,GV,2026-03-02 13:39:12.528,true,false,3,2
+5,Iago Sodré,iagosodre@geogis.com.br,s0dre897,IS,2026-03-02 13:39:13.731,true,false,2,9
+6,Ítalo Carvalho dos Santos,italocarvalho@geogis.com.br,Jesus@2026,ÍC,2026-03-02 13:39:15.31,true,false,4,6
+7,Josirene dos Santos,josirene@geogis.com.br,J@si1425,JD,2026-03-02 13:39:16.141,true,false,3,3
+8,Kleber Fernando de Anunciação Britici,kleberbritici@geogis.com.br,kb090597,KF,2026-03-02 13:39:16.976,true,false,2,9
+9,Leopoldo Miranda,leopoldo@geogis.com.br,Geogis2026,LM,2026-03-02 13:39:18.031,true,true,4,6
+10,Patrícia Pinheiro Zubiolo,patriciazubiolo@geogis.com.br,Geogis2026,PP,2026-03-02 13:39:19.205,true,true,3,13
+11,Erlan Cézar Colombari,erlanmoraes@geogis.com.br,Moraes@10,EC,2026-03-02 09:43:01,true,false,3,4

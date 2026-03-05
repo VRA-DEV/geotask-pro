@@ -1,0 +1,228 @@
+id,name,city_id
+228,Catira,35
+229,Distrito Capão Verde,35
+230,Distrito Tira Sentido,35
+231,Loteamento Bela Vista,35
+232,Conjunto Habitacional Tapirapuã,36
+233,Núcleo Habitacional Parecis,36
+234,Cidade Alta,37
+235,Jardim Planalto,37
+236,Vila Operária,37
+237,Cohab São Raimundo,38
+238,Jardim República,38
+239,João Cristante,38
+240,Núcleo Habitacional Nhambiquara,38
+241,Loteamento Residencial Ana Terezinha Ribeiro,39
+242,Marechal Rondon - Fase I,40
+243,Marechal Rondon - Fase II,40
+244,Patrimônio de Campo Novo do Parecis,40
+245,Patrimônio de Campo Novo do Parecis - Fase II,40
+246,Loteamento Cidade Campos de Júlio,41
+247,Loteamento Noga II,42
+248,Núcleo Urbano de Castanheira - Centro,42
+249,Setor Industrial,42
+250,Altos da Chapada,43
+251,Distrito de João Carro,43
+252,Distrito de Água Fria,43
+253,Olho D'Água,43
+254,Pôr do Sol,43
+255,Bela Vista,44
+256,Castelo dos Sonhos,44
+257,Centro,44
+258,Cidade Alta,44
+259,Guariba,44
+260,Copacabana,45
+261,Noroagro,45
+262,Sagrada Família,45
+263,São Francisco,45
+264,Amoreiras,46
+265,Flor dos Ipês,46
+266,Jardim do Vale,46
+267,Distrito Ouro Verde dos Pioneiros,47
+268,Distrito de Nova União - Bairro Bela Vista,47
+269,Distrito de Nova União - Bairro Centro,47
+270,Distrito de Nova União - Bairro Fortaleza,47
+271,Distrito de Nova União - Bairro Industrial,47
+272,Distrito de Nova União - Bairro Jardim Planalto,47
+273,Distrito de Nova União - Bairro Jardim das Flores,47
+274,Distrito de Nova União - Bairro Morro das Pedras,47
+275,Distrito de Nova União - Bairro dos Imigrantes,47
+276,Loteamento Cooperativa,47
+277,1º DE MARÇO - 1ª FASE,48
+278,1º DE MARÇO - 2ª FASE,48
+279,Bairro Três Barras - Remanescente Área C,48
+280,CONJUNTO HABITACIONAL CPA II,48
+281,CONJUNTO HABITACIONAL CPA III - SETOR 01,48
+282,CONJUNTO HABITACIONAL CPA III - SETOR 02,48
+283,CONJUNTO HABITACIONAL CPA III - SETOR 03,48
+284,CONJUNTO HABITACIONAL CPA III - SETOR 04,48
+285,CONJUNTO HABITACIONAL CPA III - SETOR 05,48
+286,CONJUNTO HABITACIONAL GRANDE TERCEIRO,48
+287,CONJUNTO HABITACIONAL JARDIM PRESIDENTE II,48
+288,CONJUNTO HABITACIONAL VILA REAL,48
+289,CPA I,48
+290,Campo Verde,48
+291,Chácara dos Pinheiros,48
+292,Distrito Nossa Senhora da Guia,48
+293,JARDIM BRASIL PARTE 1,48
+294,JARDIM BRASIL PARTE 2,48
+295,JARDIM BRASIL PARTE 3,48
+296,JARDIM BRASIL PARTE 4,48
+297,JARDIM FLORIANÓPOLIS,48
+298,JARDIM SANTA AMALIA,48
+299,JARDIM UNIÃO,48
+300,JARDIM VITÓRIA,48
+301,Jardim Alvorada - Loteamento Jardim Fernandes,48
+302,Jardim Alvorada - Loteamento Quintandinha,48
+303,Jardim Alvorada - Loteamento Senhor dos Passos I,48
+304,Jardim Alvorada - Loteamento Senhor dos Passos II,48
+305,Jardim Alvorada - Loteamento Senhor dos Passos IV,48
+306,Jardim Alvorada - Quarta Feira,48
+307,Jardim Fortaleza,48
+308,Jardim Santa Izabel,48
+309,Loteamento 8 de Abril,48
+310,Loteamento Aricá Açu,48
+311,Loteamento São Roque,48
+312,Nova Esperança II,48
+313,Novo Paraiso II,48
+314,Novo Tempo,48
+315,NÚCLEO HABITACIONAL - TIJUCAL SETOR 3,48
+316,NÚCLEO HABITACIONAL - TIJUCAL SETOR 4,48
+317,NÚCLEO HABITACIONAL - TIJUCAL SETOR I,48
+318,NÚCLEO HABITACIONAL - TIJUCAL SETOR II,48
+319,NÚCLEO HABITACIONAL CIDADE VERDE,48
+320,NÚCLEO HABITACIONAL CPA IV - 1ª ETAPA,48
+321,NÚCLEO HABITACIONAL CPA IV - 2ª ETAPA,48
+322,NÚCLEO HABITACIONAL CPA IV - 3ª ETAPA,48
+323,NÚCLEO HABITACIONAL CPA IV - 4ª ETAPA,48
+324,NÚCLEO HABITACIONAL CPA IV - 5ª ETAPA,48
+325,NÚCLEO HABITACIONAL JARDIM INDUSTRIÁRIO II - 1ª ETAPA,48
+326,NÚCLEO HABITACIONAL JARDIM INDUSTRIÁRIO II - 2ª ETAPA,48
+327,NÚCLEO HABITACIONAL JARDIM INDUSTRIÁRIO II - 3ª ETAPA,48
+328,NÚCLEO HABITACIONAL NOVA CUIABÁ,48
+329,NÚCLEO HABITACIONAL SÃO GONÇALO,48
+330,Núcleo Habitacional - Tijucal,48
+331,Parque Mariana,48
+332,RESIDENCIAL ITAPAJÉ,48
+333,Renascer,48
+334,Residencial São Carlos,48
+335,SANTA INES,48
+336,SETOR 01 DO NÚCLEO HABITACIONAL CPA I,48
+337,SETOR 02 DO NÚCLEO HABITACIONAL CPA I,48
+338,SETOR 03 DO NÚCLEO HABITACIONAL CPA I,48
+339,Santo Antonio do Pedregal,48
+340,Sonho Meu,48
+341,São João Del Rey,48
+342,Vista da Chapada,48
+343,Voluntários da Pátria,48
+344,Jardim Boa Esperança,49
+345,Loteamento Jardim Alvorecer,49
+346,Loteamento Jardim Boa Esperança II,49
+347,Loteamento Cidade Alta,50
+348,Primavera,50
+349,Zona Central,50
+350,Diamante Negro,51
+351,Distrito Fontanillas,51
+352,Distrito de Terra Roxa,51
+353,Loteamento Andorinha,51
+354,Loteamento Boa Esperança,51
+355,Loteamento Morada do Vento,51
+356,Loteamento Padre Duílio,51
+357,Loteamento Passo do Lago,51
+358,Loteamento Portal do Sol,51
+359,Palmiteira,51
+360,Setor Industrial,51
+361,São José Operário,51
+362,Vale do Reginaldo - 1ª Etapa,52
+363,Bom Jardim,53
+364,Jardim Petrópolis,53
+365,Roda D'água,53
+366,Bairro Da Ponte,54
+367,Bandeirantes,54
+368,Centro,54
+369,Joaquim da Silva,54
+370,Novo Horizonte,54
+371,Santo Antônio,54
+372,Tapirapuã,54
+373,Núcleo Habitacional Frei Salvador Rouquet,55
+374,Residencial Edite Maria de Campos,55
+375,Núcleo Urbano de Nova Brasilândia - Alvorada,56
+376,Núcleo Urbano de Nova Brasilândia - Centro,56
+377,Núcleo Urbano de Nova Brasilândia - Ipiranga,56
+378,Núcleo Urbano de Nova Brasilândia - Jardim da Paz,56
+379,Núcleo Urbano de Nova Brasilândia - Recanto dos Pássaros,56
+380,Sol Nascente,57
+381,Jardim Planalto,58
+382,Jardim Planalto II,58
+383,Jardim Tropical,59
+384,Mário Duílio Henry,59
+385,Jardim Boa Esperança,60
+386,Jardim Ouro Verde,60
+387,Jardim Santa Rosa,60
+388,Vila Alvorada,60
+389,Loteameno Rio Manso - Nossa Senhora Aparecida,61
+390,Loteamento Rio Manso - São Gonçalo,61
+391,Centro,62
+392,Santa Isabel,62
+393,Vila da Mangueira,62
+394,Loteamento Urbano do Distrito Boa Esperança,63
+395,Jardim Arco Íris,64
+396,Jardim Olinda,64
+397,Residencial Casa Nova,64
+398,Cidade Alta II,65
+399,Cidade Alta III,65
+400,Cidade Alta V,65
+401,Distrito de São Jorge,65
+402,JARDIM SÃO ROSALINO,65
+403,Jardim Bela Vista,65
+404,Jardim Maringá,65
+405,Jardim Morada do Sol,65
+406,Jardim Presidente,65
+407,Jardim Vitória,65
+408,Jardim dos Ipês,65
+409,Loteamento Monte Líbano,65
+410,Núcleo Habitacional 13 de Maio,65
+411,Núcleo Habitacional Tarumã,65
+412,Quadras R1 e R2 do Jardim 13 de Maio,65
+413,Residencial San Diego,65
+414,Residencial San Diego II,65
+415,Vila Esmeralda I,65
+416,Vila Esmeralda II,65
+417,Vila Goiás,65
+418,Distrito Adrianópolis,66
+419,Distrito Máquina Queimada,66
+420,Centro,67
+421,ASA BELLA,68
+422,CONJUNTO HABITACIONAL CABO MICHEL,68
+423,CONJUNTO HABITACIONAL DOM BOSCO,68
+424,CONJUNTO HABITACIONAL DOM ORLANDO CHAVES,68
+425,CONJUNTO HABITACIONAL JAIME VERÍSSIMO DE CAMPOS,68
+426,CONJUNTO HABITACIONAL TARUMÃ I,68
+427,Domingos Sávio,68
+428,Governador José Fragelli,68
+429,Jardim Eldorado,68
+430,Jardim Manaíra,68
+431,Jardim Maringá I,68
+432,Jardim Maringá II,68
+433,Jardim de Alá,68
+434,Loteamento 15 de Maio,68
+435,Loteamento Industrial I - 1ª Parte,68
+436,Loteamento Industrial I - 2ª Parte,68
+437,Loteamento Industrial II,68
+438,Loteamento Industrial III,68
+439,Loteamento Núcleo 3,68
+440,Loteamento Parque Sabiá I,68
+441,Loteamento Sayonara,68
+442,Loteamento Serra Dourada,68
+443,Loteamento Terra Nova,68
+444,NÚCLEO HABITACIONAL CRISTO REI,68
+445,NÚCLEO HABITACIONAL JARDIM PRIMAVERA,68
+446,NÚCLEO HABITACIONAL NOSSA SENHORA DA GUIA,68
+447,NÚCLEO HABITACIONAL SANTA IZABEL,68
+448,Parque Sabiá II,68
+449,RESIDENCIAL ALBERTO CANELLAS,68
+450,RESIDENCIAL AM,68
+451,RESIDENCIAL ASA BRANCA,68
+452,RESIDENCIAL JR II,68
+453,Residencial 08 de Março,68
+454,Vitória Régia,68
