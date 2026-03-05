@@ -6,8 +6,11 @@ export function useLookups() {
   const { data, error, isLoading, mutate } = useSWR("/api/lookups", fetcher, {
     revalidateOnFocus: false,
     revalidateOnReconnect: false,
-    dedupingInterval: 60000,
+    dedupingInterval: 5000,
   });
+
+  if (error) console.error("useLookups error:", error);
+  if (data?.error) console.error("useLookups API error:", data.error);
 
   return {
     contracts: data?.contracts || [],

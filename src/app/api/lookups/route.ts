@@ -1,6 +1,8 @@
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const [cities, contracts, sectors, roles, taskTypes] = await Promise.all([
@@ -13,6 +15,10 @@ export async function GET() {
       prisma.role.findMany({ orderBy: { name: "asc" } }),
       prisma.taskType.findMany({ orderBy: { name: "asc" } }),
     ]);
+
+    console.log(
+      `[API Lookups] Found ${contracts.length} contracts, ${cities.length} cities`,
+    );
 
     const citiesNeighborhoods = cities.reduce(
       (acc, city) => {
