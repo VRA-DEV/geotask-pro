@@ -1,3 +1,4 @@
+import { logActivity } from "@/lib/activityLog";
 import prisma from "@/lib/prisma";
 import { changePasswordSchema } from "@/lib/validators/auth";
 import bcrypt from "bcryptjs";
@@ -51,6 +52,15 @@ export async function POST(req: Request) {
         must_change_password: false,
       },
     });
+
+    logActivity(
+      userId,
+      user.name,
+      "password_changed",
+      "user",
+      userId,
+      "Alterou a senha",
+    );
 
     return NextResponse.json({ message: "Senha alterada com sucesso" });
   } catch (error) {

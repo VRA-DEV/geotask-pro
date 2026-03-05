@@ -1,3 +1,4 @@
+import { logActivity } from "@/lib/activityLog";
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
@@ -262,6 +263,15 @@ export async function POST(req: Request) {
         console.log(`[API] No sector match for: "${sectorName}"`);
       }
     }
+
+    logActivity(
+      user_id ? Number(user_id) : null,
+      authorName,
+      "comment_added",
+      "comment",
+      comment.id,
+      `Comentou na tarefa "${taskTitle}"`,
+    );
 
     return NextResponse.json(
       { message: "Comentário adicionado", id: comment.id },

@@ -939,6 +939,20 @@ export const exportToExcel = async (
   const buffer = await wb.xlsx.writeBuffer();
   const fileName = `relatorio_geotask_${new Date().toISOString().split("T")[0]}.xlsx`;
   saveAs(new Blob([buffer]), fileName);
+
+  // Activity Log (fire-and-forget)
+  try {
+    fetch("/api/activity-log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_name: currentUser?.name || "Usuário",
+        action: "excel_exported",
+        entity: "export",
+        details: `Export Excel (${sourcePage || "geral"}) — ${tasks.length} tarefas`,
+      }),
+    }).catch(() => {});
+  } catch {}
 };
 
 // ─── PDF EXPORT ───────────────────────────────────────────────────────────────

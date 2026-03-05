@@ -1,3 +1,4 @@
+import { logActivity } from "@/lib/activityLog";
 import prisma from "@/lib/prisma";
 import { loginSchema } from "@/lib/validators/auth";
 import bcrypt from "bcryptjs";
@@ -61,6 +62,15 @@ export async function POST(req: Request) {
       );
     }
 
+    logActivity(
+      user.id,
+      user.name,
+      "user_login",
+      "user",
+      user.id,
+      `Login realizado`,
+    );
+
     return NextResponse.json({
       id: user.id,
       name: user.name,
@@ -72,9 +82,7 @@ export async function POST(req: Request) {
       must_change_password: user.must_change_password,
       created_at: user.created_at,
       role: user.Role ? { name: user.Role.name } : { name: "Sem Cargo" },
-      sector: user.Sector
-        ? { name: user.Sector.name }
-        : { name: "Sem Setor" },
+      sector: user.Sector ? { name: user.Sector.name } : { name: "Sem Setor" },
     });
   } catch (error) {
     console.error("Login error:", error);

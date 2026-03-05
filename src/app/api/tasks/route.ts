@@ -1,3 +1,4 @@
+import { logActivity } from "@/lib/activityLog";
 import prisma from "@/lib/prisma";
 import { type Prisma } from "@prisma/client";
 import { type NextRequest, NextResponse } from "next/server";
@@ -439,6 +440,15 @@ export async function POST(req: Request) {
       }
     }
 
+    logActivity(
+      createdById,
+      creatorName,
+      "task_created",
+      "task",
+      newTask.id,
+      `Criou a tarefa "${title}"`,
+    );
+
     return NextResponse.json({
       message: "Tarefa criada com sucesso",
       id: newTask.id,
@@ -542,6 +552,24 @@ export async function PATCH(req: Request) {
 
       await logHistory(task.id, userId, "status", task.status, status);
       await prisma.task.update({ where: { id: Number(id) }, data: updateData });
+
+      // Activity log
+      const userName = userId
+        ? (
+            await prisma.user.findUnique({
+              where: { id: userId },
+              select: { name: true },
+            })
+          )?.name || "Usuário"
+        : "Sistema";
+      logActivity(
+        userId,
+        userName,
+        "task_status_changed",
+        "task",
+        task.id,
+        `Status: ${task.status} → ${status} — "${task.title}"`,
+      );
 
       if (status === "Pausado") {
         await prisma.taskPause.create({
@@ -787,6 +815,127 @@ export async function PATCH(req: Request) {
       }
 
       await prisma.task.update({ where: { id: Number(id) }, data: updateData });
+
+      // Activity log with before/after details
+      const updaterName = userId
+        ? (
+            await prisma.user.findUnique({
+              where: { id: userId },
+              select: { name: true },
+            })
+          )?.name || "Usuário"
+        : "Sistema";
+
+      // Build before→after diff for each changed field
+      const FIELD_LABELS: Record<string, string> = {
+        title: "Título",
+        description: "Descrição",
+        priority: "Prioridade",
+        status: "Status",
+        type: "Tipo",
+        sector_id: "Setor",
+        responsible_id: "Responsável",
+        contract_id: "Contrato",
+        city_id: "Cidade",
+        neighborhood: "Bairro",
+        deadline: "Prazo",
+        started_at: "Início",
+        completed_at: "Conclusão",
+        address: "Endereço",
+        latitude: "Latitude",
+        longitude: "Longitude",
+      };
+
+      const diffParts: string[] = [];
+      for (const key of Object.keys(updateData)) {
+        if (key === "updated_at" || key === "time_spent" || key === "paused_at")
+          continue;
+        const label = FIELD_LABELS[key] || key;
+        let oldVal: any = (task as any)[key];
+        let newVal: any = (updateData as any)[key];
+
+        // Resolve IDs to names for readability
+        if (key === "sector_id") {
+          if (oldVal) {
+            const s = await prisma.sector.findUnique({
+              where: { id: oldVal },
+              select: { name: true },
+            });
+            oldVal = s?.name || oldVal;
+          }
+          if (newVal) {
+            const s = await prisma.sector.findUnique({
+              where: { id: newVal },
+              select: { name: true },
+            });
+            newVal = s?.name || newVal;
+          }
+        } else if (key === "responsible_id") {
+          if (oldVal) {
+            const u = await prisma.user.findUnique({
+              where: { id: oldVal },
+              select: { name: true },
+            });
+            oldVal = u?.name || oldVal;
+          }
+          if (newVal) {
+            const u = await prisma.user.findUnique({
+              where: { id: newVal },
+              select: { name: true },
+            });
+            newVal = u?.name || newVal;
+          }
+        } else if (key === "contract_id") {
+          if (oldVal) {
+            const c = await prisma.contract.findUnique({
+              where: { id: oldVal },
+              select: { name: true },
+            });
+            oldVal = c?.name || oldVal;
+          }
+          if (newVal) {
+            const c = await prisma.contract.findUnique({
+              where: { id: newVal },
+              select: { name: true },
+            });
+            newVal = c?.name || newVal;
+          }
+        } else if (key === "city_id") {
+          if (oldVal) {
+            const c = await prisma.city.findUnique({
+              where: { id: oldVal },
+              select: { name: true },
+            });
+            oldVal = c?.name || oldVal;
+          }
+          if (newVal) {
+            const c = await prisma.city.findUnique({
+              where: { id: newVal },
+              select: { name: true },
+            });
+            newVal = c?.name || newVal;
+          }
+        }
+
+        // Format dates
+        if (oldVal instanceof Date) oldVal = oldVal.toLocaleDateString("pt-BR");
+        if (newVal instanceof Date) newVal = newVal.toLocaleDateString("pt-BR");
+
+        const from = oldVal ?? "vazio";
+        const to = newVal ?? "vazio";
+        diffParts.push(`${label}: "${from}" → "${to}"`);
+      }
+
+      const diffStr =
+        diffParts.length > 0 ? diffParts.join(" | ") : "campos editados";
+      logActivity(
+        userId,
+        updaterName,
+        "task_updated",
+        "task",
+        task.id,
+        `"${task.title}" — ${diffStr}`,
+      );
     } else if (action === "toggle_subtask") {
       const { subtask_id, done } = data;
       await prisma.subtask.update({
@@ -824,9 +973,30 @@ export async function PATCH(req: Request) {
 export async function DELETE(req: Request) {
   try {
     const id = new URL(req.url).searchParams.get("id");
+    const delUserId = new URL(req.url).searchParams.get("user_id");
     if (!id)
       return NextResponse.json({ error: "ID obrigatório" }, { status: 400 });
+    const taskToDelete = await prisma.task.findUnique({
+      where: { id: Number(id) },
+      select: { title: true },
+    });
     await prisma.task.delete({ where: { id: Number(id) } });
+
+    if (delUserId) {
+      const delUser = await prisma.user.findUnique({
+        where: { id: Number(delUserId) },
+        select: { name: true },
+      });
+      logActivity(
+        Number(delUserId),
+        delUser?.name || "Usuário",
+        "task_deleted",
+        "task",
+        Number(id),
+        `Removeu a tarefa "${taskToDelete?.title || id}"`,
+      );
+    }
+
     return NextResponse.json({ message: "Tarefa removida" });
   } catch (error) {
     return NextResponse.json(

@@ -1,3 +1,4 @@
+import { logActivity } from "@/lib/activityLog";
 import prisma from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
@@ -14,13 +15,17 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const {
-      analyses = ["weekly"], // tipos selecionados pelo usuário
-      customMessage = "", // mensagem livre do usuário
-      periodDays = 7, // janela de tempo
+      analyses = ["weekly"],
+      customMessage = "",
+      periodDays = 7,
+      userId,
+      userName,
     }: {
       analyses: string[];
       customMessage: string;
       periodDays: number;
+      userId?: number;
+      userName?: string;
     } = body;
 
     const client = new OpenAI({
@@ -91,7 +96,7 @@ export async function POST(req: NextRequest) {
 
     sections.push(`
 ## CONTEXTO DO SISTEMA
-Você é o assistente inteligente do GeoTask Pro, sistema de gestão de tarefas de uma empresa de Reurb, que atua em licitações públicas.
+Você é o assistente inteligente do GeoTask Pro, sistema de gestão de tarefas de uma empresa de regularização fundiária urbana, que atua em licitações públicas.
 Período analisado: últimos ${periodDays} dias (de ${since.toLocaleDateString("pt-BR")} até hoje).
 Responda SEMPRE em português do Brasil, usando Markdown com seções bem formatadas.
 Pense que quem vai utilizar relatório são os Gestores de cada setor, Gerente, Cordenador e Ceo, o intuito principal é saber como está o andamento das tarefas, prazos, tempo de execução, gargalos e o que precisa ser feito para melhorar.
@@ -275,6 +280,15 @@ O usuário fez a seguinte solicitação específica. RESPONDA DIRETAMENTE a ela 
     });
     const text =
       completion.choices[0]?.message?.content || "Sem resposta da IA.";
+
+    logActivity(
+      userId || null,
+      userName || "Usuário",
+      "report_ai_requested",
+      "ai_report",
+      null,
+      `Relatório IA: ${analyses.join(", ")} (${periodDays} dias)`,
+    );
 
     return NextResponse.json({
       report: text,

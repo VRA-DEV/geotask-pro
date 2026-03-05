@@ -7,6 +7,7 @@ export interface AppPermissions {
     cronograma: boolean;
     mindmap: boolean;
     templates: boolean;
+    activity_log: boolean;
     settings: boolean;
   };
   tasks: {
@@ -32,6 +33,7 @@ export const getPermissions = (user?: User | null): AppPermissions => {
       cronograma: false,
       mindmap: false,
       templates: false,
+      activity_log: false,
       settings: false,
     },
     tasks: {
@@ -89,6 +91,7 @@ export const getPermissions = (user?: User | null): AppPermissions => {
   }
 
   legacyPerms.pages.settings = isAdmin || isGerente || isCoord || isGestor;
+  legacyPerms.pages.activity_log = isAdmin;
 
   // Tasks
   legacyPerms.tasks.create = isAdmin || isGerente || isCoord || isGestor;

@@ -4,6 +4,7 @@ import { AppPermissions, getPermissions } from "@/lib/permissions";
 import {
   Bell,
   Calendar,
+  ClipboardList,
   FileText,
   Layers,
   LayoutDashboard,
@@ -56,6 +57,10 @@ const TemplatesPage = dynamic(
 const NotificationsPage = dynamic(
   () => import("@/components/notifications/NotificationsPage"),
   { loading: () => <PageLoader /> },
+);
+const ActivityLogPage = dynamic(
+  () => import("@/components/activitylog/ActivityLogPage"),
+  { loading: () => <TableSkeleton rows={6} cols={4} /> },
 );
 const TemplateModal = dynamic(
   () => import("@/components/templates/TemplateModal"),
@@ -297,6 +302,7 @@ export default function GeoTask() {
     { id: "mindmap", label: "Mapa de Tarefas", icon: FileText },
     { id: "notifications", label: "Notificações", icon: Bell },
     { id: "templates", label: "Templates", icon: FileText },
+    { id: "activity_log", label: "Log de Atividades", icon: ClipboardList },
     { id: "settings", label: "Configurações", icon: Settings },
   ].filter(({ id }) => canAccess(id as any));
 
@@ -422,6 +428,9 @@ export default function GeoTask() {
               markAllRead={markAllRead}
               setSelectedTask={setSelectedTask}
             />
+          )}
+          {page === "activity_log" && canAccess("activity_log" as any) && (
+            <ActivityLogPage T={T} user={user} users={dbUsers} />
           )}
         </div>
       </div>
