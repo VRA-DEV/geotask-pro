@@ -91,9 +91,10 @@ export async function POST(req: NextRequest) {
 
     sections.push(`
 ## CONTEXTO DO SISTEMA
-Você é o assistente inteligente do GeoTask Pro, sistema de gestão de tarefas geoespaciais.
+Você é o assistente inteligente do GeoTask Pro, sistema de gestão de tarefas de uma empresa de Reurb, que atua em licitações públicas.
 Período analisado: últimos ${periodDays} dias (de ${since.toLocaleDateString("pt-BR")} até hoje).
 Responda SEMPRE em português do Brasil, usando Markdown com seções bem formatadas.
+Pense que quem vai utilizar relatório são os Gestores de cada setor, Gerente, Cordenador e Ceo, o intuito principal é saber como está o andamento das tarefas, prazos, tempo de execução, gargalos e o que precisa ser feito para melhorar.
 `);
 
     // ANÁLISE SEMANAL / GERAL
@@ -110,7 +111,7 @@ Responda SEMPRE em português do Brasil, usando Markdown com seções bem format
 **Por Prioridade:** ${JSON.stringify(stats.byPriority)}
 **Por Setor:** ${JSON.stringify(stats.bySector)}
 
-Gere um **Relatório Semanal** com: resumo executivo, principais realizações, pontos de atenção e recomendações.
+Gere um **Relatório Semanal** com: resumo executivo, principais realizações, pontos de atenção, tarefas atrasadas, tarefas pendentes, tarefas concluídas, tempo médio de execução, tempo médio de conclusão, tempo médio de atraso, tempo médio de pendência, tempo médio de conclusão.
 `);
     }
 
@@ -135,7 +136,7 @@ Gere um **Relatório Semanal** com: resumo executivo, principais realizações, 
 ## ANÁLISE POR SETOR
 ${JSON.stringify(sectorDetail, null, 2)}
 
-Gere uma **Análise por Setor**: identifique setores com melhor e pior desempenho, gargalos e sugestões específicas.
+Gere uma **Análise por Setor**: identifique setores com melhor e pior desempenho, identifique o que foi feito por cada um no setor durante a semana, como um cronograma de atividades semanal de cada um no setor, identifique gargalos, tempo ocioso, tempo de execução e tempo médio de conclusão.
 `);
     }
 
@@ -167,7 +168,7 @@ Gere uma **Análise por Setor**: identifique setores com melhor e pior desempenh
 Tarefas pendentes mais críticas:
 ${JSON.stringify(urgentPending, null, 2)}
 
-Gere uma **Análise e Sugestão de Priorização**: sugira a ordem de execução ideal, identifique dependências e riscos.
+Gere uma **Análise e Sugestão de Priorização**: sugira a ordem de execução ideal de acordo com a prioridade, prazo, setor, responsável e contrato, identifique riscos baseado em tarefas semelhantes que ja foram concluidas e seus prazos/tempo de execução.
 `);
     }
 
@@ -197,7 +198,7 @@ Gere uma **Análise e Sugestão de Priorização**: sugira a ordem de execução
 ## ANÁLISE DE CONTRATOS
 ${JSON.stringify(contractAnalysis, null, 2)}
 
-Gere uma **Análise de Contratos**: destaque contratos com baixo índice de conclusão, riscos e recomendações de ação.
+Gere uma **Análise de Contratos**: destaque contratos com baixo índice de conclusão, riscos, tempo médio de execução, tempo médio de conclusão, tempo médio de atraso, tempo médio de pendência, tempo médio de conclusão, setores e usuário com mais tarefas concluidas e pendentes.
 `);
     }
 
@@ -256,7 +257,6 @@ O usuário fez a seguinte solicitação específica. RESPONDA DIRETAMENTE a ela 
 - Responda em Markdown bem estruturado com emojis para facilitar a leitura
 - Use tabelas quando houver dados comparativos
 - Seja objetivo mas completo
-- Ao final, sempre inclua uma seção "✅ Próximos Passos Recomendados" com 3-5 ações concretas
 `;
 
     const completion = await client.chat.completions.create({
@@ -265,7 +265,7 @@ O usuário fez a seguinte solicitação específica. RESPONDA DIRETAMENTE a ela 
         {
           role: "system",
           content:
-            "Você é o assistente inteligente do GeoTask Pro, sistema de gestão de tarefas geoespaciais. Responda SEMPRE em português do Brasil, usando Markdown com seções bem formatadas.",
+            "Você é o assistente inteligente do GeoTask Pro, sistema de gestão de tarefas geoespaciais. Responda SEMPRE em português do Brasil, usando Markdown com seções bem formatadas. Pense que quem vai utilizar relatório são os Gestores de cada setor, Gerente, Cordenador e Ceo, o intuito principal é saber como está o andamento das tarefas, prazos, tempo de execução, gargalos e o que precisa ser feito para melhorar.",
         },
         {
           role: "user",
