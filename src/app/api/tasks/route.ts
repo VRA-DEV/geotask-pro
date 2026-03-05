@@ -123,7 +123,6 @@ export async function GET(request: NextRequest) {
 
     // Build optional where clause
     const where: Prisma.TaskWhereInput = {
-      parent_id: null, // Only top-level tasks (children are included via relations)
       ...(status ? { status } : {}),
       ...(sectorId ? { sector_id: sectorId } : {}),
       ...(responsibleId ? { responsible_id: responsibleId } : {}),
@@ -162,6 +161,7 @@ export async function GET(request: NextRequest) {
             },
           },
         },
+        parent: { select: { title: true } },
       },
       orderBy: { created_at: "desc" },
     });
@@ -564,22 +564,52 @@ export async function PATCH(req: Request) {
           where: { id: task.parent_id },
           include: { children: true },
         });
+
         if (parent) {
-          if (status === "Em Andamento" && parent.status === "A Fazer") {
+          const childrenStatus = parent.children.map((c: any) =>
+            c.id === task.id ? status : c.status,
+          );
+
+          // 1. Start/Resume: Parent moves to "Em Andamento" if any child is "Em Andamento"
+          if (
+            status === "Em Andamento" &&
+            (parent.status === "A Fazer" || parent.status === "Pausado")
+          ) {
             await prisma.task.update({
               where: { id: parent.id },
-              data: { status: "Em Andamento", started_at: new Date() },
+              data: {
+                status: "Em Andamento",
+                started_at: parent.started_at || new Date(),
+                paused_at: null,
+              },
             });
           }
+
+          // 2. Finish: Parent moves to "Concluído" if ALL children are "Concluído"
           if (status === "Concluído") {
-            const allDone = parent.children.every(
-              (c: any) =>
-                (c.id === task.id ? status : c.status) === "Concluído",
-            );
+            const allDone = childrenStatus.every((s) => s === "Concluído");
             if (allDone && parent.status !== "Concluído") {
               await prisma.task.update({
                 where: { id: parent.id },
                 data: { status: "Concluído", completed_at: new Date() },
+              });
+            }
+          }
+
+          // 3. Pause: Parent moves to "Pausado" if ALL non-completed children are "Pausado"
+          // User said: "pausa se todas as subs pausarem"
+          if (status === "Pausado" || status === "Concluído") {
+            const activeChildren = childrenStatus.filter(
+              (s) => s !== "Concluído",
+            );
+            const allPaused =
+              activeChildren.length > 0 &&
+              activeChildren.every((s) => s === "Pausado");
+
+            if (allPaused && parent.status === "Em Andamento") {
+              await prisma.task.update({
+                where: { id: parent.id },
+                data: { status: "Pausado", paused_at: new Date() },
               });
             }
           }

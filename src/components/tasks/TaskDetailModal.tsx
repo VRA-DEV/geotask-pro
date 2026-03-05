@@ -986,61 +986,67 @@ export default function TaskDetailModal({
         {["Admin", "Gestor", "Liderado", "Gerente", "Coordenador"].includes(
           user.role?.name || "",
         ) && (
-          <div className="mt-5 border-t border-slate-200 dark:border-gray-700 pt-4 flex gap-2.5 justify-end flex-wrap">
-            {t.status === "A Fazer" &&
-              ((form.subtasks || []).length === 0 ? (
-                <button
-                  onClick={() => {
-                    onUpdate(t.id, "update_status", { status: "Em Andamento" });
-                    onClose();
-                  }}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-500 text-white border-none rounded-lg text-[13px] font-semibold cursor-pointer"
-                >
-                  <Play size={14} /> Iniciar
-                </button>
-              ) : (
-                <div className="text-xs text-slate-500 dark:text-gray-400 italic flex items-center">
-                  Inicie pelas subtarefas
-                </div>
-              ))}
-            {t.status === "Em Andamento" && (
-              <button
-                onClick={() => {
-                  onUpdate(t.id, "update_status", { status: "Pausado" });
-                  onClose();
-                }}
-                className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white border-none rounded-lg text-[13px] font-semibold cursor-pointer"
-              >
-                <Pause size={14} /> Pausar
-              </button>
+          <div className="mt-5 border-t border-slate-200 dark:border-gray-700 pt-4 flex gap-2.5 justify-end flex-wrap items-center">
+            {(form.subtasks || []).length > 0 ? (
+              <div className="flex-1 text-[13px] text-amber-600 dark:text-amber-500 font-medium bg-amber-50 dark:bg-amber-900/20 px-4 py-2 rounded-lg flex items-center gap-2">
+                <span className="text-base uppercase font-bold">⚠️</span>
+                <span>
+                  O status desta tarefa é gerenciado automaticamente pelas suas
+                  subtarefas.
+                </span>
+              </div>
+            ) : (
+              <>
+                {t.status === "A Fazer" && (
+                  <button
+                    onClick={() => {
+                      onUpdate(t.id, "update_status", {
+                        status: "Em Andamento",
+                      });
+                      onClose();
+                    }}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-emerald-500 text-white border-none rounded-lg text-[13px] font-semibold cursor-pointer"
+                  >
+                    <Play size={14} /> Iniciar
+                  </button>
+                )}
+                {t.status === "Em Andamento" && (
+                  <button
+                    onClick={() => {
+                      onUpdate(t.id, "update_status", { status: "Pausado" });
+                      onClose();
+                    }}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white border-none rounded-lg text-[13px] font-semibold cursor-pointer"
+                  >
+                    <Pause size={14} /> Pausar
+                  </button>
+                )}
+                {t.status === "Pausado" && (
+                  <button
+                    onClick={() => {
+                      onUpdate(t.id, "update_status", {
+                        status: "Em Andamento",
+                      });
+                      onClose();
+                    }}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white border-none rounded-lg text-[13px] font-semibold cursor-pointer"
+                  >
+                    <Play size={14} /> Retomar
+                  </button>
+                )}
+                {["Em Andamento", "Pausado"].includes(t.status) && (
+                  <button
+                    onClick={() => {
+                      onUpdate(t.id, "update_status", { status: "Concluído" });
+                      onClose();
+                    }}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white border-none rounded-lg text-[13px] font-semibold cursor-pointer"
+                  >
+                    <CheckCircle size={14} /> Concluir
+                  </button>
+                )}
+              </>
             )}
-            {t.status === "Pausado" && (
-              <button
-                onClick={() => {
-                  onUpdate(t.id, "update_status", { status: "Em Andamento" });
-                  onClose();
-                }}
-                className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white border-none rounded-lg text-[13px] font-semibold cursor-pointer"
-              >
-                <Play size={14} /> Retomar
-              </button>
-            )}
-            {["Em Andamento", "Pausado"].includes(t.status) &&
-              ((form.subtasks || []).length === 0 ? (
-                <button
-                  onClick={() => {
-                    onUpdate(t.id, "update_status", { status: "Concluído" });
-                    onClose();
-                  }}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white border-none rounded-lg text-[13px] font-semibold cursor-pointer"
-                >
-                  <CheckCircle size={14} /> Concluir
-                </button>
-              ) : (
-                <div className="text-xs text-slate-500 dark:text-gray-400 italic flex items-center">
-                  Conclua todas as subtarefas
-                </div>
-              ))}
           </div>
         )}
       </div>

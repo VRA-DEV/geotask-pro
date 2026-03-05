@@ -443,17 +443,23 @@ export default function KanbanPage({
                     <div
                       key={t.id}
                       onClick={() => onSelect(t)}
-                      className="bg-white dark:bg-gray-800 rounded-[10px] p-3 border border-slate-200 dark:border-gray-700 cursor-pointer transition-all duration-150 hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] hover:-translate-y-px"
+                      className={`bg-white dark:bg-gray-800 rounded-[10px] p-3 border transition-all duration-150 hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] hover:-translate-y-px cursor-pointer ${
+                        t.parent_id
+                          ? "border-primary/50 border-l-4 shadow-sm bg-primary/5 dark:bg-primary/5"
+                          : "border-slate-200 dark:border-gray-700"
+                      }`}
                     >
                       {t.parent_id && (
-                        <div className="text-[10px] text-slate-500 dark:text-gray-400 mb-1.5 flex items-center gap-1">
+                        <div className="text-[10px] text-primary/80 dark:text-primary font-medium mb-1.5 flex items-center gap-1">
                           <span className="text-xs">↳</span>
                           <span>
                             de:{" "}
                             <b>
-                              {tasks.find(
-                                (p: KanbanTask) => p.id === t.parent_id,
-                              )?.title || "..."}
+                              {t.parent?.title ||
+                                tasks.find(
+                                  (p: KanbanTask) => p.id === t.parent_id,
+                                )?.title ||
+                                "..."}
                             </b>
                           </span>
                         </div>

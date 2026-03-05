@@ -215,7 +215,7 @@ export default function DashboardPage({
   // KPIs
   const total = filtered.length;
   const concluded = filtered.filter(
-    (t: DashboardTask) => t.status === "Conclu\u00EDdo",
+    (t: DashboardTask) => t.status === "Concluído",
   );
   const concludedForAvg = concluded.filter(
     (t: DashboardTask) => !t.subtasks || t.subtasks.length === 0,
@@ -241,7 +241,7 @@ export default function DashboardPage({
   }));
 
   // Graficos
-  const pieData = ["A Fazer", "Em Andamento", "Pausado", "Conclu\u00EDdo"]
+  const pieData = ["A Fazer", "Em Andamento", "Pausado", "Concluído"]
     .map((s) => ({
       name: s,
       value: filtered.filter((t: DashboardTask) => t.status === s).length,
@@ -264,7 +264,7 @@ export default function DashboardPage({
       (t: DashboardTask) =>
         (t.sector && typeof t.sector === "object"
           ? t.sector.name
-          : t.sector || "") === s && t.status === "Conclu\u00EDdo",
+          : t.sector || "") === s && t.status === "Concluído",
     ).length,
   }))
     .filter((x: SectorDataEntry) => x.v > 0)
@@ -276,7 +276,7 @@ export default function DashboardPage({
         (t: DashboardTask) =>
           (typeof t.responsible === "object"
             ? t.responsible?.name
-            : t.responsible) === u.name && t.status === "Conclu\u00EDdo",
+            : t.responsible) === u.name && t.status === "Concluído",
       ).length,
       sector: u.sector?.name || u.sector || "\u2014",
     }))
@@ -285,7 +285,7 @@ export default function DashboardPage({
 
   // Proximas tarefas
   const upcoming = [...filtered]
-    .filter((t) => t.status !== "Conclu\u00EDdo" && t.deadline)
+    .filter((t) => t.status !== "Concluído" && t.deadline)
     .sort((a, b) => {
       const da = parseDate(a.deadline),
         db = parseDate(b.deadline);
@@ -325,7 +325,7 @@ export default function DashboardPage({
       weekEnd.setHours(23, 59, 59, 999);
 
       const weekNum = 4 - i;
-      const label = `${weekNum}\u00AA sem: ${String(weekStart.getDate()).padStart(2, "0")}-${String(weekEnd.getDate()).padStart(2, "0")}/${String(weekEnd.getMonth() + 1).padStart(2, "0")}`;
+      const label = `${weekNum}ª sem: ${String(weekStart.getDate()).padStart(2, "0")}-${String(weekEnd.getDate()).padStart(2, "0")}/${String(weekEnd.getMonth() + 1).padStart(2, "0")}`;
 
       const novas = filtered.filter((t: DashboardTask) => {
         if (!t.created_at) return false;
@@ -338,9 +338,7 @@ export default function DashboardPage({
       }).length;
       const atrasadas = filtered.filter((t: DashboardTask) => {
         const d = parseDate(t.deadline);
-        return d && d < weekStart && t.status !== "Conclu\u00EDdo"
-          ? true
-          : false;
+        return d && d < weekStart && t.status !== "Concluído" ? true : false;
       }).length;
       const concluidas = filtered.filter((t: DashboardTask) => {
         if (!t.completed_at) return false;
@@ -662,8 +660,7 @@ export default function DashboardPage({
           {sectorRank.slice(0, 3).map((r, i) => (
             <div key={r.name} className="flex items-center gap-2 mb-1.5">
               <span className="text-[13px]">
-                {["\uD83E\uDD47", "\uD83E\uDD48", "\uD83E\uDD49"][i] ||
-                  "\u00B7"}
+                {["\uD83E\uDD47", "\uD83E\uDD48", "\uD83E\uDD49"][i] || "·"}
               </span>
               <span className="text-[11px] text-slate-500 dark:text-gray-400 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
                 {r.name}
@@ -692,8 +689,7 @@ export default function DashboardPage({
           {userRank.slice(0, 3).map((r: UserRankEntry, i: number) => (
             <div key={r.name} className="flex items-center gap-2 mb-1.5">
               <span className="text-[13px]">
-                {["\uD83E\uDD47", "\uD83E\uDD48", "\uD83E\uDD49"][i] ||
-                  "\u00B7"}
+                {["\uD83E\uDD47", "\uD83E\uDD48", "\uD83E\uDD49"][i] || "·"}
               </span>
               <span className="text-[11px] text-slate-500 dark:text-gray-400 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
                 {r.name}
@@ -730,7 +726,7 @@ export default function DashboardPage({
               ["Novas", "#3b43af"],
               ["A Entregar", "#f59e0b"],
               ["Atrasadas", "#ef4444"],
-              ["Conclu\u00EDdas", "#10b981"],
+              ["Concluídas", "#10b981"],
             ].map(([l, c]) => (
               <div
                 key={l}
@@ -787,7 +783,7 @@ export default function DashboardPage({
             />
             <Bar
               dataKey="concluidas"
-              name="Conclu\u00EDdas"
+              name="Concluídas"
               fill="#10b981"
               radius={[4, 4, 0, 0]}
             />
@@ -816,7 +812,7 @@ export default function DashboardPage({
           }}
         >
           {[
-            "T\u00EDtulo",
+            "Título",
             "Prioridade",
             "Prazo",
             "Estado",
@@ -855,6 +851,17 @@ export default function DashboardPage({
               }}
             >
               <div className="min-w-0">
+                {t.parent_id && (
+                  <div className="text-[9px] text-primary font-bold flex items-center gap-1 mb-0.5">
+                    <span className="text-xs">↳</span>
+                    <span>
+                      de:{" "}
+                      {t.parent?.title ||
+                        tasks.find((p) => p.id === t.parent_id)?.title ||
+                        "..."}
+                    </span>
+                  </div>
+                )}
                 <div className="text-[13px] font-semibold text-slate-900 dark:text-gray-50 overflow-hidden text-ellipsis whitespace-nowrap">
                   {t.title}
                 </div>

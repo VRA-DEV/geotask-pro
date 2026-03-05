@@ -320,24 +320,24 @@ export default function NewTaskModal({
   }, [form.sector, taskTypes, sectors, user]);
 
   const STEPS = [
-    "\u{1F4CB} Dados",
-    "\u{1F4CD} Localidade",
-    "\u{1F464} Respons\u00E1vel",
-    "\u{1F527} Subtarefas",
+    "📋 Dados",
+    "📍 Localidade",
+    "👤 Responsável",
+    "🛠️ Subtarefas",
   ];
 
   const validate = () => {
     const e: Record<string, string> = {};
     if (step === 0) {
-      if (!form.title.trim()) e.title = "Obrigat\u00F3rio";
-      if (!form.priority) e.priority = "Obrigat\u00F3rio";
-      if (!form.type) e.type = "Obrigat\u00F3rio";
+      if (!form.title.trim()) e.title = "Obrigatório";
+      if (!form.priority) e.priority = "Obrigatório";
+      if (!form.type) e.type = "Obrigatório";
     }
     if (step === 1) {
-      if (!form.contract) e.contract = "Obrigat\u00F3rio";
+      if (!form.contract) e.contract = "Obrigatório";
     }
     if (step === 2) {
-      if (!form.sector) e.sector = "Obrigat\u00F3rio";
+      if (!form.sector) e.sector = "Obrigatório";
     }
     setErrors(e);
     return !Object.keys(e).length;
@@ -412,7 +412,7 @@ export default function NewTaskModal({
           }`}
         >
           <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 whitespace-nowrap">
-            {"\u{1F4CB}"} Usar template:
+            {"📋"} Usar template:
           </span>
           <select
             value={selectedTemplate}
@@ -424,14 +424,14 @@ export default function NewTaskModal({
                 : "border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400"
             } ${
               templates.length === 0
-                ? "cursor-not-allowed opacity-60"
-                : "cursor-pointer opacity-100"
+                ? "Nenhum template cadastrado — crie em Templates"
+                : "Nenhum (formulário em branco)"
             }`}
           >
             <option value="">
               {templates.length === 0
                 ? "Nenhum template cadastrado — crie em Templates"
-                : "Nenhum (formul\u00E1rio em branco)"}
+                : "Nenhum (formulário em branco)"}
             </option>
             {templates.map((tpl: EnrichedTemplate) => (
               <option key={tpl.id} value={String(tpl.id)}>
@@ -447,7 +447,7 @@ export default function NewTaskModal({
               }}
               className="bg-transparent border-none cursor-pointer text-[11px] text-gray-500 dark:text-gray-400"
             >
-              {"\u2715"} Limpar
+              {"✕"} Limpar
             </button>
           )}
         </div>
@@ -470,7 +470,7 @@ export default function NewTaskModal({
                     : "text-gray-500 dark:text-gray-400 border-b-transparent"
               }`}
             >
-              {i < step ? "\u2713 " : ""}
+              {i < step ? "✓ " : ""}
               {s}
             </button>
           ))}
@@ -480,7 +480,7 @@ export default function NewTaskModal({
         <div className="flex-1 overflow-y-auto px-[22px] py-5 flex flex-col gap-3.5">
           {step === 0 && (
             <>
-              <FormField label="T\u00EDtulo da Tarefa" req err={errors.title}>
+              <FormField label="Título da Tarefa" req err={errors.title}>
                 <FormInput
                   T={T}
                   value={form.title}
@@ -612,7 +612,7 @@ export default function NewTaskModal({
                   err={errors.sector}
                 />
               </FormField>
-              <FormField label="Usu\u00E1rio Respons\u00E1vel">
+              <FormField label="Usuário Responsável">
                 <FormSelect
                   T={T}
                   val={form.responsible}
@@ -621,8 +621,8 @@ export default function NewTaskModal({
                   placeholder={
                     form.sector
                       ? sectorUsers.length
-                        ? "Selecione o respons\u00E1vel..."
-                        : "Nenhum usu\u00E1rio neste setor"
+                        ? "Selecione o responsável..."
+                        : "Nenhum usuário neste setor"
                       : "Selecione um setor primeiro..."
                   }
                 />
@@ -630,7 +630,7 @@ export default function NewTaskModal({
               {form.sector && sectorUsers.length > 0 && (
                 <div className="bg-white dark:bg-gray-900 rounded-[10px] p-3 border border-gray-200 dark:border-gray-700">
                   <div className="text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-2.5 uppercase">
-                    Usu\u00E1rios do setor
+                    Usuários do setor
                   </div>
                   {sectorUsers.map((u: User) => (
                     <div
@@ -671,16 +671,16 @@ export default function NewTaskModal({
             <>
               <div className="bg-primary/[0.07] border border-primary/20 rounded-[10px] p-3">
                 <div className="text-[11px] font-bold text-primary mb-1.5 uppercase">
-                  {"\u2139\uFE0F"} Herança automática
+                  {"ℹ️"} Herança automática
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {[
-                    ["Prioridade", form.priority || "\u2014"],
-                    ["Tipo", form.type || "\u2014"],
-                    ["Prazo", form.deadline || "\u2014"],
-                    ["Contrato", form.contract || "\u2014"],
-                    ["Cidade", form.city || "\u2014"],
-                    ["Bairro", form.nucleus || "\u2014"],
+                    ["Prioridade", form.priority || "—"],
+                    ["Tipo", form.type || "—"],
+                    ["Prazo", form.deadline || "—"],
+                    ["Contrato", form.contract || "—"],
+                    ["Cidade", form.city || "—"],
+                    ["Bairro", form.nucleus || "—"],
                   ].map(([k, v]) => (
                     <span
                       key={k}
@@ -723,7 +723,7 @@ export default function NewTaskModal({
                         return found ? found.name : sVal || "—";
                       })()}
                       {s.responsible
-                        ? ` \u00B7 ${(() => {
+                        ? ` · ${(() => {
                             const rVal = s.responsible;
                             const found = users.find(
                               (u: User) =>
@@ -754,7 +754,7 @@ export default function NewTaskModal({
                   <div className="text-xs font-bold text-primary">
                     Nova Subtarefa
                   </div>
-                  <FormField label="T\u00EDtulo" req>
+                  <FormField label="Título" req>
                     <FormInput
                       T={T}
                       value={subForm.title || ""}
@@ -763,10 +763,10 @@ export default function NewTaskModal({
                           f ? { ...f, title: v } : f,
                         )
                       }
-                      placeholder="T\u00EDtulo da subtarefa"
+                      placeholder="Título da subtarefa"
                     />
                   </FormField>
-                  <FormField label="Descri\u00E7\u00E3o">
+                  <FormField label="Descrição">
                     <FormTextarea
                       T={T}
                       value={subForm.description || ""}
@@ -776,7 +776,7 @@ export default function NewTaskModal({
                         )
                       }
                       rows={2}
-                      placeholder="Descri\u00E7\u00E3o (opcional)"
+                      placeholder="Descrição (opcional)"
                     />
                   </FormField>
                   <div className="grid grid-cols-2 gap-2.5">
@@ -798,7 +798,7 @@ export default function NewTaskModal({
                         opts={sectors}
                       />
                     </FormField>
-                    <FormField label="Respons\u00E1vel">
+                    <FormField label="Responsável">
                       <FormSelect
                         T={T}
                         val={subForm.responsible || ""}
@@ -809,8 +809,10 @@ export default function NewTaskModal({
                         }
                         opts={subSectorUsers.map((u: User) => u.name)}
                         placeholder={
-                          subForm?.sector
-                            ? "Respons\u00E1vel..."
+                          subForm.sector
+                            ? subSectorUsers.length
+                              ? "Responsável..."
+                              : "Nenhum usuário neste setor"
                             : "Setor primeiro..."
                         }
                       />
