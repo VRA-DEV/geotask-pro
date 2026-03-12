@@ -888,17 +888,6 @@ export default function DashboardPage({
               }}
             >
               <div className="min-w-0">
-                {t.parent_id && (
-                  <div className="text-[9px] text-primary font-bold flex items-center gap-1 mb-0.5">
-                    <span className="text-xs">↳</span>
-                    <span>
-                      de:{" "}
-                      {t.parent?.title ||
-                        tasks.find((p) => p.id === t.parent_id)?.title ||
-                        "..."}
-                    </span>
-                  </div>
-                )}
                 <div className="text-[13px] font-semibold text-slate-900 dark:text-gray-50 overflow-hidden text-ellipsis whitespace-nowrap">
                   {t.title}
                 </div>

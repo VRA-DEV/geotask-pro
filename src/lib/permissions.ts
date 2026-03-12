@@ -6,6 +6,7 @@ export interface AppPermissions {
     kanban: boolean;
     cronograma: boolean;
     mindmap: boolean;
+    list: boolean;
     templates: boolean;
     activity_log: boolean;
     settings: boolean;
@@ -32,6 +33,7 @@ export const getPermissions = (user?: User | null): AppPermissions => {
       kanban: false,
       cronograma: false,
       mindmap: false,
+      list: true, 
       templates: false,
       activity_log: false,
       settings: false,
@@ -77,6 +79,7 @@ export const getPermissions = (user?: User | null): AppPermissions => {
   legacyPerms.pages.kanban = true;
   legacyPerms.pages.cronograma = true;
   legacyPerms.pages.mindmap = true;
+  legacyPerms.pages.list = true;
 
   if (rawPerms["Dashboard"] && rawPerms["Dashboard"] !== "none") {
     legacyPerms.pages.dashboard = true;

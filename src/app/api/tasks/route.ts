@@ -418,7 +418,7 @@ export async function POST(req: Request) {
 
     const newTask = await prisma.task.create({
       data: taskData,
-      include: { children: true },
+      include: { children: true, coworkers: true },
     });
 
     let creatorName = "Alguém";
@@ -440,6 +440,21 @@ export async function POST(req: Request) {
         `${creatorName} atribuiu uma tarefa a você em ${dateStr} às ${timeStr}h: "${title}"`,
         newTask.id,
       );
+    }
+
+    // Notify new coworkers
+    if (newTask.coworkers && newTask.coworkers.length > 0) {
+      for (const cw of newTask.coworkers) {
+        if (cw.user_id !== resolvedResponsibleId) {
+          await notifyUser(
+            cw.user_id,
+            "task_assigned",
+            "Nova Atribuição (Equipe)",
+            `${creatorName} adicionou você à equipe da tarefa "${title}" em ${dateStr} às ${timeStr}h.`,
+            newTask.id,
+          );
+        }
+      }
     }
 
     // Notify responsible of each subtask (if set),
@@ -563,7 +578,10 @@ export async function PATCH(req: Request) {
     if (!id)
       return NextResponse.json({ error: "ID é obrigatório" }, { status: 400 });
 
-    const task = await prisma.task.findUnique({ where: { id: Number(id) } });
+    const task = await prisma.task.findUnique({ 
+      where: { id: Number(id) },
+      include: { coworkers: true }
+    });
     if (!task)
       return NextResponse.json(
         { error: "Tarefa não encontrada" },
@@ -925,6 +943,27 @@ export async function PATCH(req: Request) {
           deleteMany: {}, // Clear old assignments
           create: data.coworkers.map((uid: number) => ({ user_id: Number(uid) })),
         };
+        const currentCoworkers = (task.coworkers || []).map((c: any) => c.user_id);
+        const newCoworkers = data.coworkers.map(Number).filter((uid: number) => !currentCoworkers.includes(uid));
+
+        let updaterName = "Alguém";
+        if (userId) {
+          const updater = await prisma.user.findUnique({ where: { id: userId } });
+          if (updater) updaterName = updater.name;
+        }
+        const ds = new Date().toLocaleDateString();
+        const ts = new Date().toLocaleTimeString().slice(0, 5);
+        for (const uid of newCoworkers) {
+          if (uid !== task.responsible_id && uid !== userId) {
+            await notifyUser(
+              uid,
+              "task_assigned",
+              "Nova Atribuição (Equipe)",
+              `${updaterName} adicionou você à equipe da tarefa "${task.title}" em ${ds} às ${ts}h.`,
+              task.id,
+            );
+          }
+        }
       }
 
       await prisma.task.update({ where: { id: Number(id) }, data: updateData });

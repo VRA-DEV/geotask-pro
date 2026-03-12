@@ -673,7 +673,7 @@ export const exportToExcel = async (
   kpi?: ExportKPIs,
   currentUser?: { name?: string } | null,
   filterLabel?: string,
-  sourcePage?: "dashboard" | "kanban" | "cronograma",
+  sourcePage?: "dashboard" | "kanban" | "cronograma" | "lista",
 ) => {
   const wb = new ExcelJS.Workbook();
 

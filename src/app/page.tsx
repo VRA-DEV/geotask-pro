@@ -9,6 +9,7 @@ import {
   Layers,
   LayoutDashboard,
   Settings,
+  List,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
@@ -42,6 +43,9 @@ const DashboardPage = dynamic(
 );
 const KanbanPage = dynamic(() => import("@/components/kanban/KanbanPage"), {
   loading: () => <KanbanSkeleton />,
+});
+const ListPage = dynamic(() => import("@/components/list/ListPage"), {
+  loading: () => <TableSkeleton />,
 });
 const MindMapPage = dynamic(() => import("@/components/mindmap/MindMapPage"), {
   loading: () => <PageLoader />,
@@ -304,6 +308,7 @@ export default function GeoTask() {
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "kanban", label: "Quadro de Tarefas", icon: Layers },
+    { id: "list", label: "Tabela de Tarefas", icon: List },
     { id: "cronograma", label: "Cronograma", icon: Calendar },
     { id: "mindmap", label: "Mapa de Tarefas", icon: FileText },
     { id: "notifications", label: "Notificações", icon: Bell },
@@ -390,6 +395,19 @@ export default function GeoTask() {
               users={dbUsers}
               contracts={contracts}
               citiesNeighborhoods={citiesNeighborhoods}
+            />
+          )}
+          {page === "list" && (
+            <ListPage
+              T={T}
+              tasks={visibleTasks}
+              onSelect={setSelectedTask}
+              users={dbUsers}
+              contracts={contracts}
+              citiesNeighborhoods={citiesNeighborhoods}
+              sectors={mergedSectors}
+              taskTypes={visibleTaskTypes}
+              canViewAllSectors={appPerms.tasks.view_all_sectors}
             />
           )}
           {page === "cronograma" && (
