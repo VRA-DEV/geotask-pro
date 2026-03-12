@@ -150,7 +150,7 @@ export default function ListPage({
                             </div>
                             <div>
                                <div className="text-sm font-semibold text-slate-900 dark:text-gray-50">{typeof u.name === 'object' ? u.name.name : u.name}</div>
-                               <div className="text-[10px] text-slate-500 dark:text-gray-400">{u.role || "Membro"}</div>
+                               <div className="text-[10px] text-slate-500 dark:text-gray-400">{u.role ? (typeof u.role === 'object' ? u.role.name : u.role) : "Membro"}</div>
                             </div>
                           </div>
                           {u.isResponsible && <span className="text-[9px] bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded font-bold uppercase">Resp</span>}
