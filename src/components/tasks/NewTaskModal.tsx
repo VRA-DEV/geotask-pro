@@ -383,11 +383,11 @@ export default function NewTaskModal({
     <>
     <div
       onClick={onClose}
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 font-sans bg-black/65"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-0 md:p-4 font-sans bg-black/65"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-[580px] rounded-[20px] border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 max-h-[92vh] flex flex-col overflow-hidden shadow-[0_24px_64px_rgba(0,0,0,0.25)]"
+        className="w-full h-full md:max-w-[580px] md:h-auto md:max-h-[92vh] md:rounded-[20px] rounded-none border-0 md:border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col overflow-hidden shadow-[0_24px_64px_rgba(0,0,0,0.25)]"
       >
         {/* Header */}
         <div className="px-[22px] py-[18px] border-b border-gray-200 dark:border-gray-700 flex justify-between items-center shrink-0">
@@ -455,14 +455,14 @@ export default function NewTaskModal({
         </div>
 
         {/* Step tabs */}
-        <div className="flex px-[22px] border-b border-gray-200 dark:border-gray-700 shrink-0">
+        <div className="flex px-2 md:px-[22px] border-b border-gray-200 dark:border-gray-700 shrink-0 overflow-x-auto no-scrollbar">
           {STEPS.map((s, i) => (
             <button
               key={i}
               onClick={() => {
                 if (i < step) setStep(i);
               }}
-              className={`flex-1 py-2.5 text-[11px] font-bold bg-none border-none border-b-2 transition-all duration-150 ${
+              className={`flex-none md:flex-1 whitespace-nowrap px-4 md:px-0 py-2.5 text-[11px] font-bold bg-none border-none border-b-2 transition-all duration-150 ${
                 i <= step ? "cursor-pointer" : "cursor-default"
               } ${
                 i === step

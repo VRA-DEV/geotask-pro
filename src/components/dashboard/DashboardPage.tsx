@@ -441,7 +441,7 @@ export default function DashboardPage({
       />
 
       {/* -- KPIs -- */}
-      <div className="grid grid-cols-5 gap-3.5 mb-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3.5 mb-5">
         {/* Total (Merged with Priority) - Spans 2 cols */}
         <div className="col-span-2 bg-white dark:bg-gray-800 rounded-[14px] p-4 border border-slate-200 dark:border-gray-700 flex flex-col gap-3">
           <div className="flex justify-between items-start">
@@ -524,7 +524,7 @@ export default function DashboardPage({
       </div>
 
       {/* -- GRAFICOS LINHA 1 -- */}
-      <div className="grid grid-cols-3 gap-3.5 mb-3.5">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 mb-3.5">
         {/* Status */}
         <div className="bg-white dark:bg-gray-800 rounded-[14px] p-4 border border-slate-200 dark:border-gray-700">
           <div className="text-[13px] font-semibold text-slate-900 dark:text-gray-50 mb-3">
@@ -791,14 +791,63 @@ export default function DashboardPage({
             </div>
           </div>
         </div>
-        {/* Header */}
-        <div
-          className="grid px-4 py-2 border-b border-slate-200 dark:border-gray-700 gap-2"
-          style={{
-            gridTemplateColumns:
-              "2fr 80px 100px 110px 140px 100px 120px 60px 60px 48px",
-          }}
-        >
+        
+        {/* Mobile View (Cards) */}
+        <div className="lg:hidden flex flex-col gap-3 p-4">
+          {upcoming.length === 0 && (
+            <div className="text-center py-4 text-[13px] text-slate-500 dark:text-gray-400">
+              Nenhuma tarefa pendente.
+            </div>
+          )}
+          {upcoming.map((t) => (
+            <div key={t.id} onClick={() => onSelect(t)} className="bg-slate-50 dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-xl p-3.5 flex flex-col gap-2 cursor-pointer shadow-sm">
+              <div className="flex justify-between items-start gap-2">
+                <div className="flex flex-col gap-1">
+                  <div className="text-[10px] font-bold uppercase text-slate-500 dark:text-gray-400">
+                     {t.type} &middot; {typeof t.sector === 'object' ? t.sector?.name : t.sector}
+                  </div>
+                  <div className="text-[14px] font-bold text-slate-900 dark:text-gray-50 leading-snug">
+                    {t.title}
+                  </div>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap" style={{ background: PRIO_COLOR[t.priority as string] + "22", color: PRIO_COLOR[t.priority as string] }}>
+                  {t.priority}
+                </span>
+              </div>
+              
+              <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-1 border-t border-slate-200 dark:border-gray-700/50 pt-2 border-dashed">
+                <div className="text-[11px] text-slate-600 dark:text-gray-300">
+                  <span className="font-semibold">Prazo:</span> {t.deadline}
+                </div>
+                <div className="text-[11px] text-slate-600 dark:text-gray-300">
+                  <span className="font-semibold">Bairro:</span> {typeof t.nucleus === 'object' && t.nucleus !== null ? (t.nucleus as any).name : t.nucleus || '\u2014'}
+                </div>
+              </div>
+              <div className="flex justify-between items-center mt-1">
+                {getTaskState(t) && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded" style={{ background: getTaskState(t)!.color + "22", color: getTaskState(t)!.color }}>
+                    {getTaskState(t)!.label}
+                  </span>
+                )}
+                <div className="text-[11px] text-slate-500 dark:text-gray-400">
+                  {typeof t.city === 'object' ? (t.city as any).name : t.city || '\u2014'}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop View (Table) */}
+        <div className="hidden lg:block overflow-x-auto overflow-y-hidden pb-2 -mr-1 pr-1">
+          <div className="min-w-[1020px]">
+            {/* Header */}
+            <div
+              className="grid px-4 py-2 border-b border-slate-200 dark:border-gray-700 gap-2"
+              style={{
+                gridTemplateColumns:
+                  "2fr 80px 100px 110px 140px 100px 120px 60px 60px 48px",
+              }}
+            >
           {[
             "Título",
             "Prioridade",
@@ -915,6 +964,8 @@ export default function DashboardPage({
             </div>
           );
         })}
+          </div>
+        </div>
       </div>
     </div>
   );

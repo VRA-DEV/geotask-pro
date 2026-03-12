@@ -322,6 +322,7 @@ export default function GeoTask() {
         navItems={navItems}
         unreadCount={unreadCount}
         setPage={setPage}
+        toggleSidebar={toggleSidebar}
         onLogout={() => {
           logout();
           router.push("/login");
@@ -346,7 +347,7 @@ export default function GeoTask() {
         />
 
         {/* ── PAGE CONTENT ──────────────────────────────────────────── */}
-        <div className="flex-1 overflow-auto p-6">
+        <div className="flex-1 overflow-auto p-4 md:p-6">
           {page === "dashboard" && (
             <DashboardPage
               T={T}

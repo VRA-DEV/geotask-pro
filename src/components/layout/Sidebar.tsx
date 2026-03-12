@@ -17,15 +17,26 @@ interface SidebarProps {
   unreadCount: number;
   setPage: (page: string) => void;
   onLogout: () => void;
+  toggleSidebar?: () => void;
 }
 
 export function Sidebar({
-  user, sidebarOpen, page, navItems, unreadCount, setPage, onLogout,
+  user, sidebarOpen, page, navItems, unreadCount, setPage, onLogout, toggleSidebar
 }: SidebarProps) {
   return (
-    <aside
-      className={`flex flex-col flex-shrink-0 border-r border-slate-200 bg-white transition-[width] duration-200 dark:border-gray-700 dark:bg-gray-900 ${sidebarOpen ? "w-[220px]" : "w-[60px]"}`}
-    >
+    <>
+      {/* Mobile Backdrop */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 z-40 bg-black/50 md:hidden" 
+          onClick={toggleSidebar}
+        />
+      )}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 md:relative flex flex-col shrink-0 border-r border-slate-200 bg-white transition-all duration-300 dark:border-gray-700 dark:bg-gray-900 ${
+          sidebarOpen ? "translate-x-0 w-[240px] md:w-[220px]" : "-translate-x-full md:translate-x-0 md:w-[60px]"
+        }`}
+      >
       {/* Logo */}
       <div className={`flex h-[60px] items-center justify-center border-b border-slate-200 dark:border-gray-700 ${sidebarOpen ? "px-4" : "px-0"}`}>
         {sidebarOpen ? (
@@ -42,10 +53,15 @@ export function Sidebar({
           return (
             <button
               key={id}
-              onClick={() => setPage(id)}
+              onClick={() => {
+                setPage(id);
+                if (window.innerWidth < 768 && toggleSidebar) {
+                  toggleSidebar();
+                }
+              }}
               title={label}
               className={`flex w-full items-center gap-2.5 rounded-[10px] border-none text-[13px] transition-all duration-150 cursor-pointer ${
-                sidebarOpen ? "justify-start px-3 py-2.5" : "justify-center p-2.5"
+                sidebarOpen ? "justify-start px-3 py-3 md:py-2.5" : "justify-center p-2.5"
               } ${
                 active
                   ? "bg-primary font-semibold text-white"
@@ -74,7 +90,7 @@ export function Sidebar({
       <div className="border-t border-slate-200 p-2.5 dark:border-gray-700">
         {sidebarOpen ? (
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
               {user.avatar}
             </div>
             <div className="min-w-0 flex-1">
@@ -101,6 +117,7 @@ export function Sidebar({
         )}
       </div>
     </aside>
+    </>
   );
 }
 

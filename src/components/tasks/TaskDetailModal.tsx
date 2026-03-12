@@ -1,7 +1,7 @@
 "use client";
 
 import { getPermissions } from "@/lib/permissions";
-import { CheckCircle, Eye, Pause, Play, X } from "lucide-react";
+import { CheckCircle, Eye, Pause, Play, X, Send } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import TeamSelectionModal from "./TeamSelectionModal";
 
@@ -380,11 +380,11 @@ export default function TaskDetailModal({
     <>
     <div
       onClick={onClose}
-      className="fixed inset-0 z-100 flex items-center justify-center p-4 font-sans bg-black/60"
+      className="fixed inset-0 z-100 flex items-center justify-center p-0 md:p-4 font-sans bg-black/60"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-[600px] rounded-[20px] p-6 flex flex-col max-h-[90vh] bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700"
+        className="w-full h-full md:max-w-[600px] md:max-h-[90vh] md:rounded-[20px] rounded-none p-4 md:p-6 flex flex-col bg-white dark:bg-gray-800 border-0 md:border md:border-slate-200 dark:border-gray-700"
       >
         {/* Header */}
         <div className="flex justify-between mb-5">
@@ -435,7 +435,7 @@ export default function TaskDetailModal({
             <button
               key={tb}
               onClick={() => setTab(tb)}
-              className={`px-4 py-2.5 bg-transparent border-none text-[13px] font-semibold cursor-pointer capitalize ${
+              className={`flex-1 md:flex-none px-2 md:px-4 py-2.5 bg-transparent border-none text-[12px] md:text-[13px] font-semibold cursor-pointer capitalize ${
                 tab === tb
                   ? "border-b-2 border-primary text-primary"
                   : "border-b-2 border-transparent text-slate-500 dark:text-gray-400"
@@ -451,9 +451,9 @@ export default function TaskDetailModal({
             </button>
           ))}
         </div>
-        <div className="flex-1 overflow-y-auto overflow-x-hidden pr-2 -mr-1">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden pr-1 md:pr-2 -mr-1">
           {tab === "dados" && (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="col-span-full">
                 <div className="text-[11px] font-bold text-slate-500 dark:text-gray-400 mb-1">
                   DESCRIÇÃO
@@ -921,7 +921,7 @@ export default function TaskDetailModal({
                 )}
               </div>
 
-              <div className="relative">
+              <div className="relative flex gap-2 items-end">
                 <textarea
                   value={commentText}
                   onChange={(e) => handleCommentChange(e.target.value)}
@@ -935,6 +935,14 @@ export default function TaskDetailModal({
                   rows={2}
                   className="w-full p-3 rounded-[10px] border border-slate-200 dark:border-gray-700 bg-slate-100 dark:bg-gray-700 text-slate-900 dark:text-gray-50 text-[13px] resize-none"
                 />
+                <button
+                  type="button"
+                  disabled={!commentText.trim() || sendingComment}
+                  onClick={submitComment}
+                  className="h-10 w-10 shrink-0 flex items-center justify-center bg-primary text-white rounded-lg border-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-opacity mb-1"
+                >
+                  <Send size={16} />
+                </button>
                 {mentionSuggestions.length > 0 && (
                   <div className="absolute bottom-full left-0 right-0 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-[10px] shadow-lg z-200 overflow-hidden">
                     {mentionSuggestions.map((s) => (
@@ -1030,10 +1038,10 @@ export default function TaskDetailModal({
           )}
         </div>
 
-        {["Admin", "Gestor", "Liderado", "Gerente", "Coordenador"].includes(
+        {tab === "dados" && ["Admin", "Gestor", "Liderado", "Gerente", "Coordenador"].includes(
           user.role?.name || "",
         ) && (
-          <div className="mt-5 border-t border-slate-200 dark:border-gray-700 pt-4 flex gap-2.5 justify-end flex-wrap items-center">
+          <div className="mt-5 border-t border-slate-200 dark:border-gray-700 pt-4 flex gap-2.5 justify-end flex-wrap items-center shrink-0 mb-4 md:mb-0">
             {(form.subtasks || []).length > 0 ? (
               <div className="flex-1 text-[13px] text-amber-600 dark:text-amber-500 font-medium bg-amber-50 dark:bg-amber-900/20 px-4 py-2 rounded-lg flex items-center gap-2">
                 <span className="text-base uppercase font-bold">⚠️</span>
@@ -1052,7 +1060,7 @@ export default function TaskDetailModal({
                       });
                       onClose();
                     }}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-emerald-500 text-white border-none rounded-lg text-[13px] font-semibold cursor-pointer"
+                    className="flex-1 md:flex-none justify-center flex items-center gap-1.5 px-4 py-3 md:py-2 bg-emerald-500 text-white border-none rounded-lg text-[13px] font-semibold cursor-pointer"
                   >
                     <Play size={14} /> Iniciar
                   </button>
@@ -1063,7 +1071,7 @@ export default function TaskDetailModal({
                       onUpdate(t.id, "update_status", { status: "Pausado" });
                       onClose();
                     }}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white border-none rounded-lg text-[13px] font-semibold cursor-pointer"
+                    className="flex-1 md:flex-none justify-center flex items-center gap-1.5 px-4 py-3 md:py-2 bg-amber-500 text-white border-none rounded-lg text-[13px] font-semibold cursor-pointer"
                   >
                     <Pause size={14} /> Pausar
                   </button>
@@ -1076,7 +1084,7 @@ export default function TaskDetailModal({
                       });
                       onClose();
                     }}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white border-none rounded-lg text-[13px] font-semibold cursor-pointer"
+                    className="flex-1 md:flex-none justify-center flex items-center gap-1.5 px-4 py-3 md:py-2 bg-primary text-white border-none rounded-lg text-[13px] font-semibold cursor-pointer"
                   >
                     <Play size={14} /> Retomar
                   </button>
@@ -1087,7 +1095,7 @@ export default function TaskDetailModal({
                       onUpdate(t.id, "update_status", { status: "Concluído" });
                       onClose();
                     }}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white border-none rounded-lg text-[13px] font-semibold cursor-pointer"
+                    className="flex-1 md:flex-none justify-center flex items-center gap-1.5 px-4 py-3 md:py-2 bg-emerald-600 text-white border-none rounded-lg text-[13px] font-semibold cursor-pointer"
                   >
                     <CheckCircle size={14} /> Concluir
                   </button>

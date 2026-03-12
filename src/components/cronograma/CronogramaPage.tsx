@@ -221,7 +221,41 @@ export default function CronogramaPage({
           </div>
         ))}
       </div>
-      <div className="overflow-hidden rounded-[14px] bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700">
+      {/* Mobile View (Cards) */}
+      <div className="lg:hidden flex flex-col gap-3">
+        {filtered.map((t: Task) => (
+          <div key={t.id} onClick={() => onSelect(t)} className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl p-3.5 flex flex-col gap-3 cursor-pointer shadow-sm">
+            <div>
+              <div className="text-[14px] font-bold text-slate-900 dark:text-gray-50 leading-snug">
+                {t.title}
+              </div>
+              <div className="text-[11px] text-slate-500 dark:text-gray-400 mt-0.5">
+                {t.responsible && typeof t.responsible === "object" ? t.responsible.name : t.responsible || "Não atribuído"}
+              </div>
+            </div>
+            
+            <div className="flex flex-col gap-2 border-t border-slate-200 dark:border-gray-700/50 pt-3 border-dashed">
+              {evts.map(ev => {
+                 const tRec = t as unknown as Record<string, string | undefined>;
+                 const val = tRec[ev.k];
+                 if (!val) return null;
+                 return (
+                   <div key={ev.k} className="flex justify-between items-center text-[11px]">
+                     <div className="flex items-center gap-1.5">
+                       <div className="h-2 w-2 rounded-full" style={{ background: ev.c }} />
+                       <span className="text-slate-600 dark:text-gray-300">{ev.l}</span>
+                     </div>
+                     <span className="font-semibold" style={{ color: ev.c }}>{val}</span>
+                   </div>
+                 );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop View (Timeline) */}
+      <div className="hidden lg:block overflow-hidden rounded-[14px] bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700">
         <div
           className="grid px-4 py-2.5 border-b border-slate-200 dark:border-gray-700"
           style={{ gridTemplateColumns: "200px 1fr" }}
