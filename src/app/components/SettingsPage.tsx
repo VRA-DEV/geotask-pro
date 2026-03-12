@@ -12,6 +12,7 @@ import {
   UserCheck,
   User as UserIcon,
   Users,
+  Upload,
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useSWRConfig } from "swr";
@@ -19,6 +20,7 @@ import { ChangePasswordModal } from "./ChangePasswordModal";
 import { RoleModal } from "./RoleModal";
 import { SectorModal } from "./SectorModal";
 import { UserModal } from "./UserModal";
+import { ImportUsersModal } from "./ImportUsersModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -150,6 +152,7 @@ export function SettingsPage({
   const [isAdminPasswordReset, setIsAdminPasswordReset] = useState(false);
 
   const [showUserModal, setShowUserModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [editingUser, setEditingUser] = useState<any | null>(null);
 
   const [showRoleModal, setShowRoleModal] = useState(false);
@@ -662,16 +665,25 @@ export function SettingsPage({
                 <span className="text-[13px] font-semibold text-slate-900 dark:text-gray-50">
                   Usuários ({users.length})
                 </span>
-                <button
-                  onClick={() => {
-                    setEditingUser(null);
-                    setShowUserModal(true);
-                  }}
-                  className="flex items-center gap-[5px] py-1.5 px-3 bg-primary text-white border-none rounded-lg text-xs font-semibold cursor-pointer"
-                >
-                  <Plus size={12} />
-                  Novo usuário
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowImportModal(true)}
+                    className="flex items-center gap-[5px] py-1.5 px-3 bg-slate-100 dark:bg-gray-700 text-slate-700 dark:text-gray-300 border border-slate-200 dark:border-gray-600 rounded-lg text-xs font-semibold cursor-pointer hover:bg-slate-200 dark:hover:bg-gray-600 transition-colors"
+                  >
+                    <Upload size={12} />
+                    Importar Usuários
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditingUser(null);
+                      setShowUserModal(true);
+                    }}
+                    className="flex items-center gap-[5px] py-1.5 px-3 bg-primary text-white border-none rounded-lg text-xs font-semibold cursor-pointer"
+                  >
+                    <Plus size={12} />
+                    Novo usuário
+                  </button>
+                </div>
               </div>
 
               {/* Table header */}
@@ -1291,6 +1303,13 @@ export function SettingsPage({
         onClose={() => setShowSectorModal(false)}
         onSuccess={fetchData}
         sector={editingSector}
+        T={T}
+      />
+
+      <ImportUsersModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onSuccess={fetchData}
         T={T}
       />
     </div>
