@@ -146,10 +146,10 @@ export default function ListPage({
                         <div key={idx} className="flex items-center justify-between bg-slate-50 dark:bg-gray-700/50 p-2 rounded-lg">
                           <div className="flex items-center gap-2">
                             <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs font-bold">
-                              {u.avatar || u.name?.substring(0,2).toUpperCase()}
+                              {(u.avatar || (typeof u.name === 'object' ? u.name.name : u.name)?.substring(0,2))?.toUpperCase() || "?"}
                             </div>
                             <div>
-                               <div className="text-sm font-semibold text-slate-900 dark:text-gray-50">{u.name}</div>
+                               <div className="text-sm font-semibold text-slate-900 dark:text-gray-50">{typeof u.name === 'object' ? u.name.name : u.name}</div>
                                <div className="text-[10px] text-slate-500 dark:text-gray-400">{u.role || "Membro"}</div>
                             </div>
                           </div>
