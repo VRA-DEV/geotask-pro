@@ -67,3 +67,4 @@ tsconfig.tsbuildinfo
 *.txt
 *errodeployvercel.md
 *plano_deploy.md
+data/
