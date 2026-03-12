@@ -51,6 +51,7 @@ interface CronogramaPageProps {
   citiesNeighborhoods?: CitiesNeighborhoods;
   sectors?: (Sector | string)[];
   taskTypes?: any[];
+  canViewAllSectors?: boolean;
 }
 
 export default function CronogramaPage({
@@ -62,6 +63,7 @@ export default function CronogramaPage({
   citiesNeighborhoods = {},
   sectors = [],
   taskTypes = [],
+  canViewAllSectors,
 }: CronogramaPageProps) {
   const [search, setSearch] = useState("");
   const [fSector, setFSector] = useState<string[]>([]);
@@ -70,6 +72,7 @@ export default function CronogramaPage({
   const [fNeighbor, setFNeighbor] = useState("");
   const [fPriority, setFPriority] = useState("");
   const [fType, setFType] = useState("");
+  const [fResponsible, setFResponsible] = useState("");
   const [fDateFrom, setFDateFrom] = useState<DateRange | undefined>(undefined);
   const [fDateTo, setFDateTo] = useState<DateRange | undefined>(undefined);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -100,6 +103,11 @@ export default function CronogramaPage({
     if (fNeighbor && t.nucleus !== fNeighbor) return false;
     if (fPriority && t.priority !== fPriority) return false;
     if (fType && t.type !== fType) return false;
+    if (fResponsible) {
+      const respName = (t.responsible && typeof t.responsible === "object") ? t.responsible.name : t.responsible || "";
+      const isCoworker = (t.coworkers || []).some((cw: any) => cw.name === fResponsible);
+      if (respName !== fResponsible && !isCoworker) return false;
+    }
     if (fDateFrom?.from || fDateFrom?.to) {
       const td = parseDate(t.deadline);
       if (!td) return false;
@@ -121,6 +129,7 @@ export default function CronogramaPage({
     fNeighbor,
     fPriority,
     fType,
+    fResponsible,
     fDateFrom?.from || fDateFrom?.to,
     fDateTo?.from || fDateTo?.to,
   ].filter(Boolean).length;
@@ -135,7 +144,7 @@ export default function CronogramaPage({
     setFNeighbor("");
     setFPriority("");
     setFType("");
-    setFType("");
+    setFResponsible("");
     setFDateFrom(undefined);
     setFDateTo(undefined);
   };
@@ -177,6 +186,8 @@ export default function CronogramaPage({
         setPriority={setFPriority}
         type={fType}
         setType={setFType}
+        responsible={fResponsible}
+        setResponsible={setFResponsible}
         contract={fContract}
         setContract={setFContract}
         city={fCity}
@@ -194,6 +205,7 @@ export default function CronogramaPage({
         onClear={clearAll}
         totalTasks={tasks.length}
         filteredTasks={filtered.length}
+        canViewAllSectors={canViewAllSectors}
       />
 
       <div className="mb-4 flex flex-wrap gap-4 rounded-[10px] px-3.5 py-2.5 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700">

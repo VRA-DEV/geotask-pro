@@ -39,6 +39,9 @@ interface TaskFiltersProps {
   onClear: () => void;
   totalTasks: number;
   filteredTasks: number;
+  showSubtasks?: boolean;
+  setShowSubtasks?: (v: boolean) => void;
+  canViewAllSectors?: boolean;
 }
 
 export function TaskFilters({
@@ -73,6 +76,9 @@ export function TaskFilters({
   onClear,
   totalTasks,
   filteredTasks,
+  showSubtasks,
+  setShowSubtasks,
+  canViewAllSectors,
 }: TaskFiltersProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -93,6 +99,75 @@ export function TaskFilters({
       })
       .map((t) => t.name);
   }, [taskTypes, sector, sectors]);
+
+  // Group Users by Sector
+  const groupedUsers = React.useMemo(() => {
+    if (!users || users.length === 0) return [];
+    
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const userGroups: Record<string, any[]> = { "Sem Setor": [] };
+    
+    users.forEach((u: any) => {
+       const sectorName = u.sector?.name || u.Sector?.name || "Sem Setor";
+       if (!userGroups[sectorName]) userGroups[sectorName] = [];
+       userGroups[sectorName].push(u);
+    });
+
+    const groups = [];
+    const sortedSectors = Object.keys(userGroups).sort((a, b) => {
+        if (a === "Sem Setor") return 1;
+        if (b === "Sem Setor") return -1;
+        return a.localeCompare(b);
+    });
+
+    for (const s of sortedSectors) {
+       if (userGroups[s].length > 0) {
+          const sortedUsers = [...userGroups[s]].sort((a, b) => a.name.localeCompare(b.name));
+          groups.push({
+             label: s,
+             options: sortedUsers.map(u => ({ id: u.name, name: u.name }))
+          });
+       }
+    }
+    return groups;
+  }, [users]);
+
+  // Group TaskTypes by Sector
+  const groupedTaskTypes = React.useMemo(() => {
+    if (!taskTypes || taskTypes.length === 0) return [];
+    
+    const ttGroups: Record<string, typeof taskTypes> = { "Geral": [] };
+    
+    visibleTaskTypes.forEach((vtName) => {
+       const tt = taskTypes.find(t => t.name === vtName);
+       if (!tt) return;
+       let sectorName = "Geral";
+       if (tt.sector_id) {
+          const matchSector = sectors.find(s => s.id === tt.sector_id);
+          if (matchSector) sectorName = matchSector.name;
+       }
+       if (!ttGroups[sectorName]) ttGroups[sectorName] = [];
+       ttGroups[sectorName].push(tt);
+    });
+
+    const groups = [];
+    const sortedSectors = Object.keys(ttGroups).sort((a, b) => {
+        if (a === "Geral") return -1;
+        if (b === "Geral") return 1;
+        return a.localeCompare(b);
+    });
+
+    for (const s of sortedSectors) {
+       if (ttGroups[s].length > 0) {
+          const sortedTypes = [...ttGroups[s]].sort((a, b) => a.name.localeCompare(b.name));
+          groups.push({
+             label: s,
+             options: sortedTypes.map(t => ({ id: t.name, name: t.name }))
+          });
+       }
+    }
+    return groups;
+  }, [taskTypes, sectors, visibleTaskTypes]);
 
   const activeCount = [
     status,
@@ -143,15 +218,17 @@ export function TaskFilters({
               />
             </div>
           )}
-          <div className="w-[160px]">
-            <MultiSelect
-              label="Setores"
-              val={sector}
-              onChange={setSector}
-              opts={sectorOptions}
-              placeholder="Todos"
-            />
-          </div>
+          {canViewAllSectors !== false && (
+            <div className="w-[160px]">
+              <MultiSelect
+                label="Setores"
+                val={sector}
+                onChange={setSector}
+                opts={sectorOptions}
+                placeholder="Todos"
+              />
+            </div>
+          )}
           <div className="w-[150px]">
             <FilterSelect
               label="Prioridade"
@@ -161,6 +238,24 @@ export function TaskFilters({
               placeholder="Todas"
             />
           </div>
+
+          {setShowSubtasks && (
+            <div className="flex items-center gap-2 h-10 px-2">
+              <input
+                type="checkbox"
+                id="showSubtasks"
+                checked={showSubtasks}
+                onChange={(e) => setShowSubtasks(e.target.checked)}
+                className="w-3.5 h-3.5 rounded-sm border-slate-300 text-primary focus:ring-primary"
+              />
+              <label
+                htmlFor="showSubtasks"
+                className="text-xs font-semibold text-slate-600 dark:text-gray-400 cursor-pointer select-none"
+              >
+                Exibir Subtarefas
+              </label>
+            </div>
+          )}
 
           {/* Action Buttons */}
           <div className="flex gap-2">
@@ -227,7 +322,7 @@ export function TaskFilters({
             label="Tipo"
             val={type}
             onChange={setType}
-            opts={visibleTaskTypes}
+            groups={groupedTaskTypes}
             placeholder="Todos"
           />
           {setResponsible && (
@@ -235,7 +330,7 @@ export function TaskFilters({
               label="Responsável"
               val={responsible || ""}
               onChange={setResponsible}
-              opts={users.map((u) => u.name)}
+              groups={groupedUsers}
               placeholder="Todos"
             />
           )}

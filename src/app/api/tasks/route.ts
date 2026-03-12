@@ -147,6 +147,19 @@ export async function GET(request: NextRequest) {
         created_by: { select: { id: true, name: true } },
         pauses: true,
         subtasks: true,
+        coworkers: {
+          select: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                avatar: true,
+                Role: { select: { name: true } },
+                Sector: { select: { name: true } },
+              },
+            },
+          },
+        },
         children: {
           orderBy: { id: "asc" },
           include: {
@@ -221,7 +234,17 @@ export async function GET(request: NextRequest) {
       deadline: t.deadline
         ? new Date(t.deadline).toLocaleDateString("pt-BR")
         : null,
-      time: t.time_spent ? Math.round(t.time_spent / 60) : 0,
+      time:
+        t.children && t.children.length > 0
+          ? Math.round(
+              t.children.reduce(
+                (acc: number, c: any) => acc + (c.time_spent || 0),
+                0,
+              ) / 60,
+            )
+          : t.time_spent
+            ? Math.round(t.time_spent / 60)
+            : 0,
       subtasks: [
         ...(t.subtasks || []).map((s: any) => ({ ...s, isLegacy: true })),
         ...(t.children || []).map((c: any) => ({
@@ -246,6 +269,15 @@ export async function GET(request: NextRequest) {
             : null,
         })),
       ],
+      coworkers: (t.coworkers || [])
+        .filter((cw: any) => cw?.user?.id)
+        .map((cw: any) => ({
+          id: cw.user.id,
+          name: cw.user.name,
+          avatar: cw.user.avatar,
+          role: cw.user.Role?.name || null,
+          sector: cw.user.Sector?.name || null,
+        })),
       pauses: t.pauses || [],
     }));
 
@@ -298,6 +330,7 @@ export async function POST(req: Request) {
       children,
       created_by,
       parent_id,
+      coworkers,
     } = body;
 
     let contractId: number | null = body.contract_id
@@ -343,6 +376,12 @@ export async function POST(req: Request) {
       created_by_id: createdById,
       parent_id: parentId,
     };
+
+    if (coworkers && Array.isArray(coworkers) && coworkers.length > 0) {
+      taskData.coworkers = {
+        create: coworkers.map((uid: number) => ({ user_id: Number(uid) })),
+      };
+    }
 
     if ((subtasks || children) && Array.isArray(subtasks || children)) {
       taskData.children = {
@@ -644,13 +683,80 @@ export async function PATCH(req: Request) {
         }
       }
 
-      if (status === "Concluído")
-        await notifyManagers(
-          "task_completed",
-          `Tarefa Concluída: "${task.title}"`,
-          `Tarefa concluída na data ${new Date().toLocaleDateString()}`,
-          Number(id),
-        );
+      if (status === "Concluído") {
+        const ds = new Date().toLocaleDateString();
+
+        // 1. Notify Creator
+        if (task.created_by_id) {
+          await notifyUser(
+            task.created_by_id,
+            "task_completed",
+            `Tarefa Concluída: "${task.title}"`,
+            `Tarefa concluída na data ${ds}`,
+            Number(id),
+          );
+        }
+
+        // 2. Notify Sector Gestor(es)
+        if (task.sector_id) {
+          const gestores = await prisma.user.findMany({
+            where: {
+              sector_id: task.sector_id,
+              Role: { name: { in: ["Gestor", "Gerente", "Coordenador", "Admin"] } },
+            },
+            select: { id: true },
+          });
+          for (const g of gestores) {
+            if (g.id !== task.created_by_id && g.id !== userId) {
+              await notifyUser(
+                g.id,
+                "task_completed",
+                `Tarefa Concluída no Setor: "${task.title}"`,
+                `Tarefa concluída na data ${ds}`,
+                Number(id),
+              );
+            }
+          }
+        }
+
+        // 3. If Subtask, Notify Other Subtasks' Assignees of the Same Parent
+        if (task.parent_id) {
+          const siblingsTasks = await prisma.task.findMany({
+            where: { parent_id: task.parent_id, id: { not: task.id } },
+            select: { responsible_id: true }
+          });
+          const legacySubtasks = await prisma.subtask.findMany({
+            where: { task_id: task.parent_id },
+            select: { responsible_id: true }
+          });
+          
+          const notifiedSet = new Set<number>();
+          if (task.created_by_id) notifiedSet.add(task.created_by_id);
+          if (userId) notifiedSet.add(userId);
+
+          const siblingUsers = new Set<number>();
+          siblingsTasks.forEach(s => {
+            if (s.responsible_id && !notifiedSet.has(s.responsible_id)) {
+              siblingUsers.add(s.responsible_id);
+            }
+          });
+          legacySubtasks.forEach(s => {
+            if (s.responsible_id && !notifiedSet.has(s.responsible_id)) {
+              siblingUsers.add(s.responsible_id);
+            }
+          });
+
+          for (const uid of siblingUsers) {
+            await notifyUser(
+               uid,
+               "task_completed",
+               `Subtarefa Finalizada`,
+               `A subtarefa "${task.title}" vinculada à tarefa principal foi concluída.`,
+               task.parent_id
+            );
+          }
+        }
+      }
     } else if (action === "update_fields") {
       const basicFields = [
         "title",
@@ -812,6 +918,13 @@ export async function PATCH(req: Request) {
           await logHistory(task.id, userId, "deadline", task.deadline, d);
           updateData.deadline = d;
         }
+      }
+
+      if (data.coworkers !== undefined) {
+        updateData.coworkers = {
+          deleteMany: {}, // Clear old assignments
+          create: data.coworkers.map((uid: number) => ({ user_id: Number(uid) })),
+        };
       }
 
       await prisma.task.update({ where: { id: Number(id) }, data: updateData });

@@ -104,6 +104,13 @@ export interface Task {
   parent?: Task | null;
   children?: Task[];
   subtasks?: Subtask[];
+  coworkers?: {
+    id: number;
+    name: string;
+    avatar?: string | null;
+    role?: string | null;
+    sector?: string | null;
+  }[];
   comments?: Comment[];
   /** Pause history from enriched API responses */
   pauses?: { started_at: string; ended_at?: string }[];

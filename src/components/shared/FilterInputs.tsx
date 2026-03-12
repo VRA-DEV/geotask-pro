@@ -21,13 +21,15 @@ export function FilterSelect({
   val,
   onChange,
   opts,
+  groups,
   placeholder = "",
   label = "",
   disabled = false,
 }: {
   val: string;
   onChange: (v: string) => void;
-  opts: FilterOption[];
+  opts?: FilterOption[];
+  groups?: { label: string; options: FilterOption[] }[];
   placeholder?: string;
   label?: string;
   disabled?: boolean;
@@ -54,19 +56,31 @@ export function FilterSelect({
         <option value="">
           {placeholder || (label ? `Todos ${label}` : "")}
         </option>
-        {opts.map((o: FilterOption, i: number) => {
-          const l = typeof o === "object" ? o.name || o.label : o;
-          const v = typeof o === "object" ? o.id || o.value : o;
-          const key =
-            typeof o === "object"
-              ? o.id || o.name || `fopt-${i}`
-              : `fopt-${o}-${i}`;
-          return (
-            <option key={key} value={v}>
-              {l}
-            </option>
-          );
-        })}
+        {groups
+          ? groups.map((g, gi) => (
+              <optgroup key={`group-${gi}`} label={g.label}>
+                {g.options.map((o: FilterOption, i: number) => {
+                  const l = typeof o === "object" ? o.name || o.label : o;
+                  const v = typeof o === "object" ? o.id || o.value : o;
+                  const key = typeof o === "object" ? o.id || o.name || `fgopt-${gi}-${i}` : `fgopt-${gi}-${o}-${i}`;
+                  return (
+                    <option key={key} value={v}>
+                      {l}
+                    </option>
+                  );
+                })}
+              </optgroup>
+            ))
+          : (opts || []).map((o: FilterOption, i: number) => {
+              const l = typeof o === "object" ? o.name || o.label : o;
+              const v = typeof o === "object" ? o.id || o.value : o;
+              const key = typeof o === "object" ? o.id || o.name || `fopt-${i}` : `fopt-${o}-${i}`;
+              return (
+                <option key={key} value={v}>
+                  {l}
+                </option>
+              );
+            })}
       </select>
     </div>
   );

@@ -16,6 +16,7 @@ import type {
 } from "@/types";
 import { Check, Link, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import TeamSelectionModal from "./TeamSelectionModal";
 
 // ── Local types for form state ───────────────────────────────────────
 
@@ -62,6 +63,7 @@ interface FormState {
   lote: string;
   sector: string;
   responsible: string;
+  coworkers: number[];
   subtasks: SubtaskDraft[];
 }
 
@@ -129,6 +131,7 @@ export default function NewTaskModal({
     lote: "",
     sector: "",
     responsible: "",
+    coworkers: [] as number[],
     subtasks: [] as SubtaskDraft[],
   };
   const [form, setForm] = useState<FormState>(empty);
@@ -136,6 +139,7 @@ export default function NewTaskModal({
   const [subForm, setSubForm] = useState<SubForm | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [selectedTemplate, setSelectedTemplate] = useState("");
+  const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
 
   const set = (k: string, v: string) =>
     setForm((prev) => ({ ...prev, [k]: v }));
@@ -333,9 +337,6 @@ export default function NewTaskModal({
       if (!form.priority) e.priority = "Obrigatório";
       if (!form.type) e.type = "Obrigatório";
     }
-    if (step === 1) {
-      if (!form.contract) e.contract = "Obrigatório";
-    }
     if (step === 2) {
       if (!form.sector) e.sector = "Obrigatório";
     }
@@ -379,6 +380,7 @@ export default function NewTaskModal({
   };
 
   return (
+    <>
     <div
       onClick={onClose}
       className="fixed inset-0 z-[100] flex items-center justify-center p-4 font-sans bg-black/65"
@@ -542,7 +544,7 @@ export default function NewTaskModal({
 
           {step === 1 && (
             <>
-              <FormField label="Contrato" req err={errors.contract}>
+              <FormField label="Contrato">
                 <FormSelect
                   T={T}
                   val={form.contract}
@@ -664,6 +666,43 @@ export default function NewTaskModal({
                   ))}
                 </div>
               )}
+              <div className="bg-white dark:bg-gray-900 rounded-[10px] p-3 border border-gray-200 dark:border-gray-700 mt-2">
+                  <div className="flex items-center justify-between mb-2.5">
+                    <div className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase">
+                      Equipe da Tarefa ({(form.coworkers || []).length})
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsTeamModalOpen(true)}
+                      className="text-[11px] font-semibold text-primary bg-primary/10 hover:bg-primary/20 px-2.5 py-1.5 rounded-md border-none cursor-pointer transition-colors"
+                    >
+                      Gerenciar Equipe
+                    </button>
+                  </div>
+                  
+                  {(form.coworkers || []).length === 0 ? (
+                    <div className="text-[11px] text-gray-400 py-2 border-t border-dashed border-gray-200 dark:border-gray-700">
+                      Nenhum outro membro selecionado.
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {(form.coworkers || []).map((id) => {
+                        const u = users.find((user) => user.id === id);
+                        if (!u) return null;
+                        return (
+                          <div key={id} className="flex items-center gap-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full px-2 py-1">
+                            <div className="w-5 h-5 rounded-full bg-primary/20 text-primary text-[9px] font-bold flex items-center justify-center overflow-hidden">
+                              {typeof u.avatar === "string" && u.avatar.startsWith("http") ? (
+                                <img src={u.avatar} alt={u.name} className="w-full h-full object-cover" />
+                              ) : u.name ? u.name.charAt(0) : "?"}
+                            </div>
+                            <span className="text-[11px] font-medium text-gray-700 dark:text-gray-300 pr-1">{u.name}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
             </>
           )}
 
@@ -929,6 +968,19 @@ export default function NewTaskModal({
           )}
         </div>
       </div>
+      {isTeamModalOpen && (
+        <TeamSelectionModal
+          T={T}
+          isOpen={isTeamModalOpen}
+          onClose={() => setIsTeamModalOpen(false)}
+          onSave={(selectedIds) => setForm(prev => ({ ...prev, coworkers: selectedIds }))}
+          users={users}
+          sectors={sectors}
+          initialSelectedIds={form.coworkers}
+          mainResponsibleId={users.find(u => u.name === form.responsible)?.id}
+        />
+      )}
     </div>
+    </>
   );
 }

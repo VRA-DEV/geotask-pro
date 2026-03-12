@@ -170,8 +170,8 @@ export function SettingsPage({
   }, [isAdmin, canManageLocations]);
 
   useEffect(() => {
-    if (!isAdmin && tab !== "account") setTab("account");
-  }, [isAdmin, tab, setTab]);
+    if (!isAdmin && !canManageLocations && tab !== "account") setTab("account");
+  }, [isAdmin, canManageLocations, tab, setTab]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -180,10 +180,10 @@ export function SettingsPage({
       if (isAdmin) {
         proms.push(fetch("/api/users").then((r) => r.json()));
         proms.push(fetch("/api/roles").then((r) => r.json()));
+      }
+      if (isAdmin || canManageLocations) {
         proms.push(fetch("/api/sectors").then((r) => r.json()));
         proms.push(fetch("/api/task-types").then((r) => r.json()));
-      }
-      if (canManageLocations) {
         proms.push(fetch("/api/contracts").then((r) => r.json()));
         proms.push(fetch("/api/cities").then((r) => r.json()));
         proms.push(fetch("/api/neighborhoods").then((r) => r.json()));
@@ -194,10 +194,10 @@ export function SettingsPage({
       if (isAdmin) {
         setUsers(results[idx++]);
         setRoles(results[idx++]);
+      }
+      if (isAdmin || canManageLocations) {
         setSectors(results[idx++]);
         setTaskTypes(results[idx++]);
-      }
-      if (canManageLocations) {
         setContracts(results[idx++]);
         setCities(results[idx++]);
         setNeighborhoods(results[idx++]);
@@ -532,7 +532,7 @@ export function SettingsPage({
 
   const tabs = allTabs.filter((t) => {
     if (t.id === "account") return true;
-    if (t.id === "locations") return canManageLocations;
+    if (t.id === "locations" || t.id === "task-types") return canManageLocations;
     return isAdmin;
   });
 

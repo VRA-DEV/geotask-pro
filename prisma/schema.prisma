@@ -30,6 +30,7 @@ model User {
   templates            Template[]
   template_subtasks    TemplateSubtask[]
   activity_logs        ActivityLog[]
+  coworkers            TaskUser[]
   Role                 Role           @relation(fields: [role_id], references: [id])
   Sector               Sector         @relation(fields: [sector_id], references: [id])
 }
@@ -73,6 +74,7 @@ model Task {
   Sector          Sector?        @relation(fields: [sector_id], references: [id])
   history         TaskHistory[]
   pauses          TaskPause[]
+  coworkers       TaskUser[]
 
   @@index([responsible_id])
   @@index([sector_id])
@@ -268,4 +270,18 @@ model ActivityLog {
   @@index([user_id])
   @@index([action])
   @@index([created_at])
+}
+
+model TaskUser {
+  id         Int      @id @default(autoincrement())
+  task_id    Int
+  user_id    Int
+  created_at DateTime @default(now())
+  
+  task       Task     @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([task_id, user_id])
+  @@index([task_id])
+  @@index([user_id])
 }

@@ -31,6 +31,7 @@ import { TaskFilters } from "../shared/TaskFilters";
 interface KanbanTask extends Task {
   /** Alias – API sometimes returns pre-computed time instead of time_spent */
   time?: number;
+  isLegacy?: boolean;
 }
 
 // ── Inline helper component props ──────────────────────────────────
@@ -70,6 +71,7 @@ interface KanbanPageProps {
   citiesNeighborhoods?: CitiesNeighborhoods;
   sectors?: Sector[];
   taskTypes?: any[];
+  canViewAllSectors?: boolean;
 }
 
 // ── Inline helper components ────────────────────────────────────
@@ -281,6 +283,8 @@ export default function KanbanPage({
   const [fNeighbor, setFNeighbor] = useState("");
   const [fPriority, setFPriority] = useState("");
   const [fType, setFType] = useState("");
+  const [fResponsible, setFResponsible] = useState("");
+  const [showSubtasks, setShowSubtasks] = useState(true);
   const [fDateFrom, setFDateFrom] = useState<DateRange | undefined>(undefined);
   const [fDateTo, setFDateTo] = useState<DateRange | undefined>(undefined);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -290,6 +294,7 @@ export default function KanbanPage({
   const cols = ["A Fazer", "Em Andamento", "Pausado", "Concluído"];
 
   const filtered = tasks.filter((t: KanbanTask) => {
+    if (!showSubtasks && (t.parent_id || t.isLegacy)) return false;
     if (search && !t.title.toLowerCase().includes(search.toLowerCase()))
       return false;
     const sectorVal =
@@ -308,6 +313,11 @@ export default function KanbanPage({
     if (fNeighbor && t.nucleus !== fNeighbor) return false;
     if (fPriority && t.priority !== fPriority) return false;
     if (fType && t.type !== fType) return false;
+    if (fResponsible) {
+      const respName = (t.responsible && typeof t.responsible === "object") ? t.responsible.name : t.responsible || "";
+      const isCoworker = (t.coworkers || []).some((cw: any) => cw.name === fResponsible);
+      if (respName !== fResponsible && !isCoworker) return false;
+    }
     if (fDateFrom?.from || fDateFrom?.to) {
       const td = parseDate(t.deadline);
       if (!td) return false;
@@ -395,6 +405,8 @@ export default function KanbanPage({
         setPriority={setFPriority}
         type={fType}
         setType={setFType}
+        responsible={fResponsible}
+        setResponsible={setFResponsible}
         contract={fContract}
         setContract={setFContract}
         city={fCity}
@@ -405,6 +417,8 @@ export default function KanbanPage({
         setDateFrom={setFDateFrom}
         dateTo={fDateTo}
         setDateTo={setFDateTo}
+        showSubtasks={showSubtasks}
+        setShowSubtasks={setShowSubtasks}
         contracts={contracts}
         taskTypes={taskTypes}
         sectors={sectors}

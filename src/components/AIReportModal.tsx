@@ -75,6 +75,12 @@ const ANALYSIS_OPTIONS: AnalysisOption[] = [
     description: "Carga de trabalho e produtividade por colaborador",
     icon: <Users size={16} />,
   },
+  {
+    id: "execution",
+    label: "Execução Diária",
+    description: "Atividades diárias, ociosidade e tempo médio por pessoa",
+    icon: <FileText size={16} />,
+  },
 ];
 
 // ─── Renderizador de Markdown simples ────────────────────────────────────────

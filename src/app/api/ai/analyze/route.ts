@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
           responsible: true,
           contract: true,
           subtasks: true,
-          history: { orderBy: { created_at: "desc" }, take: 5 },
+          history: { orderBy: { created_at: "desc" }, take: 5, include: { user: true } },
         },
         orderBy: { created_at: "desc" },
       }),
@@ -238,6 +238,50 @@ Gere uma **Análise de Contratos**: destaque contratos com baixo índice de conc
 ${JSON.stringify(byResponsible, null, 2)}
 
 Gere uma **Análise de Desempenho por Responsável**: identifique quem está sobrecarregado, quem tem melhor produtividade, e sugira redistribuição de carga se necessário.
+`);
+    }
+
+    // RELATÓRIO DE EXECUÇÃO DIÁRIA
+    if (analyses.includes("execution")) {
+      const executionData: Record<string, Record<string, any[]>> = {};
+
+      tasks.forEach((t) => {
+        const sectorName = t.Sector?.name || "Sem setor";
+        const responsibleName = t.responsible?.name || "Sem responsável";
+        
+        if (!executionData[sectorName]) executionData[sectorName] = {};
+        if (!executionData[sectorName][responsibleName]) {
+          executionData[sectorName][responsibleName] = [];
+        }
+
+        // Add task data 
+        const executionInfo = {
+          task_id: t.id,
+          title: t.title,
+          status: t.status,
+          priority: t.priority,
+          created_at: t.created_at,
+          completed_at: t.completed_at,
+          history_updates: t.history.map((h: any) => ({
+            date: h.created_at,
+            field_changed: h.field,
+            old: h.old_value,
+            new: h.new_value,
+            user: h.user?.name || "Sistema"
+          }))
+        };
+        
+        executionData[sectorName][responsibleName].push(executionInfo);
+      });
+
+      sections.push(`
+## EXECUÇÃO DIÁRIA (POR SETOR E USUÁRIO)
+${JSON.stringify(executionData, null, 2)}
+
+Gere um detalhado **Relatório de Execução Diária**: 
+1. Quebre detalhadamente (em formato de linha do tempo ou cronograma diário - Ex: Segunda, Terça, Quarta) o que os usuários de cada setor fizeram durante a semana, usando as datas de "created_at", "completed_at", e os dados de "history_updates".
+2. Identifique explicitamente os **períodos de ociosidade** de cada usuário (falta de atualizações ou tarefas ativas no período).
+3. Calcule e apresente a **média de tempo por tarefa concluída** para cada usuário com base nas datas das tarefas.
 `);
     }
 

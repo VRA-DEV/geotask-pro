@@ -4,6 +4,7 @@ import { Calendar as CalendarIcon, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
+import { InputMask } from "@react-input/mask";
 
 export function DatePicker({
   date,
@@ -40,10 +41,37 @@ export function DatePicker({
     setIsOpen(false);
   };
 
-  let displayValue = "Selecione...";
-  if (date) {
-    displayValue = format(date, "dd/MM/yyyy", { locale: ptBR });
-  }
+  const [inputValue, setInputValue] = useState("");
+
+  useEffect(() => {
+    if (date) {
+      setInputValue(format(date, "dd/MM/yyyy", { locale: ptBR }));
+    } else {
+      setInputValue("");
+    }
+  }, [date]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setInputValue(val);
+
+    // If it's a full date like "dd/mm/yyyy"
+    if (val.replace(/_/g, "").length === 10) {
+      const parts = val.split("/");
+      if (parts.length === 3) {
+        const d = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        const y = parseInt(parts[2], 10);
+        
+        const newDate = new Date(y, m, d);
+        if (!isNaN(newDate.getTime()) && newDate.getDate() === d && newDate.getFullYear() === y) {
+           setDate(newDate);
+        }
+      }
+    } else if (val.replace(/\D/g, "").length === 0) {
+      setDate(undefined);
+    }
+  };
 
   const dropdownStyle: React.CSSProperties = {
     position: "absolute",
@@ -88,7 +116,25 @@ export function DatePicker({
         }}
       >
         <CalendarIcon size={14} color={T.sub} />
-        <span style={{ flex: 1 }}>{displayValue}</span>
+        <InputMask
+          mask="__/__/____"
+          replacement={{ _: /\d/ }}
+          value={inputValue}
+          onChange={handleInputChange}
+          placeholder="DD/MM/AAAA"
+          onClick={(e: React.MouseEvent<HTMLInputElement>) => {
+             e.stopPropagation();
+             setIsOpen(true);
+          }}
+          style={{
+            flex: 1,
+            background: "transparent",
+            outline: "none",
+            color: "inherit",
+            cursor: "text",
+            width: "100%",
+          }}
+        />
         {date && (
           <div
             onClick={(e) => {

@@ -101,7 +101,7 @@ export const getPermissions = (user?: User | null): AppPermissions => {
 
   // Settings
   legacyPerms.settings.manage_locations = isAdmin || isGerente || isCoord;
-  legacyPerms.settings.manage_task_types = isAdmin || isGerente;
+  legacyPerms.settings.manage_task_types = isAdmin || isGerente || isCoord;
   legacyPerms.settings.manage_users = isAdmin || isGerente;
   legacyPerms.settings.manage_roles = isAdmin;
 

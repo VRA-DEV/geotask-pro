@@ -3,6 +3,7 @@
 import { getPermissions } from "@/lib/permissions";
 import { CheckCircle, Eye, Pause, Play, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import TeamSelectionModal from "./TeamSelectionModal";
 
 import { DatePicker } from "@/app/components/DatePicker";
 import { SECTORS, STATUS_COLOR } from "@/lib/constants";
@@ -33,6 +34,7 @@ interface TaskDetailModalProps {
   sectors?: (Sector | string)[];
   tasks?: Task[];
   setSelectedTask: (t: Task) => void;
+  canViewAllSectors?: boolean;
 }
 
 interface HistoryEntry {
@@ -65,6 +67,7 @@ export default function TaskDetailModal({
   sectors = [],
   tasks = [],
   setSelectedTask,
+  canViewAllSectors,
 }: TaskDetailModalProps) {
   const sc = STATUS_COLOR[t.status];
 
@@ -72,6 +75,7 @@ export default function TaskDetailModal({
   const [form, setForm] = useState({
     ...t,
     sector: (typeof t.sector === "object" ? t.sector?.name : t.sector) || "",
+    coworkers: (t.coworkers || []).map((c: any) => c.id),
   });
   const [saving, setSaving] = useState(false);
 
@@ -94,6 +98,7 @@ export default function TaskDetailModal({
   });
   const [creatingSubtask, setCreatingSubtask] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
 
   const filteredUsers = useMemo(() => {
     if (!form.sector) return [];
@@ -171,6 +176,7 @@ export default function TaskDetailModal({
     setForm({
       ...t,
       sector: (typeof t.sector === "object" ? t.sector?.name : t.sector) || "",
+      coworkers: (t.coworkers || []).map((c: any) => c.id),
     });
   }, [t]);
 
@@ -371,6 +377,7 @@ export default function TaskDetailModal({
   };
 
   return (
+    <>
     <div
       onClick={onClose}
       className="fixed inset-0 z-100 flex items-center justify-center p-4 font-sans bg-black/60"
@@ -646,6 +653,46 @@ export default function TaskDetailModal({
                   </div>
                 );
               })}
+
+              <div className="col-span-full bg-white dark:bg-gray-900 rounded-[10px] p-3 border border-gray-200 dark:border-gray-700 mt-2 mb-3">
+                  <div className="flex items-center justify-between mb-2.5">
+                    <div className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase">
+                      Equipe da Tarefa ({(form.coworkers || []).length})
+                    </div>
+                    {canEdit("responsible_id") && (
+                      <button
+                        type="button"
+                        onClick={() => setIsTeamModalOpen(true)}
+                        className="text-[11px] font-semibold text-primary bg-primary/10 hover:bg-primary/20 px-2.5 py-1.5 rounded-md border-none cursor-pointer transition-colors"
+                      >
+                        Gerenciar Equipe
+                      </button>
+                    )}
+                  </div>
+                  
+                  {(form.coworkers || []).length === 0 ? (
+                    <div className="text-[11px] text-gray-400 py-2 border-t border-dashed border-gray-200 dark:border-gray-700">
+                      Nenhum outro membro selecionado.
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {(form.coworkers || []).map((id: number) => {
+                        const u = users.find((user) => user.id === id);
+                        if (!u) return null;
+                        return (
+                          <div key={id} className="flex items-center gap-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full px-2 py-1">
+                            <div className="w-5 h-5 rounded-full bg-primary/20 text-primary text-[9px] font-bold flex items-center justify-center overflow-hidden">
+                              {typeof u.avatar === "string" && u.avatar.startsWith("http") ? (
+                                <img src={u.avatar} alt={u.name} className="w-full h-full object-cover" />
+                              ) : u.name ? u.name.charAt(0) : "?"}
+                            </div>
+                            <span className="text-[11px] font-medium text-gray-700 dark:text-gray-300 pr-1">{u.name}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
 
               <div className="col-span-full pt-2.5">
                 <button
@@ -1051,5 +1098,19 @@ export default function TaskDetailModal({
         )}
       </div>
     </div>
+    
+    {isTeamModalOpen && (
+      <TeamSelectionModal
+        T={T}
+        isOpen={isTeamModalOpen}
+        onClose={() => setIsTeamModalOpen(false)}
+        onSave={(selectedIds) => setForm(prev => ({ ...prev, coworkers: selectedIds }))}
+        users={users}
+        sectors={sectors}
+        initialSelectedIds={form.coworkers}
+        mainResponsibleId={form.responsible_id ? Number(form.responsible_id) : undefined}
+      />
+    )}
+    </>
   );
 }

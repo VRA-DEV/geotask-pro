@@ -264,6 +264,7 @@ export default function GeoTask() {
         (t: any) =>
           t.responsible_id === user.id ||
           t.responsible?.id === user.id ||
+          (t.coworkers || []).some((cw: any) => cw.id === user.id) ||
           (t.subtasks || []).some(
             (s: any) =>
               s.responsible_id === user.id || s.responsible?.id === user.id,
@@ -283,6 +284,11 @@ export default function GeoTask() {
     }
     return tasks;
   }, [tasks, isLiderado, isGestor, user, userSectorId, userSectorName]);
+
+  const visibleTaskTypes = useMemo(() => {
+    if (appPerms.tasks.view_all_sectors) return taskTypes;
+    return taskTypes.filter((t: any) => !t.sector_id || t.sector_id === userSectorId);
+  }, [taskTypes, userSectorId, appPerms.tasks.view_all_sectors]);
 
   // ── Auth guard ──────────────────────────────────────────────────────
   if (authLoading) {
@@ -351,7 +357,8 @@ export default function GeoTask() {
               contracts={contracts}
               citiesNeighborhoods={citiesNeighborhoods}
               sectors={mergedSectors}
-              taskTypes={taskTypes}
+              taskTypes={visibleTaskTypes}
+              canViewAllSectors={appPerms.tasks.view_all_sectors}
             />
           )}
           {page === "kanban" && (
@@ -366,7 +373,8 @@ export default function GeoTask() {
               contracts={contracts}
               citiesNeighborhoods={citiesNeighborhoods}
               sectors={mergedSectors}
-              taskTypes={taskTypes}
+              taskTypes={visibleTaskTypes}
+              canViewAllSectors={appPerms.tasks.view_all_sectors}
             />
           )}
           {page === "map" && (
@@ -449,7 +457,8 @@ export default function GeoTask() {
           tasks={tasks}
           setSelectedTask={setSelectedTask}
           sectors={mergedSectors}
-          taskTypes={taskTypes}
+          taskTypes={visibleTaskTypes}
+          canViewAllSectors={appPerms.tasks.view_all_sectors}
         />
       )}
       {showNewTask && (
@@ -463,7 +472,7 @@ export default function GeoTask() {
           citiesNeighborhoods={citiesNeighborhoods}
           templates={templates}
           sectors={mergedSectors}
-          taskTypes={taskTypes}
+          taskTypes={visibleTaskTypes}
         />
       )}
       {showMustChangePassword && user && (

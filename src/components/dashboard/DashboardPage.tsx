@@ -101,6 +101,7 @@ interface DashboardPageProps {
   taskTypes?: { id: number; name: string }[];
   citiesNeighborhoods?: CitiesNeighborhoods;
   sectors?: Sector[];
+  canViewAllSectors?: boolean;
 }
 
 export default function DashboardPage({
@@ -113,6 +114,7 @@ export default function DashboardPage({
   taskTypes = [],
   citiesNeighborhoods = {},
   sectors = [],
+  canViewAllSectors,
 }: DashboardPageProps) {
   const [fSearch, setFSearch] = useState("");
   const [fContract, setFContract] = useState("");
@@ -154,13 +156,16 @@ export default function DashboardPage({
         ? t.sector?.name
         : t.sector || "";
     if (fSector.length > 0 && !fSector.includes(sectorVal)) return false;
-    if (
-      fUser &&
-      (typeof t.responsible === "object"
-        ? t.responsible?.name
-        : t.responsible) !== fUser
-    )
-      return false;
+    if (fUser) {
+      const respName =
+        typeof t.responsible === "object"
+          ? t.responsible?.name
+          : t.responsible;
+      const isCoworker = (t.coworkers || []).some(
+        (cw: any) => cw.name === fUser,
+      );
+      if (respName !== fUser && !isCoworker) return false;
+    }
     if (fDateFrom?.from || fDateFrom?.to) {
       const td = parseDate(t.deadline);
       if (!td) return false;
@@ -272,12 +277,15 @@ export default function DashboardPage({
   const userRank = users
     .map((u: User) => ({
       name: u.name,
-      v: filtered.filter(
-        (t: DashboardTask) =>
-          (typeof t.responsible === "object"
+      v: filtered.filter((t: DashboardTask) => {
+        const rName =
+          typeof t.responsible === "object"
             ? t.responsible?.name
-            : t.responsible) === u.name && t.status === "Concluído",
-      ).length,
+            : t.responsible;
+        const cws = t.coworkers || [];
+        const isTarget = rName === u.name || cws.some((cw: any) => cw.name === u.name);
+        return isTarget && t.status === "Concluído";
+      }).length,
       sector: u.sector?.name || u.sector || "\u2014",
     }))
     .filter((x: UserRankEntry) => x.v > 0)
@@ -569,78 +577,58 @@ export default function DashboardPage({
         </div>
 
         {/* Por setor */}
-        <div className="bg-white dark:bg-gray-800 rounded-[14px] p-4 border border-slate-200 dark:border-gray-700">
-          <div className="text-[13px] font-semibold text-slate-900 dark:text-gray-50 mb-3">
+        <div className="bg-white dark:bg-gray-800 rounded-[14px] p-4 border border-slate-200 dark:border-gray-700 h-full flex flex-col">
+          <div className="text-[13px] font-semibold text-slate-900 dark:text-gray-50 mb-4">
             Tarefas por Setor
           </div>
-          <ResponsiveContainer width="100%" height={160}>
-            <PieChart>
-              <Pie
-                data={sectorData}
-                cx="50%"
-                cy="50%"
-                innerRadius={38}
-                outerRadius={62}
-                paddingAngle={3}
-                dataKey="v"
-              >
-                {sectorData.map((d, i) => (
-                  <Cell
-                    key={i}
-                    fill={
-                      [
-                        "#98af3b",
-                        "#10b981",
-                        "#f59e0b",
-                        "#ef4444",
-                        "#ec4899",
-                        "#8b5cf6",
-                        "#06b6d4",
-                        "#14b8a6",
-                      ][i % 8]
-                    }
-                  />
-                ))}
-              </Pie>
-              <Tooltip
-                contentStyle={{
-                  background: "var(--color-white, #fff)",
-                  border: "1px solid var(--color-slate-200, #e2e8f0)",
-                  borderRadius: 8,
-                  color: "var(--color-slate-900, #0f172a)",
-                  fontSize: 11,
-                }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="flex flex-col gap-1 mt-1">
-            {sectorData.map((d, i) => (
-              <div key={d.name} className="flex justify-between text-[11px]">
-                <div className="flex items-center gap-1.5">
-                  <div
-                    className="w-2 h-2 rounded-full"
-                    style={{
-                      background: [
-                        "#98af3b",
-                        "#10b981",
-                        "#f59e0b",
-                        "#ef4444",
-                        "#ec4899",
-                        "#8b5cf6",
-                        "#06b6d4",
-                        "#14b8a6",
-                      ][i % 8],
-                    }}
-                  />
-                  <span className="text-slate-500 dark:text-gray-400">
-                    {d.name}
-                  </span>
-                </div>
-                <span className="font-bold text-slate-900 dark:text-gray-50">
-                  {d.v}
-                </span>
+          <div className="flex flex-col gap-3 overflow-y-auto pr-1 flex-1 max-h-[220px] pb-2">
+            {sectorData.length === 0 && (
+              <div className="text-[11px] text-slate-500 dark:text-gray-400">
+                &mdash;
               </div>
-            ))}
+            )}
+            {sectorData.map((d, i) => {
+              const maxV = sectorData[0]?.v || 1;
+              const pct = (d.v / maxV) * 100;
+              const color = [
+                "#98af3b",
+                "#10b981",
+                "#f59e0b",
+                "#ef4444",
+                "#ec4899",
+                "#8b5cf6",
+                "#06b6d4",
+                "#14b8a6",
+              ][i % 8];
+
+              return (
+                <div key={d.name} className="flex flex-col gap-1 w-full">
+                  <div className="flex justify-between items-center text-[11px]">
+                    <div className="flex items-center gap-1.5 truncate pr-2">
+                      <div
+                        className="w-1.5 h-1.5 rounded-full shrink-0"
+                        style={{ backgroundColor: color }}
+                      />
+                      <span className="text-slate-600 dark:text-gray-300 font-medium truncate">
+                        {d.name}
+                      </span>
+                    </div>
+                    <span className="font-bold text-slate-900 dark:text-gray-50 shrink-0">
+                      {d.v}
+                    </span>
+                  </div>
+                  <div className="w-full h-1.5 bg-slate-100 dark:bg-gray-700/50 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{
+                        width: `${pct}%`,
+                        backgroundColor: color,
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
