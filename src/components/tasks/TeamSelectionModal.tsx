@@ -58,25 +58,27 @@ export default function TeamSelectionModal({
       // Ensure user has an ID
       if (!u.id) return false;
 
-      if (!searchTerm) return true;
-      const term = searchTerm.toLowerCase();
-      const nameMatch = u.name.toLowerCase().includes(term);
-
+      // Resolve sector and role names for comparison
       const uSectorName =
-        typeof u.sector === "object" ? u.sector?.name : u.sector;
-      const finalSName = uSectorName ? String(uSectorName) : u.sector_id
-        ? sectors.find((s) => typeof s === "object" && s.id === u.sector_id)
-            // @ts-ignore
-            ?.name
-        : "";
-
-      const uRoleName = typeof u.role === "object" ? u.role?.name : u.role;
+        typeof u.sector === "object" ? u.sector?.name : typeof u.sector === "string" ? u.sector : "";
       
-      const sectorMatch = uSectorName
-        ? String(uSectorName).toLowerCase().includes(term)
-        : false;
+      const finalSName = uSectorName || (u.sector_id
+        ? (sectors.find((s) => typeof s === "object" && s.id === u.sector_id) as Sector)?.name
+        : "");
 
-      const searchMatches = term ? (nameMatch || sectorMatch) : true;
+      const uRoleName = typeof u.role === "object" ? u.role?.name : String(u.role || "");
+
+      // Apply Search Term Filter
+      let searchMatches = true;
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        const nameMatch = u.name.toLowerCase().includes(term);
+        const sectorMatch = String(finalSName).toLowerCase().includes(term);
+        const roleMatch = String(uRoleName).toLowerCase().includes(term);
+        searchMatches = nameMatch || sectorMatch || roleMatch;
+      }
+
+      // Apply Dropdown Filters
       const sectorFilterMatches = selectedFilterSector ? String(finalSName) === selectedFilterSector : true;
       const roleFilterMatches = selectedFilterRole ? String(uRoleName) === selectedFilterRole : true;
 

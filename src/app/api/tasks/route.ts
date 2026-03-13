@@ -951,10 +951,18 @@ export async function PATCH(req: Request) {
           const updater = await prisma.user.findUnique({ where: { id: userId } });
           if (updater) updaterName = updater.name;
         }
+        
+        const currentResponsibleId = updateData.responsible_id !== undefined 
+          ? updateData.responsible_id 
+          : task.responsible_id;
+
         const ds = new Date().toLocaleDateString();
         const ts = new Date().toLocaleTimeString().slice(0, 5);
+        
         for (const uid of newCoworkers) {
-          if (uid !== task.responsible_id && uid !== userId) {
+          // Notify only if NOT the main responsible (already notified in that block)
+          // and NOT the person making the change
+          if (uid !== currentResponsibleId && uid !== userId) {
             await notifyUser(
               uid,
               "task_assigned",

@@ -263,31 +263,47 @@ export default function GeoTask() {
   const userSectorName = user?.sector?.name;
 
   const visibleTasks = useMemo(() => {
-    if (isLiderado && user) {
-      return tasks.filter(
-        (t: any) =>
-          t.responsible_id === user.id ||
-          t.responsible?.id === user.id ||
-          (t.coworkers || []).some((cw: any) => cw.id === user.id) ||
-          (t.subtasks || []).some(
-            (s: any) =>
-              s.responsible_id === user.id || s.responsible?.id === user.id,
-          ),
+    if (!user) return [];
+
+    const isLiderado = user?.role?.name === "Liderado";
+    const isGestor = user?.role?.name === "Gestor";
+    const isAdmin = user?.role?.name === "Admin";
+    const userSectorId = user?.sector?.id || user?.sector_id;
+    const userSectorName = user?.sector?.name;
+
+    if (isAdmin) return tasks;
+
+    return tasks.filter((t: any) => {
+      const uId = Number(user.id);
+      
+      // 1. Assignment Visibility: Always see tasks where you are involved
+      const isResponsible = Number(t.responsible_id) === uId || Number(t.responsible?.id) === uId;
+      const isInTeam = (t.coworkers || []).some((cw: any) => Number(cw.id) === uId);
+      const isSubtaskResponsible = (t.subtasks || []).some(
+        (s: any) => Number(s.responsible_id) === uId || Number(s.responsible?.id) === uId
       );
-    }
-    if (isGestor) {
-      return tasks.filter((t: any) => {
+
+      if (isResponsible || isInTeam || isSubtaskResponsible) return true;
+
+      // 2. Sector-based Visibility (Gestor only)
+      if (isGestor) {
         const tSectorId = t.sector_id || t.sector?.id;
-        const tSectorName =
-          typeof t.sector === "string" ? t.sector : t.sector?.name;
-        if (userSectorId && tSectorId) return tSectorId === userSectorId;
-        if (userSectorName && tSectorName)
-          return tSectorName.toLowerCase() === userSectorName.toLowerCase();
-        return false;
-      });
-    }
-    return tasks;
-  }, [tasks, isLiderado, isGestor, user, userSectorId, userSectorName]);
+        const tSectorName = typeof t.sector === "string" ? t.sector : t.sector?.name;
+        
+        if (userSectorId && tSectorId && Number(tSectorId) === Number(userSectorId))
+          return true;
+        
+        if (
+          userSectorName &&
+          tSectorName &&
+          String(tSectorName).toLowerCase().trim() === String(userSectorName).toLowerCase().trim()
+        )
+          return true;
+      }
+
+      return false;
+    });
+  }, [tasks, user]);
 
   const visibleTaskTypes = useMemo(() => {
     if (appPerms.tasks.view_all_sectors) return taskTypes;
