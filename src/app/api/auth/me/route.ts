@@ -9,7 +9,12 @@ export async function POST(req: Request) {
 
     const user = await prisma.user.findUnique({
       where: { id: Number(id) },
-      include: { Role: true, Sector: true },
+      include: {
+        Role: true,
+        Sector: true,
+        Team: true,
+        user_sectors: { include: { sector: true } },
+      },
     });
 
     if (!user)
@@ -26,6 +31,8 @@ export async function POST(req: Request) {
       ...userWithoutPassword,
       role: (user as any).Role,
       sector: (user as any).Sector,
+      team: (user as any).Team,
+      user_sectors: (user as any).user_sectors,
     });
   } catch (error) {
     console.error("Auth check error:", error);

@@ -10,6 +10,7 @@ interface UserModalProps {
   user?: any; // null = create mode
   roles: any[];
   sectors: any[];
+  teams: any[];
   T: any;
 }
 
@@ -20,12 +21,15 @@ export function UserModal({
   user,
   roles,
   sectors,
+  teams,
   T,
 }: UserModalProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [roleId, setRoleId] = useState("");
   const [sectorId, setSectorId] = useState("");
+  const [teamId, setTeamId] = useState("");
+  const [secondarySectorIds, setSecondarySectorIds] = useState<number[]>([]);
   const [resetPassword, setResetPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -39,12 +43,25 @@ export function UserModal({
         setSectorId(
           user.sector_id?.toString() || user.sector?.id?.toString() || "",
         );
+        setTeamId(user.team_id?.toString() || user.team?.id?.toString() || "");
         setResetPassword(false);
+
+        // Fetch user sectors
+        fetch(`/api/user-sectors?user_id=${user.id}`)
+          .then((r) => r.json())
+          .then((data) => {
+            if (Array.isArray(data)) {
+              setSecondarySectorIds(data.map((us: any) => us.sector_id));
+            }
+          })
+          .catch(console.error);
       } else {
         setName("");
         setEmail("");
         setRoleId("");
         setSectorId("");
+        setTeamId("");
+        setSecondarySectorIds([]);
         setResetPassword(false);
       }
       setError("");
@@ -69,6 +86,7 @@ export function UserModal({
         email,
         role_id: Number(roleId),
         sector_id: Number(sectorId),
+        team_id: teamId ? Number(teamId) : null,
       };
 
       if (user) {
@@ -77,7 +95,6 @@ export function UserModal({
           body.resetPassword = true;
         }
       }
-      // Novo usuário: senha padrão definida pela API automaticamente
 
       const res = await fetch("/api/users", {
         method,
@@ -89,6 +106,18 @@ export function UserModal({
         const data = await res.json();
         throw new Error(data.error || "Erro ao salvar usuário");
       }
+
+      const savedUser = await res.json();
+
+      // Sync secondary sectors
+      await fetch("/api/user-sectors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: savedUser.id,
+          sector_ids: secondarySectorIds,
+        }),
+      });
 
       onSuccess();
       onClose();
@@ -248,6 +277,74 @@ export function UserModal({
                 ))}
               </select>
             </div>
+          </div>
+
+          <div>
+            <label style={label}>Time / Equipe</label>
+            <select
+              value={teamId}
+              onChange={(e) => setTeamId(e.target.value)}
+              style={inp}
+            >
+              <option value="">Nenhum time</option>
+              {teams.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label style={label}>Setores Adicionais (Visibilidade)</label>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "8px 12px",
+                padding: "12px",
+                background: T.inp,
+                border: `1px solid ${T.border}`,
+                borderRadius: 8,
+                maxHeight: 120,
+                overflowY: "auto",
+              }}
+            >
+              {sectors
+                .filter((s) => s.id.toString() !== sectorId)
+                .map((s) => (
+                  <label
+                    key={s.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      fontSize: 12,
+                      color: T.text,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={secondarySectorIds.includes(s.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSecondarySectorIds([...secondarySectorIds, s.id]);
+                        } else {
+                          setSecondarySectorIds(
+                            secondarySectorIds.filter((id) => id !== s.id),
+                          );
+                        }
+                      }}
+                      style={{ cursor: "pointer", accentColor: "#98af3b" }}
+                    />
+                    {s.name}
+                  </label>
+                ))}
+            </div>
+            <p style={{ fontSize: 10, color: T.sub, marginTop: 4, margin: 0 }}>
+              Permite que o usuário visualize tarefas destes setores adicionais.
+            </p>
           </div>
 
           {/* Se criando: info sobre senha padrão */}

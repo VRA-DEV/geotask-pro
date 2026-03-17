@@ -2,6 +2,7 @@ import { logActivity } from "@/lib/activityLog";
 import prisma from "@/lib/prisma";
 import { type Prisma } from "@prisma/client";
 import { type NextRequest, NextResponse } from "next/server";
+import { broadcast } from "../events/route";
 
 async function resolveSectorId(s: any): Promise<number | null> {
   if (!s) return null;
@@ -74,7 +75,7 @@ async function notifyManagers(
   try {
     const managers = await prisma.user.findMany({
       where: {
-        Role: { name: { in: ["Gestor", "Gerente", "Coordenador", "Admin"] } },
+        Role: { name: { in: ["Gestor", "Gerente", "Coordenador de Setores", "Coordenador de Polo", "Admin"] } },
       },
       select: { id: true },
     });
@@ -121,13 +122,68 @@ export async function GET(request: NextRequest) {
     const sectorId = Number(url.searchParams.get("sector_id")) || undefined;
     const responsibleId =
       Number(url.searchParams.get("responsible_id")) || undefined;
+    const teamIdFilter = Number(url.searchParams.get("team_id")) || undefined;
+    const createdByMe = url.searchParams.get("created_by_me");
+    const createdById = Number(url.searchParams.get("created_by_id")) || undefined;
+    const summary = url.searchParams.get("summary") === "true";
 
     // Build optional where clause
     const where: Prisma.TaskWhereInput = {
       ...(status ? { status } : {}),
       ...(sectorId ? { sector_id: sectorId } : {}),
       ...(responsibleId ? { responsible_id: responsibleId } : {}),
+      ...(teamIdFilter ? {
+        OR: [
+          { team_id: teamIdFilter },
+          { responsible: { team_id: teamIdFilter } }
+        ]
+      } : {}),
+      ...((createdByMe === "true" && createdById)
+        ? { created_by_id: createdById }
+        : {}),
     };
+
+    if (summary) {
+      const tasks = await prisma.task.findMany({
+        where,
+        ...(limit > 0 ? { take: limit, skip: (page - 1) * limit } : {}),
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          priority: true,
+          type: true,
+          deadline: true,
+          created_at: true,
+          sector_id: true,
+          responsible_id: true,
+          team_id: true,
+          Sector: { select: { id: true, name: true } },
+          responsible: { select: { id: true, name: true, team_id: true } },
+          city: { select: { name: true } },
+          contract: { select: { name: true } },
+        },
+        orderBy: { created_at: "desc" },
+      });
+
+      const total = limit > 0 ? await prisma.task.count({ where }) : tasks.length;
+      const result = tasks.map(t => ({
+        ...t,
+        sector: t.Sector,
+        city: t.city?.name || "",
+        contract: t.contract?.name || "",
+        created: t.created_at ? new Date(t.created_at).toLocaleDateString("pt-BR") : null,
+        deadline: t.deadline ? t.deadline.toISOString() : null,
+      }));
+
+      if (limit > 0) {
+        return NextResponse.json({
+          data: result,
+          pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+        });
+      }
+      return NextResponse.json(result);
+    }
 
     const tasks = await prisma.task.findMany({
       where,
@@ -140,6 +196,7 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             name: true,
+            team_id: true,
             Role: { select: { name: true } },
             Sector: { select: { name: true } },
           },
@@ -169,6 +226,7 @@ export async function GET(request: NextRequest) {
               select: {
                 id: true,
                 name: true,
+                team_id: true,
                 Role: { select: { name: true } },
                 Sector: { select: { name: true } },
               },
@@ -232,7 +290,7 @@ export async function GET(request: NextRequest) {
           })
         : null,
       deadline: t.deadline
-        ? new Date(t.deadline).toLocaleDateString("pt-BR")
+        ? t.deadline.toISOString()
         : null,
       time:
         t.children && t.children.length > 0
@@ -331,6 +389,7 @@ export async function POST(req: Request) {
       created_by,
       parent_id,
       coworkers,
+      team_id,
     } = body;
 
     let contractId: number | null = body.contract_id
@@ -375,6 +434,7 @@ export async function POST(req: Request) {
       link: link || "",
       created_by_id: createdById,
       parent_id: parentId,
+      team_id: team_id && !isNaN(Number(team_id)) ? Number(team_id) : null,
     };
 
     if (coworkers && Array.isArray(coworkers) && coworkers.length > 0) {
@@ -477,7 +537,7 @@ export async function POST(req: Request) {
           where: {
             sector_id: child.sector_id,
             Role: {
-              name: { in: ["Gestor", "Gerente", "Coordenador", "Admin"] },
+              name: { in: ["Gestor", "Gerente", "Coordenador de Setores", "Coordenador de Polo", "Admin"] },
             },
           },
           select: { id: true },
@@ -502,6 +562,8 @@ export async function POST(req: Request) {
       newTask.id,
       `Criou a tarefa "${title}"`,
     );
+
+    broadcast("TASK_CREATED", { taskId: newTask.id, creatorId: createdById });
 
     return NextResponse.json({
       message: "Tarefa criada com sucesso",
@@ -589,6 +651,13 @@ export async function PATCH(req: Request) {
       );
 
     const updateData: any = { updated_at: new Date() };
+
+    // Ensure IDs are numbers
+    ["sector_id", "responsible_id", "city_id", "contract_id", "team_id"].forEach((key) => {
+      if (data[key] !== undefined && data[key] !== null) {
+        data[key] = Number(data[key]);
+      }
+    });
 
     if (action === "update_status") {
       const { status } = data;
@@ -720,7 +789,7 @@ export async function PATCH(req: Request) {
           const gestores = await prisma.user.findMany({
             where: {
               sector_id: task.sector_id,
-              Role: { name: { in: ["Gestor", "Gerente", "Coordenador", "Admin"] } },
+              Role: { name: { in: ["Gestor", "Gerente", "Coordenador de Setores", "Coordenador de Polo", "Admin"] } },
             },
             select: { id: true },
           });
@@ -776,6 +845,30 @@ export async function PATCH(req: Request) {
         }
       }
     } else if (action === "update_fields") {
+      // Permission Validation
+      const userRequesting = await prisma.user.findUnique({
+        where: { id: Number(userId) },
+        include: { Role: true },
+      });
+      const roleName = userRequesting?.Role?.name || "";
+      const isCreator = task.created_by_id === userId;
+
+      // "apenas quem criou a tarefa poderá editar o campo do prazo"
+      if (data.deadline !== undefined && !isCreator) {
+        return NextResponse.json(
+          { error: "Apenas o criador da tarefa pode editar o prazo de entrega." },
+          { status: 403 },
+        );
+      }
+
+      // "gestores podem editar as informações de uma tarefa mas sómente as criadas por ele"
+      if (roleName === "Gestor" && !isCreator) {
+        return NextResponse.json(
+          { error: "Você só tem permissão para editar tarefas que você mesmo criou." },
+          { status: 403 },
+        );
+      }
+
       const basicFields = [
         "title",
         "description",
@@ -931,10 +1024,27 @@ export async function PATCH(req: Request) {
         const d = parseBackendDate(data.deadline);
         const oldD = task.deadline ? new Date(task.deadline) : null;
 
-        // Compare timestamps to avoid unnecessary updates if same date
         if (d?.getTime() !== oldD?.getTime()) {
           await logHistory(task.id, userId, "deadline", task.deadline, d);
           updateData.deadline = d;
+        }
+      }
+
+      if (data.started_at !== undefined) {
+        const d = data.started_at ? new Date(data.started_at) : null;
+        const oldD = task.started_at ? new Date(task.started_at) : null;
+        if (d?.getTime() !== oldD?.getTime()) {
+          await logHistory(task.id, userId, "started_at", task.started_at, d);
+          updateData.started_at = d;
+        }
+      }
+
+      if (data.completed_at !== undefined) {
+        const d = data.completed_at ? new Date(data.completed_at) : null;
+        const oldD = task.completed_at ? new Date(task.completed_at) : null;
+        if (d?.getTime() !== oldD?.getTime()) {
+          await logHistory(task.id, userId, "completed_at", task.completed_at, d);
+          updateData.completed_at = d;
         }
       }
 
@@ -1096,6 +1206,55 @@ export async function PATCH(req: Request) {
         task.id,
         `"${task.title}" — ${diffStr}`,
       );
+    } else if (action === "manage_pauses") {
+      // Manage retroactive pauses — receives array of {started_at, ended_at}
+      const { pauses } = data;
+      if (!Array.isArray(pauses)) {
+        return NextResponse.json({ error: "pauses deve ser um array" }, { status: 400 });
+      }
+
+      // Delete existing pauses and recreate
+      await prisma.taskPause.deleteMany({ where: { task_id: Number(id) } });
+      for (const p of pauses) {
+        await prisma.taskPause.create({
+          data: {
+            task_id: Number(id),
+            started_at: new Date(p.started_at),
+            ended_at: p.ended_at ? new Date(p.ended_at) : null,
+          },
+        });
+      }
+
+      // Recalculate time_spent excluding pauses
+      if (task.started_at) {
+        const endTime = task.completed_at
+          ? new Date(task.completed_at).getTime()
+          : new Date().getTime();
+        const startTime = new Date(task.started_at).getTime();
+        let totalPauseMs = 0;
+        for (const p of pauses) {
+          if (p.started_at && p.ended_at) {
+            totalPauseMs += new Date(p.ended_at).getTime() - new Date(p.started_at).getTime();
+          }
+        }
+        const effectiveMs = Math.max(0, endTime - startTime - totalPauseMs);
+        await prisma.task.update({
+          where: { id: Number(id) },
+          data: { time_spent: Math.floor(effectiveMs / 1000) },
+        });
+      }
+
+      // Log history
+      await logHistory(task.id, userId, "Pausas", "editado", `${pauses.length} pausa(s)`);
+
+      // Activity log
+      const pauseUpdater = userId
+        ? (await prisma.user.findUnique({ where: { id: userId }, select: { name: true } }))?.name || "Usuário"
+        : "Sistema";
+      logActivity(userId, pauseUpdater, "task_pauses_updated", "task", task.id,
+        `Pausas atualizadas: ${pauses.length} período(s) — "${task.title}"`);
+
+      return NextResponse.json({ message: "Pausas atualizadas com sucesso" });
     } else if (action === "toggle_subtask") {
       const { subtask_id, done } = data;
       await prisma.subtask.update({
@@ -1119,6 +1278,7 @@ export async function PATCH(req: Request) {
       }
       return NextResponse.json({ message: "Subtarefa atualizada" });
     }
+    broadcast("TASK_UPDATED", { taskId: Number(id), userId });
     return NextResponse.json({ message: "Atualizado com sucesso" });
   } catch (error) {
     console.error("Erro ao atualizar tarefa:", error);
@@ -1157,6 +1317,7 @@ export async function DELETE(req: Request) {
       );
     }
 
+    broadcast("TASK_DELETED", { taskId: Number(id), userId: delUserId });
     return NextResponse.json({ message: "Tarefa removida" });
   } catch (error) {
     return NextResponse.json(

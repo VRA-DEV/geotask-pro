@@ -8,6 +8,7 @@ export const createUserSchema = z.object({
   role: z.coerce.number().int().positive().optional(),
   sector: z.coerce.number().int().positive().optional(),
   avatar: z.string().optional(),
+  team_id: z.coerce.number().int().positive().nullable().optional(),
 }).refine(
   (d) => d.role_id || d.role,
   { message: "role_id é obrigatório", path: ["role_id"] },
@@ -26,6 +27,7 @@ export const updateUserSchema = z.object({
   sector: z.coerce.number().int().positive().optional(),
   avatar: z.string().optional(),
   active: z.boolean().optional(),
+  team_id: z.coerce.number().int().positive().nullable().optional(),
   password: z.string().min(6).optional(),
   resetPassword: z.boolean().optional(),
 });

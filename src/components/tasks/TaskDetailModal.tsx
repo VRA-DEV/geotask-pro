@@ -1,8 +1,8 @@
 "use client";
 
 import { getPermissions } from "@/lib/permissions";
-import { CheckCircle, Eye, Pause, Play, X, Send } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { CheckCircle, Eye, Pause, Play, X, Send, Paperclip, FileText, Image, Trash2, Upload, Download, Plus, Clock } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TeamSelectionModal from "./TeamSelectionModal";
 
 import { DatePicker } from "@/app/components/DatePicker";
@@ -54,6 +54,24 @@ interface CommentEntry {
   created_at: string;
 }
 
+interface AttachmentEntry {
+  id: number;
+  task_id: number;
+  filename: string;
+  original_name: string;
+  mime_type: string;
+  size: number;
+  url: string;
+  uploaded_by_id: number | null;
+  uploaded_by: { id: number; name: string; avatar?: string | null } | null;
+  created_at: string;
+}
+
+interface PauseEntry {
+  started_at: string;
+  ended_at?: string;
+}
+
 export default function TaskDetailModal({
   T,
   task: t,
@@ -99,6 +117,26 @@ export default function TaskDetailModal({
   const [creatingSubtask, setCreatingSubtask] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
+
+  // Attachments State
+  const [attachments, setAttachments] = useState<AttachmentEntry[]>([]);
+  const [loadingAttachments, setLoadingAttachments] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Timing/Pauses State
+  const [showTimingModal, setShowTimingModal] = useState(false);
+  const [editTiming, setEditTiming] = useState({
+    started_at: t.started_at || "",
+    completed_at: t.completed_at || "",
+    pauses: (t.pauses || []).map((p: any) => ({
+      started_at: p.started_at || "",
+      ended_at: p.ended_at || "",
+    })) as PauseEntry[],
+  });
+  const [savingTiming, setSavingTiming] = useState(false);
+
+  const perms = useMemo(() => getPermissions(user), [user]);
 
   const filteredUsers = useMemo(() => {
     if (!form.sector) return [];
@@ -194,6 +232,14 @@ export default function TaskDetailModal({
         .then((data) => setHistory(Array.isArray(data) ? data : []))
         .catch(() => {})
         .finally(() => setLoadingHistory(false));
+    }
+    if (tab === "anexos") {
+      setLoadingAttachments(true);
+      fetch(`/api/tasks/${t.id}/attachments`)
+        .then((r) => r.json())
+        .then((data) => setAttachments(Array.isArray(data) ? data : []))
+        .catch(() => {})
+        .finally(() => setLoadingAttachments(false));
     }
   }, [tab, t.id]);
 
@@ -294,18 +340,27 @@ export default function TaskDetailModal({
 
   // Permission Logic
   const canEdit = (field: string) => {
-    // Admin, Gestor, Coordenador, Gerente can edit everything
-    if (
-      ["Admin", "Gestor", "Coordenador", "Gerente"].includes(
-        user.role?.name || "",
-      )
-    )
-      return true;
+    const role = user.role?.name || "";
+    const isCreator = t.created_by_id === user.id;
+    const isSuper = ["Admin", "Gerente", "Diretor", "Coordenador de Polo", "Coordenador de Setores"].includes(role);
+
+    // "apenas quem criou a tarefa poderá editar o campo do prazo"
+    if (field === "deadline") {
+      return isCreator;
+    }
+
+    // "gestores podem editar as informações de uma tarefa mas sómente as criadas por ele"
+    if (role === "Gestor") {
+      return isCreator;
+    }
+
+    // Admin, Gerente, Coordenadores, Diretor can edit everything else
+    if (isSuper) return true;
 
     // Liderado/Others restrictions
-    if (user.role?.name === "Liderado") {
+    if (role === "Liderado") {
       if (field === "status") return true;
-      if (field === "subtasks") return true; // Can check subtasks
+      if (field === "subtasks") return true;
       return false;
     }
     return false;
@@ -339,6 +394,117 @@ export default function TaskDetailModal({
       }
     } else {
       setMentionSuggestions([]);
+    }
+  };
+
+  // --- Attachment helpers ---
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const refreshAttachments = useCallback(async () => {
+    const res = await fetch(`/api/tasks/${t.id}/attachments`);
+    const data = await res.json();
+    setAttachments(Array.isArray(data) ? data : []);
+  }, [t.id]);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingFile(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("uploaded_by_id", String(user?.id || ""));
+      const res = await fetch(`/api/tasks/${t.id}/attachments`, {
+        method: "POST",
+        body: fd,
+      });
+      if (res.ok) {
+        await refreshAttachments();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || "Erro ao enviar arquivo");
+      }
+    } catch {
+      alert("Erro ao enviar arquivo");
+    } finally {
+      setUploadingFile(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleDeleteAttachment = async (attachmentId: number) => {
+    if (!confirm("Tem certeza que deseja remover este anexo?")) return;
+    try {
+      const res = await fetch(
+        `/api/tasks/${t.id}/attachments?attachment_id=${attachmentId}&user_id=${user?.id || ""}`,
+        { method: "DELETE" },
+      );
+      if (res.ok) {
+        await refreshAttachments();
+      } else {
+        alert("Erro ao remover anexo");
+      }
+    } catch {
+      alert("Erro ao remover anexo");
+    }
+  };
+
+  const canDeleteAttachments = ["Admin", "Gerente"].includes(user.role?.name || "");
+
+  // --- Timing/Pauses helpers ---
+  const openTimingModal = () => {
+    setEditTiming({
+      started_at: t.started_at || "",
+      completed_at: t.completed_at || "",
+      pauses: (t.pauses || []).map((p: any) => ({
+        started_at: p.started_at || "",
+        ended_at: p.ended_at || "",
+      })),
+    });
+    setShowTimingModal(true);
+  };
+
+  const handleSaveTiming = async () => {
+    setSavingTiming(true);
+    try {
+      // 1. Update pauses
+      const resP = await fetch("/api/tasks", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: t.id,
+          action: "manage_pauses",
+          user_id: user?.id,
+          pauses: editTiming.pauses.filter((p) => p.started_at),
+        }),
+      });
+
+      // 2. Update start/complete dates
+      const resD = await fetch("/api/tasks", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: t.id,
+          action: "update_fields",
+          started_at: editTiming.started_at || null,
+          completed_at: editTiming.completed_at || null,
+        }),
+      });
+
+      if (resP.ok && resD.ok) {
+        setShowTimingModal(false);
+        if (onUpdate) await onUpdate(t.id, "refresh", {});
+      } else {
+        alert("Erro ao salvar cronologia");
+      }
+    } catch {
+      alert("Erro ao salvar cronologia");
+    } finally {
+      setSavingTiming(false);
     }
   };
 
@@ -431,23 +597,26 @@ export default function TaskDetailModal({
 
         {/* Tabs */}
         <div className="flex gap-1 border-b border-slate-200 dark:border-gray-700 mb-5">
-          {["dados", "subtarefas", "comentarios", "historico"].map((tb) => (
+          {["dados", "subtarefas", "comentarios", "anexos", "historico"].map((tb) => (
             <button
               key={tb}
               onClick={() => setTab(tb)}
-              className={`flex-1 md:flex-none px-2 md:px-4 py-2.5 bg-transparent border-none text-[12px] md:text-[13px] font-semibold cursor-pointer capitalize ${
+              className={`flex-1 md:flex-none px-2 md:px-4 py-2.5 bg-transparent border-none text-[12px] md:text-[13px] font-semibold cursor-pointer capitalize flex items-center justify-center gap-1 ${
                 tab === tb
                   ? "border-b-2 border-primary text-primary"
                   : "border-b-2 border-transparent text-slate-500 dark:text-gray-400"
               }`}
             >
+              {tb === "anexos" && <Paperclip size={13} />}
               {tb === "comentarios"
                 ? "Comentários"
                 : tb === "historico"
                   ? "Histórico"
                   : tb === "subtarefas"
                     ? "Subtarefas"
-                    : "Dados Padrão"}
+                    : tb === "anexos"
+                      ? "Anexos"
+                      : "Dados Padrão"}
             </button>
           ))}
         </div>
@@ -465,12 +634,23 @@ export default function TaskDetailModal({
                     setForm({ ...form, description: e.target.value })
                   }
                   rows={3}
-                  className={`w-full p-2.5 rounded-lg border border-slate-200 dark:border-gray-700 text-[13px] resize-none text-slate-900 dark:text-gray-50 ${
+                  className={`w-full p-2.5 rounded-lg border border-slate-200 dark:border-gray-700 text-[13px] resize-none text-slate-900 dark:text-gray-50 mb-4 ${
                     canEdit("description")
                       ? "bg-slate-100 dark:bg-gray-700"
                       : "bg-slate-100 dark:bg-gray-900"
                   }`}
                 />
+
+                {(perms.tasks.edit_retroactive_dates || perms.tasks.manage_pauses) && (
+                  <button
+                    type="button"
+                    onClick={openTimingModal}
+                    className="w-full flex items-center justify-center gap-2 p-2.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 rounded-lg text-[13px] font-bold cursor-pointer hover:bg-amber-500/20 transition-all mb-4"
+                  >
+                    <Clock size={16} />
+                    Editar Início, Pausas e Finalização
+                  </button>
+                )}
               </div>
 
               {[
@@ -501,12 +681,6 @@ export default function TaskDetailModal({
                 { l: "Quadra", f: "quadra" },
                 { l: "Lote", f: "lote" },
                 { l: "Prazo", f: "deadline", type: "date-picker" },
-                { l: "Início real", f: "started_at", type: "datetime-local" },
-                {
-                  l: "Conclusão real",
-                  f: "completed_at",
-                  type: "datetime-local",
-                },
               ].map(({ l, f, o, type, groups }) => {
                 const formRec = form as unknown as Record<
                   string,
@@ -963,8 +1137,119 @@ export default function TaskDetailModal({
             </div>
           )}
 
+          {tab === "anexos" && (
+            <div className="flex flex-col gap-3">
+              {/* Upload button */}
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-[11px] font-bold text-slate-500 dark:text-gray-400 uppercase">
+                  Anexos ({attachments.length})
+                </div>
+                <label className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white rounded-lg text-[12px] font-semibold cursor-pointer hover:opacity-90 transition-opacity">
+                  <Upload size={13} />
+                  {uploadingFile ? "Enviando..." : "Enviar Arquivo"}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*,.pdf"
+                    className="hidden"
+                    onChange={handleFileUpload}
+                    disabled={uploadingFile}
+                  />
+                </label>
+              </div>
+
+              {loadingAttachments && (
+                <div className="text-center text-slate-500 dark:text-gray-400 text-xs py-4">
+                  Carregando...
+                </div>
+              )}
+
+              {!loadingAttachments && attachments.length === 0 && (
+                <div className="text-center text-slate-500 dark:text-gray-400 text-[13px] py-4">
+                  Nenhum anexo encontrado.
+                </div>
+              )}
+
+              {attachments.map((att) => (
+                <div
+                  key={att.id}
+                  className="flex items-center gap-3 p-3 bg-slate-100 dark:bg-gray-900 rounded-[10px] border border-slate-200 dark:border-gray-700"
+                >
+                  {/* Thumbnail or icon */}
+                  <div className="w-10 h-10 rounded-lg bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 flex items-center justify-center overflow-hidden shrink-0">
+                    {att.mime_type.startsWith("image/") ? (
+                      <img
+                        src={att.url}
+                        alt={att.original_name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : att.mime_type === "application/pdf" ? (
+                      <FileText size={18} className="text-red-500" />
+                    ) : (
+                      <FileText size={18} className="text-slate-400 dark:text-gray-500" />
+                    )}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13px] font-semibold text-slate-900 dark:text-gray-50 truncate">
+                      {att.original_name}
+                    </div>
+                    <div className="text-[11px] text-slate-500 dark:text-gray-400 flex gap-1.5 flex-wrap">
+                      <span>{formatFileSize(att.size)}</span>
+                      {att.uploaded_by && (
+                        <>
+                          <span>&bull;</span>
+                          <span>{att.uploaded_by.name}</span>
+                        </>
+                      )}
+                      <span>&bull;</span>
+                      <span>{new Date(att.created_at).toLocaleString("pt-BR")}</span>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <a
+                      href={att.url}
+                      download={att.original_name}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-1.5 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg cursor-pointer hover:bg-slate-50 dark:hover:bg-gray-700 transition-colors"
+                      title="Baixar"
+                    >
+                      <Download size={14} className="text-slate-500 dark:text-gray-400" />
+                    </a>
+                    {canDeleteAttachments && (
+                      <button
+                        onClick={() => handleDeleteAttachment(att.id)}
+                        className="p-1.5 bg-white dark:bg-gray-800 border border-red-200 dark:border-red-900 rounded-lg cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                        title="Remover anexo"
+                      >
+                        <Trash2 size={14} className="text-red-500" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {tab === "historico" && (
             <div className="flex flex-col gap-3">
+              {/* Gerenciar Pausas button */}
+              {(perms.tasks.manage_pauses || perms.tasks.edit_retroactive_dates) && (
+                <div className="flex justify-end mb-2">
+                  <button
+                    onClick={openTimingModal}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 rounded-lg text-[12px] font-semibold cursor-pointer hover:bg-amber-500/20 transition-colors"
+                  >
+                    <Clock size={13} />
+                    Gerenciar Cronologia
+                  </button>
+                </div>
+              )}
+
               <div className="mb-5 p-4 bg-slate-100 dark:bg-gray-900 rounded-xl flex items-center justify-between relative">
                 <div className="absolute left-10 right-10 top-6 h-0.5 z-0 bg-slate-200 dark:bg-gray-700" />
                 {[
@@ -1017,17 +1302,31 @@ export default function TaskDetailModal({
                       <span className="font-semibold">
                         {h.user?.name || "Sistema"}
                       </span>{" "}
-                      alterou <b>{h.field}</b>
+                      {h.field === "anexo" ? (
+                        <>
+                          {h.old_value && !h.new_value ? (
+                            <>removeu anexo <b>{h.old_value}</b></>
+                          ) : !h.old_value && h.new_value ? (
+                            <>anexou documento <b>{h.new_value}</b></>
+                          ) : (
+                            <>alterou <b>anexo</b></>
+                          )}
+                        </>
+                      ) : (
+                        <>alterou <b>{h.field}</b></>
+                      )}
                     </div>
-                    <div className="text-xs text-slate-500 dark:text-gray-400 mt-1">
-                      <span className="line-through opacity-70">
-                        {h.old_value || "(vazio)"}
-                      </span>
-                      {" ➝ "}
-                      <span className="text-primary font-semibold">
-                        {h.new_value || "(vazio)"}
-                      </span>
-                    </div>
+                    {h.field !== "anexo" && (
+                      <div className="text-xs text-slate-500 dark:text-gray-400 mt-1">
+                        <span className="line-through opacity-70">
+                          {h.old_value || "(vazio)"}
+                        </span>
+                        {" \u279D "}
+                        <span className="text-primary font-semibold">
+                          {h.new_value || "(vazio)"}
+                        </span>
+                      </div>
+                    )}
                     <div className="text-[10px] text-slate-500 dark:text-gray-400 mt-1">
                       {new Date(h.created_at).toLocaleString("pt-BR")}
                     </div>
@@ -1118,6 +1417,161 @@ export default function TaskDetailModal({
         initialSelectedIds={form.coworkers}
         mainResponsibleId={form.responsible_id ? Number(form.responsible_id) : undefined}
       />
+    )}
+
+    {/* Gerenciar Cronologia Modal */}
+    {showTimingModal && (
+      <div
+        onClick={() => setShowTimingModal(false)}
+        className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60"
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="w-full max-w-[520px] bg-white dark:bg-gray-800 rounded-[16px] p-5 flex flex-col max-h-[85vh] border border-slate-200 dark:border-gray-700"
+        >
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-2">
+              <Clock size={18} className="text-amber-500" />
+              <h3 className="text-[16px] font-bold text-slate-900 dark:text-gray-50 m-0">
+                Gerenciar Cronologia
+              </h3>
+            </div>
+            <button
+              onClick={() => setShowTimingModal(false)}
+              className="bg-slate-100 dark:bg-gray-700 border-none rounded-lg p-1.5 cursor-pointer"
+            >
+              <X size={16} className="text-slate-500 dark:text-gray-400" />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto flex flex-col gap-5 mb-5 pr-1">
+            {/* Start/End Fields */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-wider">
+                  Início Real
+                </label>
+                <input
+                  type="datetime-local"
+                  value={formatDatetimeLocal(editTiming.started_at)}
+                  onChange={(e) => setEditTiming(prev => ({ ...prev, started_at: e.target.value ? new Date(e.target.value).toISOString() : "" }))}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-gray-700 bg-slate-50 dark:bg-gray-900 text-slate-900 dark:text-gray-50 text-[13px]"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-wider">
+                  Conclusão Real
+                </label>
+                <input
+                  type="datetime-local"
+                  value={formatDatetimeLocal(editTiming.completed_at)}
+                  onChange={(e) => setEditTiming(prev => ({ ...prev, completed_at: e.target.value ? new Date(e.target.value).toISOString() : "" }))}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-gray-700 bg-slate-50 dark:bg-gray-900 text-slate-900 dark:text-gray-50 text-[13px]"
+                />
+              </div>
+            </div>
+
+            <div className="h-px bg-slate-100 dark:bg-gray-700" />
+
+            {/* Pauses Section */}
+            <div>
+              <div className="text-[11px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-wider mb-3 flex items-center justify-between">
+                <span>Pausas Registradas ({editTiming.pauses.length})</span>
+                <button
+                  onClick={() => setEditTiming(prev => ({ ...prev, pauses: [...prev.pauses, { started_at: "", ended_at: "" }] }))}
+                  className="text-[10px] font-bold text-primary hover:underline bg-transparent border-none cursor-pointer"
+                >
+                  + ADICIONAR PAUSA
+                </button>
+              </div>
+              
+              <div className="flex flex-col gap-3">
+                {editTiming.pauses.length === 0 && (
+                  <div className="text-center text-slate-400 dark:text-gray-500 text-[12px] py-4 bg-slate-50 dark:bg-gray-900/50 rounded-lg border border-dashed border-slate-200 dark:border-gray-700">
+                    Nenhuma pausa registrada.
+                  </div>
+                )}
+                {editTiming.pauses.map((p, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-end gap-2 p-3 bg-slate-50 dark:bg-gray-900/80 rounded-[12px] border border-slate-200 dark:border-gray-700"
+                  >
+                    <div className="flex-1">
+                      <div className="text-[10px] font-bold text-slate-500 dark:text-gray-400 mb-1 uppercase">
+                        Início
+                      </div>
+                      <input
+                        type="datetime-local"
+                        value={formatDatetimeLocal(p.started_at)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setEditTiming((prev) => ({
+                            ...prev,
+                            pauses: prev.pauses.map((pp, i) =>
+                              i === idx
+                                ? { ...pp, started_at: val ? new Date(val).toISOString() : "" }
+                                : pp,
+                            ),
+                          }));
+                        }}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-slate-900 dark:text-gray-50 text-[12px]"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-[10px] font-bold text-slate-500 dark:text-gray-400 mb-1 uppercase">
+                        Fim
+                      </div>
+                      <input
+                        type="datetime-local"
+                        value={formatDatetimeLocal(p.ended_at)}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setEditTiming((prev) => ({
+                            ...prev,
+                            pauses: prev.pauses.map((pp, i) =>
+                              i === idx
+                                ? { ...pp, ended_at: val ? new Date(val).toISOString() : "" }
+                                : pp,
+                            ),
+                          }));
+                        }}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-slate-900 dark:text-gray-50 text-[12px]"
+                      />
+                    </div>
+                    <button
+                      onClick={() =>
+                        setEditTiming((prev) => ({
+                          ...prev,
+                          pauses: prev.pauses.filter((_, i) => i !== idx),
+                        }))
+                      }
+                      className="p-1.5 bg-white dark:bg-gray-800 border border-red-200 dark:border-red-900 rounded-lg cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors shrink-0 mb-0.5"
+                    >
+                      <X size={14} className="text-red-500" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowTimingModal(false)}
+              className="flex-1 p-2.5 bg-transparent text-slate-500 dark:text-gray-400 border border-slate-200 dark:border-gray-700 rounded-lg text-[13px] font-semibold cursor-pointer hover:bg-slate-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleSaveTiming}
+              disabled={savingTiming}
+              className="flex-[2] p-2.5 bg-amber-500 text-white border-none rounded-lg text-[13px] font-bold cursor-pointer disabled:opacity-60 shadow-lg shadow-amber-500/20"
+            >
+              {savingTiming ? "Salvando..." : "Salvar Cronologia"}
+            </button>
+          </div>
+        </div>
+      </div>
     )}
     </>
   );

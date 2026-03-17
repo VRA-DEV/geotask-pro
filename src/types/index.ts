@@ -20,6 +20,35 @@ export interface Sector {
   updated_at?: string;
 }
 
+export interface Team {
+  id: number;
+  name: string;
+  created_at?: string;
+  updated_at?: string;
+  _count?: { users: number; tasks: number };
+}
+
+export interface UserSector {
+  id: number;
+  user_id: number;
+  sector_id: number;
+  created_at?: string;
+  sector?: Sector;
+}
+
+export interface TaskAttachment {
+  id: number;
+  task_id: number;
+  filename: string;
+  original_name: string;
+  mime_type: string;
+  size: number;
+  url: string;
+  uploaded_by_id?: number | null;
+  created_at: string;
+  uploaded_by?: { id: number; name: string; avatar?: string | null } | null;
+}
+
 export interface Contract {
   id: number;
   name: string;
@@ -51,6 +80,9 @@ export interface User {
   created_at?: string;
   role?: Role | null;
   sector?: Sector | null;
+  team_id?: number | null;
+  team?: Team | null;
+  user_sectors?: UserSector[];
   /** Alias — some API responses use Role/Sector (capitalized Prisma names) */
   Role?: Role | null;
   Sector?: Sector | null;
@@ -114,6 +146,9 @@ export interface Task {
   comments?: Comment[];
   /** Pause history from enriched API responses */
   pauses?: { started_at: string; ended_at?: string }[];
+  attachments?: TaskAttachment[];
+  team_id?: number | null;
+  team?: Team | null;
   /** Pre-formatted date aliases used by some views */
   created?: string;
   assigned?: string;

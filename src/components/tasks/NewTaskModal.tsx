@@ -117,7 +117,7 @@ export default function NewTaskModal({
   templates = [],
   sectors = [],
 }: NewTaskModalProps) {
-  const empty: FormState = {
+  const empty = useMemo((): FormState => ({
     title: "",
     description: "",
     priority: "Alta",
@@ -133,13 +133,47 @@ export default function NewTaskModal({
     responsible: "",
     coworkers: [] as number[],
     subtasks: [] as SubtaskDraft[],
-  };
+  }), []);
+
   const [form, setForm] = useState<FormState>(empty);
   const [step, setStep] = useState(0);
   const [subForm, setSubForm] = useState<SubForm | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [selectedTemplate, setSelectedTemplate] = useState("");
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
+
+  const isDirty = useMemo(() => {
+    return (
+      form.title !== "" ||
+      form.description !== "" ||
+      form.deadline !== "" ||
+      form.subtasks.length > 0
+    );
+  }, [form]);
+
+  const handleCloseAttempt = () => {
+    if (isDirty) {
+      if (
+        window.confirm(
+          "Você tem alterações não salvas. Deseja realmente cancelar a criação da tarefa e perder o progresso?",
+        )
+      ) {
+        onClose();
+      }
+    } else {
+      onClose();
+    }
+  };
+
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        handleCloseAttempt();
+      }
+    };
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, [isDirty, onClose]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const set = (k: string, v: string) =>
     setForm((prev) => ({ ...prev, [k]: v }));
@@ -382,8 +416,8 @@ export default function NewTaskModal({
   return (
     <>
     <div
-      onClick={onClose}
-      className="fixed inset-0 z-[100] flex items-center justify-center p-0 md:p-4 font-sans bg-black/65"
+      onClick={handleCloseAttempt}
+      className="fixed inset-0 z-100 flex items-center justify-center p-0 md:p-4 font-sans bg-black/65"
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -400,7 +434,7 @@ export default function NewTaskModal({
             </p>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleCloseAttempt}
             className="bg-gray-100 dark:bg-gray-700 border-none rounded-lg p-1.5 cursor-pointer flex"
           >
             <X size={16} className="text-gray-500 dark:text-gray-400" />
@@ -860,13 +894,13 @@ export default function NewTaskModal({
                   <div className="flex gap-2">
                     <button
                       onClick={() => setSubForm(null)}
-                      className="flex-1 p-2 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 border-none rounded-lg text-[13px] font-semibold cursor-pointer"
+                      className="flex items-center gap-2 p-1.5 rounded-lg text-slate-500 dark:text-gray-400 hover:bg-primary/3 hover:text-primary transition-colors cursor-pointer border-none bg-transparent"
                     >
                       Cancelar
                     </button>
                     <button
                       onClick={addSub}
-                      className="flex-[2] p-2 bg-primary text-white border-none rounded-lg text-[13px] font-semibold cursor-pointer"
+                      className="flex-2 py-3 bg-primary text-white border-none rounded-xl text-[13px] font-bold cursor-pointer disabled:opacity-50 shadow-lg shadow-primary/20"
                     >
                       Salvar Subtarefa
                     </button>

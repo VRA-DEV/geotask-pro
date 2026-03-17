@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { getPermissions } from "@/lib/permissions";
 import { NextResponse } from "next/server";
 
 async function resolveSectorId(s: any): Promise<number | null> {
@@ -70,9 +71,27 @@ function subtaskResponsible(s: SubtaskInput): string | undefined {
 }
 
 // GET /api/templates
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url);
+    const userId = searchParams.get("user_id");
+
+    const where: any = {};
+
+    if (userId) {
+      const user = await prisma.user.findUnique({
+        where: { id: Number(userId) },
+        include: { Role: true },
+      });
+
+      const perms = getPermissions(user as any);
+      if (!perms.pages.view_all_templates) {
+        where.created_by_id = Number(userId);
+      }
+    }
+
     const templates = await prisma.template.findMany({
+      where,
       include: {
         Sector: { select: { id: true, name: true } },
         tasks: {

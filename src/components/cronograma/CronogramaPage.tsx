@@ -52,6 +52,11 @@ interface CronogramaPageProps {
   sectors?: (Sector | string)[];
   taskTypes?: any[];
   canViewAllSectors?: boolean;
+  createdByMe?: boolean;
+  setCreatedByMe?: (v: boolean) => void;
+  team?: string;
+  setTeam?: (v: string) => void;
+  teams?: { id: number; name: string }[];
 }
 
 export default function CronogramaPage({
@@ -64,6 +69,11 @@ export default function CronogramaPage({
   sectors = [],
   taskTypes = [],
   canViewAllSectors,
+  createdByMe,
+  setCreatedByMe,
+  team,
+  setTeam,
+  teams,
 }: CronogramaPageProps) {
   const [search, setSearch] = useState("");
   const [fSector, setFSector] = useState<string[]>([]);
@@ -206,6 +216,11 @@ export default function CronogramaPage({
         totalTasks={tasks.length}
         filteredTasks={filtered.length}
         canViewAllSectors={canViewAllSectors}
+        createdByMe={createdByMe}
+        setCreatedByMe={setCreatedByMe}
+        team={team}
+        setTeam={setTeam}
+        teams={teams}
       />
 
       <div className="mb-4 flex flex-wrap gap-4 rounded-[10px] px-3.5 py-2.5 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700">

@@ -42,6 +42,11 @@ interface TaskFiltersProps {
   showSubtasks?: boolean;
   setShowSubtasks?: (v: boolean) => void;
   canViewAllSectors?: boolean;
+  createdByMe?: boolean;
+  setCreatedByMe?: (v: boolean) => void;
+  team?: string;
+  setTeam?: (v: string) => void;
+  teams?: { id: number; name: string }[];
 }
 
 export function TaskFilters({
@@ -79,6 +84,11 @@ export function TaskFilters({
   showSubtasks,
   setShowSubtasks,
   canViewAllSectors,
+  createdByMe,
+  setCreatedByMe,
+  team,
+  setTeam,
+  teams,
 }: TaskFiltersProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -180,14 +190,16 @@ export function TaskFilters({
     responsible,
     dateFrom?.from || dateFrom?.to,
     dateTo?.from || dateTo?.to,
+    createdByMe,
+    team,
   ].filter(Boolean).length;
 
   return (
     <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-2xl p-4 shadow-sm mb-6 transition-all">
       {/* Top Bar: Search and Quick Filters */}
-      <div className="flex flex-col lg:flex-row gap-4 items-end">
+      <div className="flex flex-col gap-5">
         {/* Search */}
-        <div className="flex flex-col gap-1.5 flex-1 w-full">
+        <div className="flex flex-col gap-1.5 w-full">
           <label className="text-[11px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-wider">
             Buscar
           </label>
@@ -206,9 +218,9 @@ export function TaskFilters({
         </div>
 
         {/* Quick Filters */}
-        <div className="flex flex-wrap sm:flex-nowrap gap-3 items-end w-full lg:w-auto">
+        <div className="flex flex-wrap gap-4 items-end w-full">
           {setStatus && (
-            <div className="w-[160px]">
+            <div className="flex-1 min-w-[140px] max-w-[200px]">
               <FilterSelect
                 label="Status"
                 val={status || ""}
@@ -219,7 +231,7 @@ export function TaskFilters({
             </div>
           )}
           {canViewAllSectors !== false && (
-            <div className="w-[160px]">
+            <div className="flex-1 min-w-[140px] max-w-[200px]">
               <MultiSelect
                 label="Setores"
                 val={sector}
@@ -229,7 +241,7 @@ export function TaskFilters({
               />
             </div>
           )}
-          <div className="w-[150px]">
+          <div className="flex-1 min-w-[140px] max-w-[200px]">
             <FilterSelect
               label="Prioridade"
               val={priority}
@@ -239,26 +251,58 @@ export function TaskFilters({
             />
           </div>
 
-          {setShowSubtasks && (
-            <div className="flex items-center gap-2 h-10 px-2">
-              <input
-                type="checkbox"
-                id="showSubtasks"
-                checked={showSubtasks}
-                onChange={(e) => setShowSubtasks(e.target.checked)}
-                className="w-3.5 h-3.5 rounded-sm border-slate-300 text-primary focus:ring-primary"
+          <div className="flex flex-wrap items-center gap-4 h-10 px-1">
+            {setShowSubtasks && (
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="showSubtasks"
+                  checked={showSubtasks}
+                  onChange={(e) => setShowSubtasks(e.target.checked)}
+                  className="w-3.5 h-3.5 rounded-sm border-slate-300 text-primary focus:ring-primary"
+                />
+                <label
+                  htmlFor="showSubtasks"
+                  className="text-xs font-semibold text-slate-600 dark:text-gray-400 cursor-pointer select-none whitespace-nowrap"
+                >
+                  Exibir Subtarefas
+                </label>
+              </div>
+            )}
+
+            {setCreatedByMe && (
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="createdByMe"
+                  checked={!!createdByMe}
+                  onChange={(e) => setCreatedByMe(e.target.checked)}
+                  className="w-3.5 h-3.5 rounded-sm border-slate-300 text-primary focus:ring-primary"
+                />
+                <label
+                  htmlFor="createdByMe"
+                  className="text-xs font-semibold text-slate-600 dark:text-gray-400 cursor-pointer select-none whitespace-nowrap"
+                >
+                  Criadas por mim
+                </label>
+              </div>
+            )}
+          </div>
+
+          {teams && teams.length > 0 && setTeam && (
+            <div className="flex-1 min-w-[140px] max-w-[200px]">
+              <FilterSelect
+                label="Time/Polo"
+                val={team || ""}
+                onChange={setTeam}
+                opts={teams}
+                placeholder="Todos"
               />
-              <label
-                htmlFor="showSubtasks"
-                className="text-xs font-semibold text-slate-600 dark:text-gray-400 cursor-pointer select-none"
-              >
-                Exibir Subtarefas
-              </label>
             </div>
           )}
 
           {/* Action Buttons */}
-          <div className="flex gap-2">
+          <div className="flex gap-2 ml-auto">
             <button
               onClick={() => setIsOpen(!isOpen)}
               className={`h-10 px-4 rounded-xl text-xs font-bold flex items-center gap-2 transition-all border ${
@@ -268,7 +312,7 @@ export function TaskFilters({
               }`}
             >
               <Filter size={15} />
-              <span>Mais Filtros</span>
+              <span className="hidden sm:inline">Mais Filtros</span>
               {activeCount > 0 && (
                 <span
                   className={`flex items-center justify-center w-5 h-5 rounded-full text-[10px] ${isOpen ? "bg-white text-primary" : "bg-primary text-white"}`}
@@ -283,7 +327,7 @@ export function TaskFilters({
                 className="h-10 px-4 rounded-xl text-xs font-bold flex items-center gap-2 bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/40 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/50 transition-all"
               >
                 <X size={15} />
-                <span>Limpar</span>
+                <span className="hidden sm:inline">Limpar</span>
               </button>
             )}
           </div>

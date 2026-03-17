@@ -14,6 +14,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import useSWR from "swr";
 
 import AIReportModal from "@/components/AIReportModal";
 import { TaskFilters } from "@/components/shared/TaskFilters";
@@ -102,6 +103,11 @@ interface DashboardPageProps {
   citiesNeighborhoods?: CitiesNeighborhoods;
   sectors?: Sector[];
   canViewAllSectors?: boolean;
+  createdByMe?: boolean;
+  setCreatedByMe?: (v: boolean) => void;
+  team?: string;
+  setTeam?: (v: string) => void;
+  teams?: { id: number; name: string }[];
 }
 
 export default function DashboardPage({
@@ -115,6 +121,11 @@ export default function DashboardPage({
   citiesNeighborhoods = {},
   sectors = [],
   canViewAllSectors,
+  createdByMe,
+  setCreatedByMe,
+  team,
+  setTeam,
+  teams,
 }: DashboardPageProps) {
   const [fSearch, setFSearch] = useState("");
   const [fContract, setFContract] = useState("");
@@ -128,6 +139,12 @@ export default function DashboardPage({
   const [fDateFrom, setFDateFrom] = useState<DateRange | undefined>(undefined); // Prazo
   const [fDateTo, setFDateTo] = useState<DateRange | undefined>(undefined); // Criacao
   const [filtersOpen, setFiltersOpen] = useState(false);
+
+  const { data: stats, isLoading: statsLoading } = useSWR(
+    `/api/dashboard/stats?team_id=${team || ""}&sector_id=${fSector.join(",")}`,
+    (url) => fetch(url).then((res) => res.json()),
+    { refreshInterval: 10000 }
+  );
 
   const cityNeighborhoods = fCity ? citiesNeighborhoods[fCity] || [] : [];
 
@@ -225,14 +242,14 @@ export default function DashboardPage({
   const concludedForAvg = concluded.filter(
     (t: DashboardTask) => !t.subtasks || t.subtasks.length === 0,
   );
-  const avgTime = concludedForAvg.length
+  const avgTime = stats?.avgTime ?? (concludedForAvg.length
     ? Math.round(
         concludedForAvg.reduce(
           (a: number, t: DashboardTask) => a + (t.time || 0),
           0,
         ) / concludedForAvg.length,
       )
-    : 0;
+    : 0);
   const byType = taskTypes
     .map((tp) => ({
       name: tp.name,
@@ -246,50 +263,70 @@ export default function DashboardPage({
   }));
 
   // Graficos
-  const pieData = ["A Fazer", "Em Andamento", "Pausado", "Concluído"]
-    .map((s) => ({
-      name: s,
-      value: filtered.filter((t: DashboardTask) => t.status === s).length,
-    }))
-    .filter((d) => d.value > 0);
-  const sectorData = SECTORS.map((s) => ({
-    name: s,
-    v: filtered.filter(
-      (t: DashboardTask) =>
-        (t.sector && typeof t.sector === "object"
-          ? t.sector.name
-          : t.sector || "") === s,
-    ).length,
-  }))
-    .filter((x: SectorDataEntry) => x.v > 0)
-    .sort((a: SectorDataEntry, b: SectorDataEntry) => b.v - a.v);
-  const sectorRank = SECTORS.map((s) => ({
-    name: s,
-    v: filtered.filter(
-      (t: DashboardTask) =>
-        (t.sector && typeof t.sector === "object"
-          ? t.sector.name
-          : t.sector || "") === s && t.status === "Concluído",
-    ).length,
-  }))
-    .filter((x: SectorDataEntry) => x.v > 0)
-    .sort((a: SectorDataEntry, b: SectorDataEntry) => b.v - a.v);
-  const userRank = users
-    .map((u: User) => ({
-      name: u.name,
-      v: filtered.filter((t: DashboardTask) => {
-        const rName =
-          typeof t.responsible === "object"
-            ? t.responsible?.name
-            : t.responsible;
-        const cws = t.coworkers || [];
-        const isTarget = rName === u.name || cws.some((cw: any) => cw.name === u.name);
-        return isTarget && t.status === "Concluído";
-      }).length,
-      sector: u.sector?.name || u.sector || "\u2014",
-    }))
-    .filter((x: UserRankEntry) => x.v > 0)
-    .sort((a: UserRankEntry, b: UserRankEntry) => b.v - a.v);
+  const pieData = stats?.byStatus
+    ? Object.entries(stats.byStatus)
+        .map(([name, value]) => ({ name, value: value as number }))
+        .filter((d) => d.value > 0)
+    : ["A Fazer", "Em Andamento", "Pausado", "Concluído"]
+        .map((s) => ({
+          name: s,
+          value: filtered.filter((t: DashboardTask) => t.status === s).length,
+        }))
+        .filter((d) => d.value > 0);
+  const sectorData = stats?.sectorStats
+    ? Object.entries(stats.sectorStats as Record<string, { total: number }>)
+        .map(([name, data]) => ({ name, v: data.total }))
+        .sort((a, b) => b.v - a.v)
+    : SECTORS.map((s) => ({
+        name: s,
+        v: filtered.filter(
+          (t: DashboardTask) =>
+            (t.sector && typeof t.sector === "object"
+              ? t.sector.name
+              : t.sector || "") === s,
+        ).length,
+      }))
+        .filter((x: SectorDataEntry) => x.v > 0)
+        .sort((a: SectorDataEntry, b: SectorDataEntry) => b.v - a.v);
+
+  const sectorRank = stats?.sectorStats
+    ? Object.entries(stats.sectorStats as Record<string, { completed: number }>)
+        .map(([name, data]) => ({ name, v: data.completed }))
+        .filter((x) => x.v > 0)
+        .sort((a, b) => b.v - a.v)
+    : SECTORS.map((s) => ({
+        name: s,
+        v: filtered.filter(
+          (t: DashboardTask) =>
+            (t.sector && typeof t.sector === "object"
+              ? t.sector.name
+              : t.sector || "") === s && t.status === "Concluído",
+        ).length,
+      }))
+        .filter((x: SectorDataEntry) => x.v > 0)
+        .sort((a: SectorDataEntry, b: SectorDataEntry) => b.v - a.v);
+
+  const userRank = stats?.userStats
+    ? Object.entries(stats.userStats as Record<string, { completed: number; sector: string }>)
+        .map(([name, data]) => ({ name, v: data.completed, sector: data.sector }))
+        .filter((x) => x.v > 0)
+        .sort((a, b) => b.v - a.v)
+    : users
+        .map((u: User) => ({
+          name: u.name,
+          v: filtered.filter((t: DashboardTask) => {
+            const rName =
+              typeof t.responsible === "object"
+                ? t.responsible?.name
+                : t.responsible;
+            const cws = t.coworkers || [];
+            const isTarget = rName === u.name || cws.some((cw: any) => cw.name === u.name);
+            return isTarget && t.status === "Concluído";
+          }).length,
+          sector: u.sector?.name || u.sector || "\u2014",
+        }))
+        .filter((x: UserRankEntry) => x.v > 0)
+        .sort((a: UserRankEntry, b: UserRankEntry) => b.v - a.v);
 
   // Proximas tarefas
   const upcoming = [...filtered]
@@ -438,6 +475,11 @@ export default function DashboardPage({
         onClear={clearAll}
         totalTasks={tasks.length}
         filteredTasks={filtered.length}
+        createdByMe={createdByMe}
+        setCreatedByMe={setCreatedByMe}
+        team={team}
+        setTeam={setTeam}
+        teams={teams}
       />
 
       {/* -- KPIs -- */}

@@ -2,6 +2,7 @@
 
 import { LogOut } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { getRoleDisplayName } from "@/lib/permissions";
 
 interface NavItem {
   id: string;
@@ -98,7 +99,7 @@ export function Sidebar({
                 {user.name}
               </div>
               <div className="text-[11px] text-slate-500 dark:text-gray-400">
-                {user.role?.name || "Sem cargo"}
+                {user.role?.name ? getRoleDisplayName(user.role.name) : "Sem cargo"}
               </div>
             </div>
             <button

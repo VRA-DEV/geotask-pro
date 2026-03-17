@@ -13,6 +13,7 @@ import {
   User as UserIcon,
   Users,
   Upload,
+  Save,
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useSWRConfig } from "swr";
@@ -21,13 +22,18 @@ import { RoleModal } from "./RoleModal";
 import { SectorModal } from "./SectorModal";
 import { UserModal } from "./UserModal";
 import { ImportUsersModal } from "./ImportUsersModal";
+import { TeamModal } from "./TeamModal";
+import { ManageTeamMembersModal } from "./ManageTeamMembersModal";
+import { Search, ChevronDown, ChevronRight, Copy } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type PermissionLevel = "full" | "sector" | "view" | "none";
 
 interface RolePermissions {
-  [module: string]: PermissionLevel;
+  [category: string]: {
+    [item: string]: boolean;
+  };
 }
 
 interface Role {
@@ -37,6 +43,11 @@ interface Role {
 }
 
 interface Sector {
+  id: number;
+  name: string;
+}
+
+interface Team {
   id: number;
   name: string;
 }
@@ -138,6 +149,7 @@ export function SettingsPage({
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [sectors, setSectors] = useState<Sector[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [taskTypes, setTaskTypes] = useState<TaskType[]>([]);
   const [cities, setCities] = useState<City[]>([]);
@@ -160,6 +172,17 @@ export function SettingsPage({
 
   const [showSectorModal, setShowSectorModal] = useState(false);
   const [editingSector, setEditingSector] = useState<any | null>(null);
+
+  const [showTeamModal, setShowTeamModal] = useState(false);
+  const [editingTeam, setEditingTeam] = useState<any | null>(null);
+
+  const [pendingPermissions, setPendingPermissions] = useState<{
+    [roleId: number]: RolePermissions;
+  }>({});
+  const [searchPerms, setSearchPerms] = useState("");
+  const [showManageMembersModal, setShowManageMembersModal] = useState(false);
+  const [managingTeam, setManagingTeam] = useState<Team | null>(null);
+  const [collapsedGroups, setCollapsedGroups] = useState<string[]>([]);
 
   const isAdmin = currentUser?.role?.name === "Admin";
   const isManager = currentUser?.role?.name === "Gerente";
@@ -190,6 +213,7 @@ export function SettingsPage({
         proms.push(fetch("/api/contracts").then((r) => r.json()));
         proms.push(fetch("/api/cities").then((r) => r.json()));
         proms.push(fetch("/api/neighborhoods").then((r) => r.json()));
+        proms.push(fetch("/api/teams").then((r) => r.json()));
       }
 
       const results = await Promise.all(proms);
@@ -204,6 +228,7 @@ export function SettingsPage({
         setContracts(results[idx++]);
         setCities(results[idx++]);
         setNeighborhoods(results[idx++]);
+        setTeams(results[idx++]);
       }
     } catch (error) {
       console.error("Failed to fetch settings data", error);
@@ -271,6 +296,20 @@ export function SettingsPage({
       }
     } catch {
       alert("Erro ao excluir setor");
+    }
+  };
+
+  const handleDeleteTeam = async (id: number) => {
+    if (!confirm("Tem certeza que deseja excluir este time?")) return;
+    try {
+      const res = await fetch(`/api/teams?id=${id}`, { method: "DELETE" });
+      if (res.ok) fetchData();
+      else {
+        const data = await res.json();
+        alert(data.error || "Erro ao excluir time");
+      }
+    } catch {
+      alert("Erro ao excluir time");
     }
   };
 
@@ -487,39 +526,94 @@ export function SettingsPage({
     }
   };
 
-  const handleTogglePermission = async (
+  const handleTogglePermission = (
     roleId: number,
     groupKey: string,
     itemId: string,
   ) => {
-    const roleIndex = roles.findIndex((r) => r.id === roleId);
-    if (roleIndex === -1) return;
-    const role = roles[roleIndex];
+    const role = roles.find((r) => r.id === roleId);
+    if (!role) return;
 
-    const currentPerms: any = getPermissions({ role } as any);
+    const currentPerms: any =
+      pendingPermissions[roleId] || getPermissions({ role } as any);
     const newValue = !currentPerms[groupKey][itemId];
 
-    const newPerms: any = { ...currentPerms };
-    newPerms[groupKey][itemId] = newValue;
+    const newRolePerms = {
+      ...currentPerms,
+      [groupKey]: {
+        ...currentPerms[groupKey],
+        [itemId]: newValue,
+      },
+    };
 
-    // Optimistic update
-    const updated = [...roles];
-    updated[roleIndex] = { ...role, permissions: newPerms };
-    setRoles(updated);
+    setPendingPermissions((prev) => ({
+      ...prev,
+      [roleId]: newRolePerms,
+    }));
+  };
 
+  const handleSavePermissions = async () => {
+    const changedRoleIds = Object.keys(pendingPermissions).map(Number);
+    if (changedRoleIds.length === 0) return;
+
+    if (
+      !confirm(
+        `Deseja salvar as alterações de permissão para ${changedRoleIds.length} cargo(s)?`,
+      )
+    )
+      return;
+
+    setLoading(true);
     try {
-      const res = await fetch("/api/roles", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: roleId, permissions: newPerms }),
-      });
-      if (!res.ok) throw new Error("Falha ao salvar permissão");
-    } catch (error) {
+      for (const roleId of changedRoleIds) {
+        const res = await fetch("/api/roles", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: roleId, permissions: pendingPermissions[roleId] }),
+        });
+        if (!res.ok) throw new Error(`Falha ao salvar permissão para cargo ${roleId}`);
+      }
+      setPendingPermissions({});
+      fetchData();
+      alert("Permissões salvas com sucesso!");
+    } catch (error: any) {
       console.error(error);
-      alert("Erro ao salvar permissão");
-      setRoles(roles); // revert
+      alert(error.message || "Erro ao salvar permissões");
+    } finally {
+      setLoading(false);
     }
   };
+
+  const handleCopyPermissions = (fromRoleId: number, toRoleId: number) => {
+    const fromRole = roles.find((r) => r.id === fromRoleId);
+    if (!fromRole) return;
+
+    const fromPerms: any =
+      pendingPermissions[fromRoleId] || getPermissions({ role: fromRole } as any);
+
+    setPendingPermissions((prev) => ({
+      ...prev,
+      [toRoleId]: { ...fromPerms },
+    }));
+  };
+
+  const toggleGroupCollapse = (groupKey: string) => {
+    setCollapsedGroups((prev) =>
+      prev.includes(groupKey)
+        ? prev.filter((k) => k !== groupKey)
+        : [...prev, groupKey]
+    );
+  };
+
+  const filteredGroups = React.useMemo(() => {
+    if (!searchPerms) return PERMISSION_GROUPS;
+    return PERMISSION_GROUPS.map((group) => ({
+      ...group,
+      items: group.items.filter((item) =>
+        item.label.toLowerCase().includes(searchPerms.toLowerCase())
+      ),
+    })).filter((group) => group.items.length > 0);
+  }, [searchPerms]);
 
   // ── Tabs ──────────────────────────────────────────────────────────────────
 
@@ -528,6 +622,7 @@ export function SettingsPage({
     { id: "users", l: "Usuários", icon: Users },
     { id: "roles", l: "Cargos", icon: Briefcase },
     { id: "sectors", l: "Setores", icon: Building2 },
+    { id: "teams", l: "Times", icon: Users },
     { id: "task-types", l: "Tipos de Tarefa", icon: Settings },
     { id: "locations", l: "Localidades", icon: MapPin },
     { id: "permissions", l: "Permissões", icon: Settings },
@@ -921,6 +1016,73 @@ export function SettingsPage({
           )}
 
           {/* ═══════════════════════════════════════════════════════════════
+              TEAMS TAB — Admin only
+          ═══════════════════════════════════════════════════════════════ */}
+          {tab === "teams" && isAdmin && (
+            <div className="flex flex-col gap-2">
+              {teams.map((t) => (
+                <div
+                  key={t.id}
+                  className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl py-3 px-4 flex justify-between items-center"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-[34px] h-[34px] bg-amber-100 rounded-lg flex items-center justify-center">
+                      <Users size={16} color="#d97706" />
+                    </div>
+                    <div>
+                      <div className="text-[13px] font-semibold text-slate-900 dark:text-gray-50">
+                        {t.name}
+                      </div>
+                      <div className="text-[11px] text-slate-500 dark:text-gray-400">
+                        {users.filter((u: any) => u.team_id === t.id).length}{" "}
+                        membro(s)
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => {
+                        setEditingTeam(t);
+                        setShowTeamModal(true);
+                      }}
+                      className="bg-slate-100 dark:bg-gray-700 border-none rounded-md p-[5px] cursor-pointer text-slate-500 dark:text-gray-400"
+                    >
+                      <Edit size={13} />
+                    </button>
+                    <button
+                      title="Gerenciar Membros"
+                      onClick={() => {
+                        setManagingTeam(t);
+                        setShowManageMembersModal(true);
+                      }}
+                      className="bg-slate-100 dark:bg-gray-700 border-none rounded-md p-[5px] cursor-pointer text-slate-500 dark:text-gray-400"
+                    >
+                      <Users size={13} />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteTeam(t.id)}
+                      className="bg-red-50 border-none rounded-md p-[5px] cursor-pointer"
+                    >
+                      <Trash2 size={13} color="#ef4444" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              <button
+                onClick={() => {
+                  setEditingTeam(null);
+                  setShowTeamModal(true);
+                }}
+                className="bg-transparent border-[1.5px] border-dashed border-slate-200 dark:border-gray-700 rounded-xl p-3.5 flex items-center justify-center gap-1.5 text-[13px] text-slate-500 dark:text-gray-400 cursor-pointer"
+              >
+                <Plus size={14} />
+                Novo time
+              </button>
+            </div>
+          )}
+
+          {/* ═══════════════════════════════════════════════════════════════
               TASK TYPES TAB — Admin only
           ═══════════════════════════════════════════════════════════════ */}
           {tab === "task-types" && isAdmin && (
@@ -983,87 +1145,140 @@ export function SettingsPage({
           {tab === "permissions" && isAdmin && (
             <div className="flex flex-col gap-4">
               <div className="bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-[14px] overflow-auto">
-                <div className="py-3.5 px-4 border-b border-slate-200 dark:border-gray-700">
-                  <div className="text-[13px] font-semibold text-slate-900 dark:text-gray-50">
-                    Permissões Avançadas por Cargo (RBAC)
+                <div className="py-3.5 px-4 border-b border-slate-200 dark:border-gray-700 flex justify-between items-center">
+                  <div>
+                    <div className="text-[13px] font-semibold text-slate-900 dark:text-gray-50">
+                      Permissões Avançadas por Cargo (RBAC)
+                    </div>
+                    <div className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">
+                      Altere as permissões e clique em salvar para aplicar.
+                    </div>
                   </div>
-                  <div className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">
-                    As alterações são salvas automaticamente e assumidas em
-                    tempo real.
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input 
+                        type="text"
+                        placeholder="Buscar permissão..."
+                        value={searchPerms}
+                        onChange={(e) => setSearchPerms(e.target.value)}
+                        className="pl-9 pr-3 py-1.5 bg-slate-100 dark:bg-gray-700 border border-slate-200 dark:border-gray-600 rounded-lg text-xs outline-none w-48 transition-all focus:w-64"
+                      />
+                    </div>
+                    {Object.keys(pendingPermissions).length > 0 && (
+                      <button
+                        onClick={handleSavePermissions}
+                        className="flex items-center gap-1.5 py-1.5 px-4 bg-primary text-white border-none rounded-lg text-xs font-semibold cursor-pointer shadow-md hover:opacity-90 transition-opacity"
+                      >
+                        <Save size={14} /> Salvar Alterações
+                      </button>
+                    )}
                   </div>
                 </div>
 
                 <table className="w-full border-collapse min-w-[500px]">
                   <thead>
                     <tr className="border-b border-slate-200 dark:border-gray-700">
-                      <th className="py-2.5 px-4 text-left text-[11px] font-bold text-slate-500 dark:text-gray-400 sticky left-0 bg-white dark:bg-gray-800">
-                        Capacidade
+                      <th className="py-2.5 px-4 text-left text-[11px] font-bold text-slate-500 dark:text-gray-400 sticky left-0 bg-white dark:bg-gray-800 z-10 uppercase tracking-tighter">
+                        Capacidade / Recurso
                       </th>
                       {roles.map((r) => (
                         <th
                           key={r.id}
                           className="py-2.5 px-3.5 text-center text-[11px] font-bold text-slate-500 dark:text-gray-400 whitespace-nowrap"
                         >
-                          {r.name}
+                          <div className="flex flex-col items-center gap-1">
+                            {r.name}
+                            <button
+                              title={`Copiar de outro cargo para ${r.name}`}
+                              className="p-1 hover:bg-slate-100 dark:hover:bg-gray-700 rounded transition-colors text-slate-400 hover:text-primary border-none bg-transparent"
+                              onClick={() => {
+                                const fromIdStr = prompt(`Copiar permissões de qual cargo para ${r.name}?\n${roles.filter(x => x.id !== r.id).map(x => `${x.id}: ${x.name}`).join('\n')}`);
+                                if (fromIdStr) {
+                                  handleCopyPermissions(Number(fromIdStr), r.id);
+                                }
+                              }}
+                            >
+                              <Copy size={10} />
+                            </button>
+                          </div>
                         </th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {PERMISSION_GROUPS.map((group) => (
-                      <React.Fragment key={group.key}>
-                        {/* Group Header */}
-                        <tr className="bg-slate-50 dark:bg-gray-900/50">
-                          <td
-                            className="py-2 px-4 text-[11px] font-bold text-slate-700 dark:text-gray-300 uppercase tracking-wider sticky left-0"
-                            colSpan={roles.length + 1}
+                    {filteredGroups.map((group) => {
+                      const isCollapsed = collapsedGroups.includes(group.key);
+                      return (
+                        <React.Fragment key={group.key}>
+                          {/* Group Header */}
+                          <tr 
+                            className="bg-slate-50 dark:bg-gray-900/50 cursor-pointer"
+                            onClick={() => toggleGroupCollapse(group.key)}
                           >
-                            {group.category}
-                          </td>
-                        </tr>
-                        {/* Items */}
-                        {group.items.map((item, i) => (
-                          <tr
-                            key={item.id}
-                            className={
-                              i < group.items.length - 1
-                                ? "border-b border-slate-100 dark:border-gray-800"
-                                : ""
-                            }
-                          >
-                            <td className="py-2.5 px-4 text-[13px] font-medium text-slate-900 dark:text-gray-50 sticky left-0 bg-white dark:bg-gray-800">
-                              {item.label}
+                            <td
+                              className="py-2 px-4 text-[11px] font-bold text-slate-700 dark:text-gray-300 uppercase tracking-wider sticky left-0 z-10 flex items-center gap-2"
+                              style={{ background: 'inherit' }}
+                              colSpan={roles.length + 1}
+                            >
+                              {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                              {group.category}
+                              <span className="ml-2 px-1.5 py-0.5 rounded-full bg-slate-200 dark:bg-gray-700 text-[9px] text-slate-500">
+                                {group.items.length} itens
+                              </span>
                             </td>
-                            {roles.map((r) => {
-                              const p: any = getPermissions({ role: r } as any);
-                              const isChecked = !!p[group.key][item.id];
-
-                              // Don't let users edit God-mode Admin roles completely if it's destructive,
-                              // but for now, they can edit anything.
-                              return (
-                                <td
-                                  key={r.id}
-                                  className="py-2 px-3.5 text-center"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={isChecked}
-                                    onChange={() =>
-                                      handleTogglePermission(
-                                        r.id,
-                                        group.key,
-                                        item.id,
-                                      )
-                                    }
-                                    className="w-4 h-4 cursor-pointer accent-primary border-slate-300 rounded"
-                                  />
-                                </td>
-                              );
-                            })}
                           </tr>
-                        ))}
-                      </React.Fragment>
-                    ))}
+                          {/* Items */}
+                          {!isCollapsed && group.items.map((item, i) => (
+                            <tr
+                              key={item.id}
+                              className={`transition-colors hover:bg-slate-50 dark:hover:bg-white/5 ${
+                                i < group.items.length - 1
+                                  ? "border-b border-slate-100 dark:border-gray-800"
+                                  : ""
+                              }`}
+                            >
+                              <td className="py-2 px-4 text-[12px] font-medium text-slate-900 dark:text-gray-50 sticky left-0 bg-white dark:bg-gray-800 z-10 pl-8">
+                                {item.label}
+                              </td>
+                              {roles.map((r) => {
+                                const p: any =
+                                  pendingPermissions[r.id] ||
+                                  getPermissions({ role: r } as any);
+                                const isChecked = !!p[group.key]?.[item.id];
+                                const isModified = pendingPermissions[r.id] !== undefined && pendingPermissions[r.id][group.key] !== undefined && pendingPermissions[r.id][group.key][item.id] !== undefined;
+
+                                return (
+                                  <td
+                                    key={r.id}
+                                    className={`py-2 px-3.5 text-center transition-colors ${isModified ? 'bg-primary/5' : ''}`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={() =>
+                                        handleTogglePermission(
+                                          r.id,
+                                          group.key,
+                                          item.id,
+                                        )
+                                      }
+                                      style={{
+                                        width: 16,
+                                        height: 16,
+                                        cursor: "pointer",
+                                        accentColor: "#98af3b",
+                                        borderRadius: 4
+                                      }}
+                                    />
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </React.Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -1287,6 +1502,7 @@ export function SettingsPage({
         user={editingUser}
         roles={roles}
         sectors={sectors}
+        teams={teams}
         T={T}
       />
 
@@ -1306,12 +1522,33 @@ export function SettingsPage({
         T={T}
       />
 
+      <TeamModal
+        isOpen={showTeamModal}
+        onClose={() => setShowTeamModal(false)}
+        onSuccess={fetchData}
+        team={editingTeam}
+        T={T}
+      />
+
       <ImportUsersModal
         isOpen={showImportModal}
         onClose={() => setShowImportModal(false)}
         onSuccess={fetchData}
         T={T}
       />
+
+      {managingTeam && (
+        <ManageTeamMembersModal
+          isOpen={showManageMembersModal}
+          onClose={() => {
+            setShowManageMembersModal(false);
+            setManagingTeam(null);
+            fetchData();
+          }}
+          team={managingTeam}
+          T={T}
+        />
+      )}
     </div>
   );
 }

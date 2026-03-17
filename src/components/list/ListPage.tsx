@@ -48,6 +48,11 @@ interface ListPageProps {
   sectors?: (Sector | string)[];
   taskTypes?: any[];
   canViewAllSectors?: boolean;
+  createdByMe?: boolean;
+  setCreatedByMe?: (v: boolean) => void;
+  team?: string;
+  setTeam?: (v: string) => void;
+  teams?: { id: number; name: string }[];
 }
 
 export default function ListPage({
@@ -60,6 +65,11 @@ export default function ListPage({
   sectors = [],
   taskTypes = [],
   canViewAllSectors,
+  createdByMe,
+  setCreatedByMe,
+  team,
+  setTeam,
+  teams,
 }: ListPageProps) {
   const [search, setSearch] = useState("");
   const [fSector, setFSector] = useState<string[]>([]);
@@ -320,6 +330,11 @@ export default function ListPage({
         filteredTasks={filtered.length}
         canViewAllSectors={canViewAllSectors}
         showSubtasks={false}
+        createdByMe={createdByMe}
+        setCreatedByMe={setCreatedByMe}
+        team={team}
+        setTeam={setTeam}
+        teams={teams}
       />
 
       <div className="flex-1 min-h-0 overflow-hidden rounded-[14px] bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 flex flex-col shadow-sm">

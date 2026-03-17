@@ -2,8 +2,9 @@ import useSWR from "swr";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
-export function useTemplates() {
-  const { data, error, isLoading, mutate } = useSWR("/api/templates", fetcher, {
+export function useTemplates(userId?: number) {
+  const url = userId ? `/api/templates?user_id=${userId}` : "/api/templates";
+  const { data, error, isLoading, mutate } = useSWR(url, fetcher, {
     revalidateOnFocus: false,
     dedupingInterval: 10000,
   });

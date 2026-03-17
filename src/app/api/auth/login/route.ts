@@ -22,6 +22,8 @@ export async function POST(req: Request) {
       include: {
         Role: true,
         Sector: true,
+        Team: true,
+        user_sectors: { include: { sector: true } },
       },
     });
 
@@ -83,6 +85,8 @@ export async function POST(req: Request) {
       created_at: user.created_at,
       role: user.Role ? { name: user.Role.name } : { name: "Sem Cargo" },
       sector: user.Sector ? { name: user.Sector.name } : { name: "Sem Setor" },
+      team: user.Team ? { id: user.Team.id, name: user.Team.name } : null,
+      user_sectors: user.user_sectors || [],
     });
   } catch (error) {
     console.error("Login error:", error);

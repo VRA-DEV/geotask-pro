@@ -72,6 +72,11 @@ interface KanbanPageProps {
   sectors?: Sector[];
   taskTypes?: any[];
   canViewAllSectors?: boolean;
+  createdByMe?: boolean;
+  setCreatedByMe?: (v: boolean) => void;
+  team?: string;
+  setTeam?: (v: string) => void;
+  teams?: { id: number; name: string }[];
 }
 
 // ── Inline helper components ────────────────────────────────────
@@ -275,6 +280,11 @@ export default function KanbanPage({
   citiesNeighborhoods = {},
   sectors = [],
   taskTypes = [],
+  createdByMe,
+  setCreatedByMe,
+  team,
+  setTeam,
+  teams,
 }: KanbanPageProps) {
   const [search, setSearch] = useState("");
   const [fSector, setFSector] = useState<string[]>([]);
@@ -426,6 +436,11 @@ export default function KanbanPage({
         onClear={clearAll}
         totalTasks={tasks.length}
         filteredTasks={filtered.length}
+        createdByMe={createdByMe}
+        setCreatedByMe={setCreatedByMe}
+        team={team}
+        setTeam={setTeam}
+        teams={teams}
       />
 
       {/* Colunas */}

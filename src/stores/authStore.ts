@@ -1,18 +1,5 @@
 import { create } from "zustand";
-
-interface User {
-  id: number;
-  name: string;
-  email: string;
-  role_id: number;
-  sector_id: number;
-  avatar: string | null;
-  active: boolean;
-  must_change_password: boolean;
-  created_at: string;
-  role: { name: string } | null;
-  sector: { name: string; id?: number } | null;
-}
+import { User } from "@/types";
 
 interface AuthState {
   user: User | null;

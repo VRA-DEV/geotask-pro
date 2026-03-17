@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { broadcast } from "../events/route";
 
 // GET /api/notifications?user_id=X&unread_only=true
 // GET /api/notifications
@@ -91,6 +92,7 @@ export async function PATCH(req: Request) {
         where: { user_id: Number(user_id), read: false },
         data: { read: true },
       });
+      broadcast("NOTIFICATIONS_UPDATED", { userId: Number(user_id) });
       return NextResponse.json({
         message: "Todas notificações marcadas como lidas",
       });
@@ -101,6 +103,7 @@ export async function PATCH(req: Request) {
         where: { id: Number(id) },
         data: { read: true },
       });
+      broadcast("NOTIFICATIONS_UPDATED", { notificationId: Number(id) });
       return NextResponse.json({ message: "Notificação marcada como lida" });
     }
 

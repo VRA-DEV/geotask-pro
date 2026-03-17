@@ -1,6 +1,6 @@
 "use client";
 
-import { AppPermissions, getPermissions } from "@/lib/permissions";
+import { AppPermissions, getPermissions, getRoleDisplayName } from "@/lib/permissions";
 import {
   Bell,
   Calendar,
@@ -13,7 +13,8 @@ import {
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSWRConfig } from "swr";
 
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
@@ -26,6 +27,7 @@ import {
 import { useLookups } from "@/hooks/useLookups";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useTasks } from "@/hooks/useTasks";
+import { useTeams } from "@/hooks/useTeams";
 import { useTemplates } from "@/hooks/useTemplates";
 import { useUsers } from "@/hooks/useUsers";
 import { SECTORS } from "@/lib/constants";
@@ -106,9 +108,20 @@ export default function GeoTask() {
     toggleNotifPopover,
     setShowTemplateModal,
   } = useUIStore();
+  
+  // ── Local state ─────────────────────────────────────────────────────
+  const [selectedTask, setSelectedTask] = useState<any>(null);
+  const [activeTemplate, setActiveTemplate] = useState<any>(null);
+  const [editingTemplate, setEditingTemplate] = useState<any>(null);
+  const [createdByMe, setCreatedByMe] = useState(false);
+  const [teamFilter, setTeamFilter] = useState("");
 
   // ── SWR hooks (cached data fetching) ────────────────────────────────
-  const { tasks, mutate: mutateTasks } = useTasks();
+  const { mutate: globalMutate } = useSWRConfig();
+  const { tasks, mutate: mutateTasks } = useTasks({
+    teamId: teamFilter ? Number(teamFilter) : undefined,
+    createdById: createdByMe ? user?.id : undefined
+  });
   const { users: dbUsers } = useUsers();
   const {
     contracts,
@@ -116,14 +129,10 @@ export default function GeoTask() {
     citiesNeighborhoods,
     taskTypes,
   } = useLookups();
-  const { templates, saveTemplate, deleteTemplate } = useTemplates();
+  const { templates, saveTemplate, deleteTemplate } = useTemplates(user?.id);
+  const { teams } = useTeams();
   const { notifications, unreadCount, markRead, markAllRead } =
     useNotifications(user?.id ?? null);
-
-  // ── Local state ─────────────────────────────────────────────────────
-  const [selectedTask, setSelectedTask] = useState<any>(null);
-  const [activeTemplate, setActiveTemplate] = useState<any>(null);
-  const [editingTemplate, setEditingTemplate] = useState<any>(null);
 
   // T is still needed by legacy components (Dashboard, Kanban, etc.)
   const T = getTheme(dark);
@@ -186,6 +195,37 @@ export default function GeoTask() {
   useEffect(() => {
     if (user?.must_change_password) setShowMustChangePassword(true);
   }, [user]);
+
+  // ── Real-time Sync (SSE) ───────────────────────────────────────────
+  useEffect(() => {
+    if (!user) return;
+
+    const eventSource = new EventSource("/api/events");
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log("Real-time event received:", data);
+
+        if (data.type === "TASK_CREATED" || data.type === "TASK_UPDATED" || data.type === "TASK_DELETED") {
+          mutateTasks();
+          globalMutate((key: string) => typeof key === 'string' && key.startsWith('/api/dashboard/stats'));
+        }
+
+        if (data.type === "NOTIFICATIONS_UPDATED" || data.type === "TASK_CREATED") {
+          globalMutate((key: string) => typeof key === 'string' && key.startsWith('/api/notifications'));
+        }
+      } catch (err) {
+        console.error("SSE parse error", err);
+      }
+    };
+
+    eventSource.onerror = (err) => {
+      console.error("SSE connection error (reconnecting...)", eventSource.readyState, err);
+    };
+
+    return () => eventSource.close();
+  }, [user, mutateTasks, globalMutate]);
 
   // ── Task actions ────────────────────────────────────────────────────
   const handleCreateTask = async (newTask: any) => {
@@ -257,53 +297,74 @@ export default function GeoTask() {
   const canCreate = appPerms.tasks.create;
 
   // ── Task visibility (role-based filtering) ──────────────────────────
-  const isLiderado = user?.role?.name === "Liderado";
-  const isGestor = user?.role?.name === "Gestor";
   const userSectorId = user?.sector?.id || user?.sector_id;
-  const userSectorName = user?.sector?.name;
 
   const visibleTasks = useMemo(() => {
     if (!user) return [];
 
-    const isLiderado = user?.role?.name === "Liderado";
-    const isGestor = user?.role?.name === "Gestor";
-    const isAdmin = user?.role?.name === "Admin";
-    const userSectorId = user?.sector?.id || user?.sector_id;
-    const userSectorName = user?.sector?.name;
+    const roleName = user?.role?.name || "";
+    const uId = Number(user.id);
+    const uSectorId = user?.sector?.id || user?.sector_id;
 
-    if (isAdmin) return tasks;
+    // Roles that see ALL tasks
+    const fullAccessRoles = ["Admin", "Gerente", "Socio", "Diretor"];
+    if (fullAccessRoles.includes(roleName)) return tasks;
 
-    return tasks.filter((t: any) => {
-      const uId = Number(user.id);
-      
-      // 1. Assignment Visibility: Always see tasks where you are involved
+    let filtered = tasks.filter((t: any) => {
+      const isCreator = Number(t.created_by_id) === uId;
       const isResponsible = Number(t.responsible_id) === uId || Number(t.responsible?.id) === uId;
-      const isInTeam = (t.coworkers || []).some((cw: any) => Number(cw.id) === uId);
-      const isSubtaskResponsible = (t.subtasks || []).some(
-        (s: any) => Number(s.responsible_id) === uId || Number(s.responsible?.id) === uId
-      );
+      const isInCoworkers = (t.coworkers || []).some((cw: any) => Number(cw.id) === uId);
 
-      if (isResponsible || isInTeam || isSubtaskResponsible) return true;
-
-      // 2. Sector-based Visibility (Gestor only)
-      if (isGestor) {
-        const tSectorId = t.sector_id || t.sector?.id;
-        const tSectorName = typeof t.sector === "string" ? t.sector : t.sector?.name;
-        
-        if (userSectorId && tSectorId && Number(tSectorId) === Number(userSectorId))
-          return true;
-        
-        if (
-          userSectorName &&
-          tSectorName &&
-          String(tSectorName).toLowerCase().trim() === String(userSectorName).toLowerCase().trim()
-        )
-          return true;
+      if (roleName === "Coordenador de Polo") {
+        if (isCreator || isResponsible || isInCoworkers) return true;
+        // Inclusive team check: task belongs to team OR responsible belongs to team
+        if (user.team_id && (
+          (t.team_id && Number(t.team_id) === Number(user.team_id)) ||
+          (t.responsible?.team_id && Number(t.responsible.team_id) === Number(user.team_id))
+        )) return true;
+        return false;
       }
 
-      return false;
+      if (roleName === "Coordenador de Setores") {
+        if (isCreator || isResponsible || isInCoworkers) return true;
+        // Check primary sector + user_sectors
+        const userSectorIds: number[] = [];
+        if (uSectorId) userSectorIds.push(Number(uSectorId));
+        const extraSectors = (user as any).user_sectors?.map((us: any) => Number(us.sector_id)) || [];
+        userSectorIds.push(...extraSectors);
+        const tSectorId = t.sector_id || t.sector?.id;
+        if (tSectorId && userSectorIds.includes(Number(tSectorId))) return true;
+        return false;
+      }
+
+      if (roleName === "Gestor") {
+        if (isResponsible || isInCoworkers) return true;
+        const tSectorId = t.sector_id || t.sector?.id;
+        if (uSectorId && tSectorId && Number(tSectorId) === Number(uSectorId)) return true;
+        return false;
+      }
+
+      // Liderado (default)
+      return isResponsible || isInCoworkers;
     });
+
+    return filtered;
   }, [tasks, user]);
+
+  // ── Additional filters (createdByMe, team) applied on top of visibleTasks
+  const filteredVisibleTasks = useMemo(() => {
+    let result = visibleTasks;
+    if (createdByMe && user) {
+      result = result.filter((t: any) => Number(t.created_by_id) === Number(user.id));
+    }
+    if (teamFilter) {
+      result = result.filter((t: any) => 
+        Number(t.team_id) === Number(teamFilter) || 
+        (t.responsible?.team_id && Number(t.responsible.team_id) === Number(teamFilter))
+      );
+    }
+    return result;
+  }, [visibleTasks, createdByMe, teamFilter, user]);
 
   const visibleTaskTypes = useMemo(() => {
     if (appPerms.tasks.view_all_sectors) return taskTypes;
@@ -372,7 +433,7 @@ export default function GeoTask() {
           {page === "dashboard" && (
             <DashboardPage
               T={T}
-              tasks={visibleTasks}
+              tasks={filteredVisibleTasks}
               user={user}
               onSelect={setSelectedTask}
               users={dbUsers}
@@ -381,12 +442,17 @@ export default function GeoTask() {
               sectors={mergedSectors}
               taskTypes={visibleTaskTypes}
               canViewAllSectors={appPerms.tasks.view_all_sectors}
+              createdByMe={createdByMe}
+              setCreatedByMe={setCreatedByMe}
+              team={teamFilter}
+              setTeam={setTeamFilter}
+              teams={teams}
             />
           )}
           {page === "kanban" && (
             <KanbanPage
               T={T}
-              tasks={visibleTasks}
+              tasks={filteredVisibleTasks}
               user={user}
               onSelect={setSelectedTask}
               canCreate={canCreate}
@@ -397,6 +463,11 @@ export default function GeoTask() {
               sectors={mergedSectors}
               taskTypes={visibleTaskTypes}
               canViewAllSectors={appPerms.tasks.view_all_sectors}
+              createdByMe={createdByMe}
+              setCreatedByMe={setCreatedByMe}
+              team={teamFilter}
+              setTeam={setTeamFilter}
+              teams={teams}
             />
           )}
           {page === "map" && (
@@ -407,7 +478,7 @@ export default function GeoTask() {
           {page === "mindmap" && (
             <MindMapPage
               T={T}
-              tasks={visibleTasks}
+              tasks={filteredVisibleTasks}
               users={dbUsers}
               contracts={contracts}
               citiesNeighborhoods={citiesNeighborhoods}
@@ -416,7 +487,7 @@ export default function GeoTask() {
           {page === "list" && (
             <ListPage
               T={T}
-              tasks={visibleTasks}
+              tasks={filteredVisibleTasks}
               onSelect={setSelectedTask}
               users={dbUsers}
               contracts={contracts}
@@ -424,17 +495,27 @@ export default function GeoTask() {
               sectors={mergedSectors}
               taskTypes={visibleTaskTypes}
               canViewAllSectors={appPerms.tasks.view_all_sectors}
+              createdByMe={createdByMe}
+              setCreatedByMe={setCreatedByMe}
+              team={teamFilter}
+              setTeam={setTeamFilter}
+              teams={teams}
             />
           )}
           {page === "cronograma" && (
             <CronogramaPage
               T={T}
-              tasks={visibleTasks}
+              tasks={filteredVisibleTasks}
               onSelect={setSelectedTask}
               users={dbUsers}
               contracts={contracts}
               citiesNeighborhoods={citiesNeighborhoods}
               sectors={mergedSectors}
+              createdByMe={createdByMe}
+              setCreatedByMe={setCreatedByMe}
+              team={teamFilter}
+              setTeam={setTeamFilter}
+              teams={teams}
             />
           )}
           {page === "templates" && canAccess("templates") && (
@@ -469,7 +550,18 @@ export default function GeoTask() {
               unreadCount={unreadCount}
               markRead={markRead}
               markAllRead={markAllRead}
-              setSelectedTask={setSelectedTask}
+              setSelectedTask={async (t: any) => {
+                // If the task object is a shallow one from notifications, fetch full details
+                if (!t.description && t.id) {
+                   const res = await fetch(`/api/tasks?id=${t.id}`);
+                   if (res.ok) {
+                     const full = await res.json();
+                     setSelectedTask(full);
+                   }
+                } else {
+                  setSelectedTask(t);
+                }
+              }}
             />
           )}
           {page === "activity_log" && canAccess("activity_log" as any) && (

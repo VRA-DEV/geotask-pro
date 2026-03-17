@@ -9,7 +9,12 @@ const DEFAULT_PASSWORD = "Geogis2026";
 export async function GET() {
   try {
     const users = await prisma.user.findMany({
-      include: { Role: true, Sector: true },
+      include: {
+        Role: true,
+        Sector: true,
+        Team: true,
+        user_sectors: { include: { sector: true } },
+      },
       orderBy: { name: "asc" },
     });
 
@@ -18,6 +23,8 @@ export async function GET() {
       password_hash: undefined,
       role: u.Role,
       sector: u.Sector,
+      team: u.Team,
+      user_sectors: u.user_sectors,
     }));
 
     return NextResponse.json(transformed);
@@ -46,6 +53,9 @@ export async function POST(req: Request) {
       parsed.data;
     const finalRoleId = Number(role_id || role);
     const finalSectorId = Number(sector_id || sector);
+    const teamId = (parsed.data as any).team_id
+      ? Number((parsed.data as any).team_id)
+      : null;
 
     const initials = name
       .split(" ")
@@ -62,12 +72,13 @@ export async function POST(req: Request) {
         email,
         role_id: finalRoleId,
         sector_id: finalSectorId,
+        team_id: teamId,
         avatar: avatar || initials,
         password_hash: hash,
         must_change_password: true,
         active: true,
       },
-      include: { Role: true, Sector: true },
+      include: { Role: true, Sector: true, Team: true },
     });
 
     return NextResponse.json(
@@ -76,6 +87,7 @@ export async function POST(req: Request) {
         password_hash: undefined,
         role: user.Role,
         sector: user.Sector,
+        team: user.Team,
       },
       { status: 201 },
     );
@@ -115,6 +127,11 @@ export async function PATCH(req: Request) {
     if (role || role_id) updateData.role_id = Number(role_id || role);
     if (sector || sector_id)
       updateData.sector_id = Number(sector_id || sector);
+    if ((data as any).team_id !== undefined) {
+      updateData.team_id = (data as any).team_id
+        ? Number((data as any).team_id)
+        : null;
+    }
 
     if (resetPassword) {
       updateData.password_hash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
@@ -127,7 +144,7 @@ export async function PATCH(req: Request) {
     const user = await prisma.user.update({
       where: { id },
       data: updateData,
-      include: { Role: true, Sector: true },
+      include: { Role: true, Sector: true, Team: true, user_sectors: { include: { sector: true } } },
     });
 
     return NextResponse.json({
@@ -135,6 +152,8 @@ export async function PATCH(req: Request) {
       password_hash: undefined,
       role: user.Role,
       sector: user.Sector,
+      team: user.Team,
+      user_sectors: user.user_sectors,
     });
   } catch (error) {
     console.error("Erro ao atualizar usuário:", error);

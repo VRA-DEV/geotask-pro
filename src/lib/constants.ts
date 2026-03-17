@@ -10,7 +10,7 @@ import {
 export const SECTORS = [
   "Administrativo",
   "Atendimento ao Cliente",
-  "Atendimento Social",
+  "Assistência Social",
   "Cadastro",
   "Controladoria",
   "Coordenação",
@@ -24,7 +24,8 @@ export const SECTORS = [
 
 export const SECTOR_ENUM_TO_DISPLAY: Record<string, string> = {
   AtendimentoAoCliente: "Atendimento ao Cliente",
-  AtendimentoSocial: "Atendimento Social",
+  AtendimentoSocial: "Assistência Social",
+  AssistenciaSocial: "Assistência Social",
   Administrativo: "Administrativo",
   Cadastro: "Cadastro",
   Engenharia: "Engenharia",

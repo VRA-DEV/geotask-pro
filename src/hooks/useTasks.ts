@@ -11,6 +11,12 @@ interface UseTasksOptions {
   /** Pagination (optional — omit for all tasks) */
   page?: number;
   limit?: number;
+  /** Lightweight fetch (optional) */
+  summary?: boolean;
+  /** Server-side filter for team */
+  teamId?: number;
+  /** Server-side filter for creator */
+  createdById?: number;
 }
 
 function buildUrl(opts: UseTasksOptions = {}): string {
@@ -21,6 +27,12 @@ function buildUrl(opts: UseTasksOptions = {}): string {
     params.set("responsible_id", String(opts.responsibleId));
   if (opts.page) params.set("page", String(opts.page));
   if (opts.limit) params.set("limit", String(opts.limit));
+  if (opts.summary) params.set("summary", "true");
+  if (opts.teamId) params.set("team_id", String(opts.teamId));
+  if (opts.createdById) {
+    params.set("created_by_me", "true");
+    params.set("created_by_id", String(opts.createdById));
+  }
   const qs = params.toString();
   return qs ? `/api/tasks?${qs}` : "/api/tasks";
 }
