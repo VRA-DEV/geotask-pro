@@ -3,6 +3,7 @@
  * SAFE: Only upserts/updates. Never deletes existing data.
  *
  * Run: npx tsx prisma/seed_roles_v2.ts
+ * Version: 2.0.1 (Triggering redeploy)
  */
 import { PrismaClient } from "@prisma/client";
 
