@@ -18,8 +18,16 @@ const prisma = new PrismaClient({
 async function main() {
   try {
     console.log("🌱 Starting seed from Excel...");
+    const filePath = "data/Email_Institucional.xlsx";
+    
+    // Check if file exists to avoid ENOENT on Vercel
+    const fs = require("fs");
+    if (!fs.existsSync(filePath)) {
+      console.log(`⚠️ Skip: ${filePath} not found. Skipping Excel seed.`);
+      return;
+    }
 
-    const workbook = readFile("data/Email_Institucional.xlsx");
+    const workbook = readFile(filePath);
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
     const data = utils.sheet_to_json(sheet) as any[];
