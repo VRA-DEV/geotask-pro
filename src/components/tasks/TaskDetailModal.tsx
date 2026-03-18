@@ -1100,7 +1100,7 @@ export default function TaskDetailModal({
                   value={commentText}
                   onChange={(e) => handleCommentChange(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
+                    if (e.key === "Enter" && e.shiftKey) {
                       e.preventDefault();
                       submitComment();
                     }
