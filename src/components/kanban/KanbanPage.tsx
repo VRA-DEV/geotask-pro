@@ -77,6 +77,8 @@ interface KanbanPageProps {
   team?: string;
   setTeam?: (v: string) => void;
   teams?: { id: number; name: string }[];
+  currentState?: string;
+  setCurrentState?: (v: string) => void;
 }
 
 // ── Inline helper components ────────────────────────────────────
@@ -148,7 +150,7 @@ function MultiSelect({
       </div>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg shadow-[0_10px_30px_rgba(0,0,0,0.15)] z-[9999] p-1.5 min-w-[180px] max-h-[300px] overflow-y-auto">
+        <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg shadow-[0_10px_30px_rgba(0,0,0,0.15)] z-9999 p-1.5 min-w-[180px] max-h-[300px] overflow-y-auto">
           {opts.map((o: FilterOption, i: number) => {
             const label = typeof o === "object" ? o.name || o.label : o;
             const value = String(
@@ -285,6 +287,8 @@ export default function KanbanPage({
   team,
   setTeam,
   teams,
+  currentState,
+  setCurrentState,
 }: KanbanPageProps) {
   const [search, setSearch] = useState("");
   const [fSector, setFSector] = useState<string[]>([]);
@@ -297,9 +301,18 @@ export default function KanbanPage({
   const [showSubtasks, setShowSubtasks] = useState(true);
   const [fDateFrom, setFDateFrom] = useState<DateRange | undefined>(undefined);
   const [fDateTo, setFDateTo] = useState<DateRange | undefined>(undefined);
+  const [fCurrentState, setFCurrentState] = useState(currentState || "");
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   const cityNeighborhoods = fCity ? citiesNeighborhoods[fCity] || [] : [];
+
+  useEffect(() => {
+    if (currentState !== undefined) setFCurrentState(currentState);
+  }, [currentState]);
+
+  useEffect(() => {
+    if (setCurrentState) setCurrentState(fCurrentState);
+  }, [fCurrentState, setCurrentState]);
 
   const cols = ["A Fazer", "Em Andamento", "Pausado", "Concluído"];
 
@@ -339,6 +352,9 @@ export default function KanbanPage({
       if (fDateTo.from && tc < fDateTo.from) return false;
       if (fDateTo.to && tc > fDateTo.to) return false;
     }
+    if (fCurrentState) {
+      if (getTaskState(t)?.label !== fCurrentState) return false;
+    }
     return true;
   });
 
@@ -351,6 +367,7 @@ export default function KanbanPage({
     fType,
     fDateFrom?.from || fDateFrom?.to,
     fDateTo?.from || fDateTo?.to,
+    fCurrentState,
   ].filter(Boolean).length;
 
   const activeAdvancedFilters = [
@@ -371,6 +388,7 @@ export default function KanbanPage({
     setFType("");
     setFDateFrom(undefined);
     setFDateTo(undefined);
+    setFCurrentState("");
   };
 
   // mini select helper for filters bar
@@ -441,6 +459,8 @@ export default function KanbanPage({
         team={team}
         setTeam={setTeam}
         teams={teams}
+        currentState={fCurrentState}
+        setCurrentState={setFCurrentState}
       />
 
       {/* Colunas */}

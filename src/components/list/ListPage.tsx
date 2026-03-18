@@ -12,7 +12,7 @@ import type {
   User,
 } from "@/types";
 import { ChevronDown, ChevronRight, Eye, FileText, Users } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DateRange } from "react-day-picker";
 
 const ExportButtons = ({
@@ -53,6 +53,8 @@ interface ListPageProps {
   team?: string;
   setTeam?: (v: string) => void;
   teams?: { id: number; name: string }[];
+  currentState?: string;
+  setCurrentState?: (v: string) => void;
 }
 
 export default function ListPage({
@@ -70,6 +72,8 @@ export default function ListPage({
   team,
   setTeam,
   teams,
+  currentState,
+  setCurrentState,
 }: ListPageProps) {
   const [search, setSearch] = useState("");
   const [fSector, setFSector] = useState<string[]>([]);
@@ -81,6 +85,15 @@ export default function ListPage({
   const [fResponsible, setFResponsible] = useState("");
   const [fDateFrom, setFDateFrom] = useState<DateRange | undefined>(undefined);
   const [fDateTo, setFDateTo] = useState<DateRange | undefined>(undefined);
+  const [fCurrentState, setFCurrentState] = useState(currentState || "");
+
+  useEffect(() => {
+    if (currentState !== undefined) setFCurrentState(currentState);
+  }, [currentState]);
+
+  useEffect(() => {
+    if (setCurrentState) setCurrentState(fCurrentState);
+  }, [fCurrentState, setCurrentState]);
   
   const [expandedTasks, setExpandedTasks] = useState<Record<number, boolean>>({});
   const [teamModalOpen, setTeamModalOpen] = useState<{ open: boolean; task?: Task } | null>(null);
@@ -118,12 +131,16 @@ export default function ListPage({
       if (fDateTo.from && tc < fDateTo.from) return false;
       if (fDateTo.to && tc > fDateTo.to) return false;
     }
+    if (fCurrentState) {
+      if (getTaskState(t)?.label !== fCurrentState) return false;
+    }
     return true;
   });
 
   const clearAll = () => {
     setSearch(""); setFSector([]); setFContract(""); setFCity(""); setFNeighbor("");
     setFPriority(""); setFType(""); setFResponsible(""); setFDateFrom(undefined); setFDateTo(undefined);
+    setFCurrentState("");
   };
 
   const TeamModal = ({ task, onClose }: { task: Task; onClose: () => void }) => {
@@ -321,6 +338,8 @@ export default function ListPage({
         setDateFrom={setFDateFrom}
         dateTo={fDateTo}
         setDateTo={setFDateTo}
+        currentState={fCurrentState}
+        setCurrentState={setFCurrentState}
         contracts={contracts}
         taskTypes={taskTypes}
         sectors={sectors as any}

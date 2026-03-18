@@ -115,6 +115,7 @@ export default function GeoTask() {
   const [editingTemplate, setEditingTemplate] = useState<any>(null);
   const [createdByMe, setCreatedByMe] = useState(false);
   const [teamFilter, setTeamFilter] = useState("");
+  const [fCurrentState, setFCurrentState] = useState("");
 
   // ── SWR hooks (cached data fetching) ────────────────────────────────
   const { mutate: globalMutate } = useSWRConfig();
@@ -447,6 +448,8 @@ export default function GeoTask() {
               team={teamFilter}
               setTeam={setTeamFilter}
               teams={teams}
+              currentState={fCurrentState}
+              setCurrentState={setFCurrentState}
             />
           )}
           {page === "kanban" && (
@@ -468,6 +471,8 @@ export default function GeoTask() {
               team={teamFilter}
               setTeam={setTeamFilter}
               teams={teams}
+              currentState={fCurrentState}
+              setCurrentState={setFCurrentState}
             />
           )}
           {page === "map" && (
@@ -500,6 +505,8 @@ export default function GeoTask() {
               team={teamFilter}
               setTeam={setTeamFilter}
               teams={teams}
+              currentState={fCurrentState}
+              setCurrentState={setFCurrentState}
             />
           )}
           {page === "cronograma" && (
@@ -516,6 +523,8 @@ export default function GeoTask() {
               team={teamFilter}
               setTeam={setTeamFilter}
               teams={teams}
+              currentState={fCurrentState}
+              setCurrentState={setFCurrentState}
             />
           )}
           {page === "templates" && canAccess("templates") && (

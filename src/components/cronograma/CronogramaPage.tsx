@@ -2,6 +2,7 @@
 
 import { TaskFilters } from "@/components/shared/TaskFilters";
 import { exportToExcel, getKpiData, type ExportKPIs } from "@/lib/exportUtils";
+import { getTaskState } from "@/lib/helpers";
 import type {
   CitiesNeighborhoods,
   Sector,
@@ -10,7 +11,7 @@ import type {
   User,
 } from "@/types";
 import { FileText } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DateRange } from "react-day-picker";
 
 // ── ExportButtons (inline) ───────────────────────────────────────
@@ -57,6 +58,8 @@ interface CronogramaPageProps {
   team?: string;
   setTeam?: (v: string) => void;
   teams?: { id: number; name: string }[];
+  currentState?: string;
+  setCurrentState?: (v: string) => void;
 }
 
 export default function CronogramaPage({
@@ -74,6 +77,8 @@ export default function CronogramaPage({
   team,
   setTeam,
   teams,
+  currentState,
+  setCurrentState,
 }: CronogramaPageProps) {
   const [search, setSearch] = useState("");
   const [fSector, setFSector] = useState<string[]>([]);
@@ -85,7 +90,16 @@ export default function CronogramaPage({
   const [fResponsible, setFResponsible] = useState("");
   const [fDateFrom, setFDateFrom] = useState<DateRange | undefined>(undefined);
   const [fDateTo, setFDateTo] = useState<DateRange | undefined>(undefined);
+  const [fCurrentState, setFCurrentState] = useState(currentState || "");
   const [filtersOpen, setFiltersOpen] = useState(false);
+
+  useEffect(() => {
+    if (currentState !== undefined) setFCurrentState(currentState);
+  }, [currentState]);
+
+  useEffect(() => {
+    if (setCurrentState) setCurrentState(fCurrentState);
+  }, [fCurrentState, setCurrentState]);
 
   // Helper local para garantir funcionamento
   const parseDate = (d: string | null | undefined) => {
@@ -129,6 +143,9 @@ export default function CronogramaPage({
       if (fDateTo.from && tc < fDateTo.from) return false;
       if (fDateTo.to && tc > fDateTo.to) return false;
     }
+    if (fCurrentState) {
+      if (getTaskState(t)?.label !== fCurrentState) return false;
+    }
     return true;
   });
 
@@ -142,9 +159,8 @@ export default function CronogramaPage({
     fResponsible,
     fDateFrom?.from || fDateFrom?.to,
     fDateTo?.from || fDateTo?.to,
+    fCurrentState,
   ].filter(Boolean).length;
-
-  const activeAdvancedFilters = totalActiveFilters;
 
   const clearAll = () => {
     setSearch("");
@@ -157,7 +173,11 @@ export default function CronogramaPage({
     setFResponsible("");
     setFDateFrom(undefined);
     setFDateTo(undefined);
+    setFCurrentState("");
   };
+
+  const activeAdvancedFilters = totalActiveFilters;
+
 
   const evts = [
     { k: "created", l: "Criado", c: "#6366f1" },
@@ -221,6 +241,8 @@ export default function CronogramaPage({
         team={team}
         setTeam={setTeam}
         teams={teams}
+        currentState={fCurrentState}
+        setCurrentState={setFCurrentState}
       />
 
       <div className="mb-4 flex flex-wrap gap-4 rounded-[10px] px-3.5 py-2.5 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700">

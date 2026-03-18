@@ -716,17 +716,24 @@ export async function PATCH(req: Request) {
       if (task.parent_id) {
         const parent = await prisma.task.findUnique({
           where: { id: task.parent_id },
-          include: { children: true },
+          include: { 
+            children: true,
+            subtasks: true // Legacy checklist items
+          },
         });
 
         if (parent) {
           const childrenStatus = parent.children.map((c: any) =>
             c.id === task.id ? status : c.status,
           );
+          const checklistItemsDone = parent.subtasks.map((s: any) => s.done);
 
-          // 1. Start/Resume: Parent moves to "Em Andamento" if any child is "Em Andamento"
+          // 1. Start/Resume: Parent moves to "Em Andamento" if any child task is "Em Andamento"
+          // OR if any checklist item is done but not all (not a perfect check for "in progress" but better than nothing)
+          const anyChildInProgress = childrenStatus.some(s => s === "Em Andamento");
+          
           if (
-            status === "Em Andamento" &&
+            (status === "Em Andamento" || anyChildInProgress) &&
             (parent.status === "A Fazer" || parent.status === "Pausado")
           ) {
             await prisma.task.update({
@@ -739,19 +746,28 @@ export async function PATCH(req: Request) {
             });
           }
 
-          // 2. Finish: Parent moves to "Concluído" if ALL children are "Concluído"
-          if (status === "Concluído") {
-            const allDone = childrenStatus.every((s) => s === "Concluído");
-            if (allDone && parent.status !== "Concluído") {
+          // 2. Finish: Parent moves to "Concluído" if ALL children (tasks AND checklist) are done
+          if (status === "Concluído" || status === "A Fazer" || status === "Pausado") {
+            const allTasksDone = childrenStatus.every((s) => s === "Concluído");
+            const allChecklistDone = checklistItemsDone.every(d => d === true);
+            
+            if (allTasksDone && allChecklistDone) {
+              if (parent.status !== "Concluído") {
+                await prisma.task.update({
+                  where: { id: parent.id },
+                  data: { status: "Concluído", completed_at: new Date() },
+                });
+              }
+            } else if (parent.status === "Concluído") {
+              // Reopen if something was undone
               await prisma.task.update({
                 where: { id: parent.id },
-                data: { status: "Concluído", completed_at: new Date() },
+                data: { status: "Em Andamento", completed_at: null },
               });
             }
           }
 
           // 3. Pause: Parent moves to "Pausado" if ALL non-completed children are "Pausado"
-          // User said: "pausa se todas as subs pausarem"
           if (status === "Pausado" || status === "Concluído") {
             const activeChildren = childrenStatus.filter(
               (s) => s !== "Concluído",
@@ -760,6 +776,8 @@ export async function PATCH(req: Request) {
               activeChildren.length > 0 &&
               activeChildren.every((s) => s === "Pausado");
 
+            // Also check if any checklist items were being worked on? 
+            // Checklist doesn't have "paused" state, so we just check child tasks.
             if (allPaused && parent.status === "Em Andamento") {
               await prisma.task.update({
                 where: { id: parent.id },
@@ -1262,17 +1280,42 @@ export async function PATCH(req: Request) {
         data: { done, done_at: done ? new Date() : null },
       });
       if (done) {
-        const remaining = await prisma.subtask.count({
+        const remainingChecklist = await prisma.subtask.count({
           where: {
             task_id: task.id,
             done: false,
             NOT: { id: Number(subtask_id) },
           },
         });
-        if (remaining === 0 && task.status !== "Concluído") {
+        const remainingChildTasks = await prisma.task.count({
+          where: {
+            parent_id: task.id,
+            status: { not: "Concluído" }
+          }
+        });
+
+        if (remainingChecklist === 0 && remainingChildTasks === 0 && task.status !== "Concluído") {
           await prisma.task.update({
             where: { id: task.id },
             data: { status: "Concluído", completed_at: new Date() },
+          });
+        } else if (task.status === "A Fazer" || task.status === "Pausado") {
+          // If we completed a subtask, the parent is now in progress
+          await prisma.task.update({
+            where: { id: task.id },
+            data: { 
+              status: "Em Andamento", 
+              started_at: task.started_at || new Date(),
+              paused_at: null 
+            },
+          });
+        }
+      } else {
+        // If we unchecked a subtask, and parent was concluded, reopen it
+        if (task.status === "Concluído") {
+          await prisma.task.update({
+            where: { id: task.id },
+            data: { status: "Em Andamento", completed_at: null },
           });
         }
       }

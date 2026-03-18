@@ -19,6 +19,8 @@ interface TaskFiltersProps {
   setPriority: (v: string) => void;
   type: string;
   setType: (v: string) => void;
+  currentState?: string;
+  setCurrentState?: (v: string) => void;
   contract: string;
   setContract: (v: string) => void;
   city: string;
@@ -61,6 +63,8 @@ export function TaskFilters({
   setPriority,
   type,
   setType,
+  currentState,
+  setCurrentState,
   contract,
   setContract,
   city,
@@ -192,6 +196,7 @@ export function TaskFilters({
     dateTo?.from || dateTo?.to,
     createdByMe,
     team,
+    currentState,
   ].filter(Boolean).length;
 
   return (
@@ -250,6 +255,17 @@ export function TaskFilters({
               placeholder="Todas"
             />
           </div>
+          {setCurrentState && (
+            <div className="flex-1 min-w-[140px] max-w-[200px]">
+              <FilterSelect
+                label="Estado Atual"
+                val={currentState || ""}
+                onChange={setCurrentState}
+                opts={["Dentro do Prazo", "Em Atraso", "Atraso na Entrega"]}
+                placeholder="Todos"
+              />
+            </div>
+          )}
 
           <div className="flex flex-wrap items-center gap-4 h-10 px-1">
             {setShowSubtasks && (

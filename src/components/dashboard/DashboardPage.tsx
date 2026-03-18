@@ -1,7 +1,7 @@
 "use client";
 
 import { Eye, FileText } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DateRange } from "react-day-picker";
 import {
   Bar,
@@ -20,7 +20,7 @@ import AIReportModal from "@/components/AIReportModal";
 import { TaskFilters } from "@/components/shared/TaskFilters";
 import { PRIO_COLOR, PRIORITIES, SECTORS, STATUS_COLOR } from "@/lib/constants";
 import { exportToExcel, getKpiData, type ExportKPIs } from "@/lib/exportUtils";
-import { getTaskState, parseDate } from "@/lib/helpers";
+import { getTaskState, parseDate, parseDateStr } from "@/lib/helpers";
 import type {
   CitiesNeighborhoods,
   Sector,
@@ -108,6 +108,8 @@ interface DashboardPageProps {
   team?: string;
   setTeam?: (v: string) => void;
   teams?: { id: number; name: string }[];
+  currentState?: string;
+  setCurrentState?: (v: string) => void;
 }
 
 export default function DashboardPage({
@@ -126,6 +128,8 @@ export default function DashboardPage({
   team,
   setTeam,
   teams,
+  currentState,
+  setCurrentState,
 }: DashboardPageProps) {
   const [fSearch, setFSearch] = useState("");
   const [fContract, setFContract] = useState("");
@@ -138,7 +142,16 @@ export default function DashboardPage({
   const [fUser, setFUser] = useState("");
   const [fDateFrom, setFDateFrom] = useState<DateRange | undefined>(undefined); // Prazo
   const [fDateTo, setFDateTo] = useState<DateRange | undefined>(undefined); // Criacao
+  const [fCurrentState, setFCurrentState] = useState(currentState || "");
   const [filtersOpen, setFiltersOpen] = useState(false);
+
+  useEffect(() => {
+    if (currentState !== undefined) setFCurrentState(currentState);
+  }, [currentState]);
+
+  useEffect(() => {
+    if (setCurrentState) setCurrentState(fCurrentState);
+  }, [fCurrentState, setCurrentState]);
 
   const { data: stats, isLoading: statsLoading } = useSWR(
     `/api/dashboard/stats?team_id=${team || ""}&sector_id=${fSector.join(",")}`,
@@ -194,6 +207,10 @@ export default function DashboardPage({
       if (fDateTo.from && tc < fDateTo.from) return false;
       if (fDateTo.to && tc > fDateTo.to) return false;
     }
+    if (fCurrentState) {
+      const state = getTaskState(t);
+      if (state?.label !== fCurrentState) return false;
+    }
     return true;
   });
 
@@ -208,6 +225,7 @@ export default function DashboardPage({
     fUser,
     fDateFrom?.from || fDateFrom?.to,
     fDateTo?.from || fDateTo?.to,
+    fCurrentState,
   ].filter(Boolean).length;
 
   const activeAdvancedFilters = [
@@ -232,6 +250,7 @@ export default function DashboardPage({
     setFUser("");
     setFDateFrom(undefined);
     setFDateTo(undefined);
+    setFCurrentState("");
   };
 
   // KPIs
@@ -378,12 +397,14 @@ export default function DashboardPage({
         return d >= weekStart && d <= weekEnd;
       }).length;
       const entregar = filtered.filter((t: DashboardTask) => {
-        const d = parseDate(t.deadline);
+        const d = parseDateStr(t.deadline || undefined);
         return d ? d >= weekStart && d <= weekEnd : false;
       }).length;
       const atrasadas = filtered.filter((t: DashboardTask) => {
-        const d = parseDate(t.deadline);
-        return d && d < weekStart && t.status !== "Concluído" ? true : false;
+        const d = parseDateStr(t.deadline || undefined);
+        // Atrasada if deadline < weekStart and it wasn't completed before weekStart
+        const wasCompletedBeforeWeek = t.completed_at && new Date(t.completed_at) < weekStart;
+        return d && d < weekStart && !wasCompletedBeforeWeek ? true : false;
       }).length;
       const concluidas = filtered.filter((t: DashboardTask) => {
         if (!t.completed_at) return false;
@@ -427,6 +448,7 @@ export default function DashboardPage({
                 fUser && `Responsável: ${fUser}`,
                 (fDateFrom?.from || fDateFrom?.to) && "Filtro de Prazo",
                 (fDateTo?.from || fDateTo?.to) && "Filtro de Criação",
+                fCurrentState && `Estado: ${fCurrentState}`,
               ]
                 .filter(Boolean)
                 .join(" | ") || "Nenhum"
@@ -467,6 +489,8 @@ export default function DashboardPage({
         setDateFrom={setFDateFrom}
         dateTo={fDateTo}
         setDateTo={setFDateTo}
+        currentState={fCurrentState}
+        setCurrentState={setFCurrentState}
         users={users}
         contracts={contracts}
         taskTypes={taskTypes}
