@@ -604,6 +604,23 @@ async function logHistory(
 ) {
   const maskedField = FIELD_NAMES[field] || field;
 
+  let ov = oldValue;
+  let nv = newValue;
+
+  if (field === "sector_id") {
+    if (ov) { const s = await prisma.sector.findUnique({where:{id:Number(ov)}}); if (s) ov = s.name; }
+    if (nv) { const s = await prisma.sector.findUnique({where:{id:Number(nv)}}); if (s) nv = s.name; }
+  } else if (field === "responsible_id") {
+    if (ov) { const u = await prisma.user.findUnique({where:{id:Number(ov)}}); if (u) ov = u.name; }
+    if (nv) { const u = await prisma.user.findUnique({where:{id:Number(nv)}}); if (u) nv = u.name; }
+  } else if (field === "contract_id") {
+    if (ov) { const c = await prisma.contract.findUnique({where:{id:Number(ov)}}); if (c) ov = c.name; }
+    if (nv) { const c = await prisma.contract.findUnique({where:{id:Number(nv)}}); if (c) nv = c.name; }
+  } else if (field === "city_id") {
+    if (ov) { const c = await prisma.city.findUnique({where:{id:Number(ov)}}); if (c) ov = c.name; }
+    if (nv) { const c = await prisma.city.findUnique({where:{id:Number(nv)}}); if (c) nv = c.name; }
+  }
+  
   const formatValue = (v: any) => {
     if (v instanceof Date) {
       if (isNaN(v.getTime())) return "";
@@ -614,18 +631,18 @@ async function logHistory(
     return s === "null" || s === "undefined" || s === "Invalid Date" ? "" : s;
   };
 
-  const ov = formatValue(oldValue);
-  const nv = formatValue(newValue);
+  const finalOv = formatValue(ov);
+  const finalNv = formatValue(nv);
 
-  if (ov === nv) return;
+  if (finalOv === finalNv) return;
 
   await prisma.taskHistory.create({
     data: {
       task_id: taskId,
       user_id: userId,
       field: maskedField,
-      old_value: ov,
-      new_value: nv,
+      old_value: finalOv,
+      new_value: finalNv,
     },
   });
 }

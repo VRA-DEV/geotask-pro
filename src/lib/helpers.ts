@@ -72,15 +72,24 @@ export const getTaskState = (
   if (!deadlineDate) return null;
   deadlineDate.setHours(23, 59, 59, 999);
   const now = new Date();
-  const isDone = task.status === "Concluído";
+  const isDone = task.status === "Concluído" || !!task.completed_at;
 
   if (!isDone) {
+    // 1 dia de atraso = Em Atraso
+    // Math.floor para tirar o resíduo de ms na diferença de dias não é o mais ideal puro, mas podemos usar startOfDay.
+    // simpler:
+    const msPerDay = 1000 * 60 * 60 * 24;
+    const diffTime = deadlineDate.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / msPerDay);
+
     if (now > deadlineDate) return { label: "Em Atraso", color: "#ef4444" };
-    return { label: "Dentro do Prazo", color: "#10b981" };
+    if (diffDays <= 2) return { label: "Próximo do Prazo", color: "#f59e0b" }; // Faltam 2 dias ou menos
+    return { label: "Dentro do Prazo", color: "#10b981" }; // Faltam 3 ou mais
   } else {
+    // Se está concluída
     const doneAt = task.completed_at ? new Date(task.completed_at) : now;
     if (doneAt > deadlineDate)
-      return { label: "Atraso na Entrega", color: "#f59e0b" };
-    return null;
+      return { label: "Atraso na Entrega", color: "#f97316" }; // orange-500
+    return { label: "Entregue no Prazo", color: "#059669" }; // emerald-600
   }
 };

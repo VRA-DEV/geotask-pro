@@ -49,6 +49,10 @@ interface TaskFiltersProps {
   team?: string;
   setTeam?: (v: string) => void;
   teams?: { id: number; name: string }[];
+  sortField?: string;
+  setSortField?: (v: string) => void;
+  sortOrder?: string;
+  setSortOrder?: (v: string) => void;
 }
 
 export function TaskFilters({
@@ -93,6 +97,10 @@ export function TaskFilters({
   team,
   setTeam,
   teams,
+  sortField,
+  setSortField,
+  sortOrder,
+  setSortOrder,
 }: TaskFiltersProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -261,7 +269,7 @@ export function TaskFilters({
                 label="Estado Atual"
                 val={currentState || ""}
                 onChange={setCurrentState}
-                opts={["Dentro do Prazo", "Em Atraso", "Atraso na Entrega"]}
+                opts={["Dentro do Prazo", "Próximo do Prazo", "Em Atraso", "Entregue no Prazo", "Atraso na Entrega"]}
                 placeholder="Todos"
               />
             </div>
@@ -402,6 +410,30 @@ export function TaskFilters({
               T={T}
             />
           </div>
+          {setSortField && setSortOrder && (
+            <>
+              <FilterSelect
+                label="Ordenar por"
+                val={sortField || ""}
+                onChange={setSortField}
+                opts={[
+                  { value: "title", label: "Título" },
+                  { value: "deadline", label: "Data de Entrega" },
+                ]}
+                placeholder="Padrão"
+              />
+              <FilterSelect
+                label="Ordem"
+                val={sortOrder || ""}
+                onChange={setSortOrder}
+                opts={[
+                  { value: "asc", label: "Crescente" },
+                  { value: "desc", label: "Decrescente" },
+                ]}
+                placeholder="Padrão"
+              />
+            </>
+          )}
           <div className="lg:col-span-1">
             <DateRangePicker
               label="Criação"

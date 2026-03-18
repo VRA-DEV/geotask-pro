@@ -91,6 +91,8 @@ export default function CronogramaPage({
   const [fDateFrom, setFDateFrom] = useState<DateRange | undefined>(undefined);
   const [fDateTo, setFDateTo] = useState<DateRange | undefined>(undefined);
   const [fCurrentState, setFCurrentState] = useState(currentState || "");
+  const [sortField, setSortField] = useState<string>("");
+  const [sortOrder, setSortOrder] = useState<string>("asc");
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
@@ -147,6 +149,13 @@ export default function CronogramaPage({
       if (getTaskState(t)?.label !== fCurrentState) return false;
     }
     return true;
+  }).sort((a, b) => {
+    if (!sortField) return 0;
+    const aVal = sortField === "deadline" ? (a.deadline ? new Date(a.deadline).getTime() : (sortOrder === "desc" ? -Infinity : Infinity)) : a.title.toLowerCase();
+    const bVal = sortField === "deadline" ? (b.deadline ? new Date(b.deadline).getTime() : (sortOrder === "desc" ? -Infinity : Infinity)) : b.title.toLowerCase();
+    if (aVal < bVal) return sortOrder === "desc" ? 1 : -1;
+    if (aVal > bVal) return sortOrder === "desc" ? -1 : 1;
+    return 0;
   });
 
   const totalActiveFilters = [
@@ -174,6 +183,8 @@ export default function CronogramaPage({
     setFDateFrom(undefined);
     setFDateTo(undefined);
     setFCurrentState("");
+    setSortField("");
+    setSortOrder("asc");
   };
 
   const activeAdvancedFilters = totalActiveFilters;
@@ -243,6 +254,10 @@ export default function CronogramaPage({
         teams={teams}
         currentState={fCurrentState}
         setCurrentState={setFCurrentState}
+        sortField={sortField}
+        setSortField={setSortField}
+        sortOrder={sortOrder}
+        setSortOrder={setSortOrder}
       />
 
       <div className="mb-4 flex flex-wrap gap-4 rounded-[10px] px-3.5 py-2.5 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700">
@@ -267,7 +282,10 @@ export default function CronogramaPage({
                 {t.title}
               </div>
               <div className="text-[11px] text-slate-500 dark:text-gray-400 mt-0.5">
-                {t.responsible && typeof t.responsible === "object" ? t.responsible.name : t.responsible || "Não atribuído"}
+                <span className="font-semibold">Res:</span> {t.responsible && typeof t.responsible === "object" ? t.responsible.name : t.responsible || "Não atribuído"}
+              </div>
+              <div className="text-[10px] text-slate-400 dark:text-gray-500 mt-0.5">
+                Criado por: {typeof t.created_by === "object" ? (t.created_by as any).name : t.created_by || "Desconhecido"}
               </div>
             </div>
             
@@ -316,9 +334,12 @@ export default function CronogramaPage({
                 {t.title}
               </div>
               <div className="mt-px text-[11px] text-slate-500 dark:text-gray-400">
-                {t.responsible && typeof t.responsible === "object"
+                <span className="font-semibold">Res:</span> {t.responsible && typeof t.responsible === "object"
                   ? t.responsible.name
                   : t.responsible || "Não atribuído"}
+              </div>
+              <div className="text-[10px] text-slate-400 dark:text-gray-500 mt-0.5">
+                Criado por: {typeof t.created_by === "object" ? (t.created_by as any).name : t.created_by || "Desconhecido"}
               </div>
             </div>
             <div className="flex items-center overflow-x-auto">

@@ -86,6 +86,8 @@ export default function ListPage({
   const [fDateFrom, setFDateFrom] = useState<DateRange | undefined>(undefined);
   const [fDateTo, setFDateTo] = useState<DateRange | undefined>(undefined);
   const [fCurrentState, setFCurrentState] = useState(currentState || "");
+  const [sortField, setSortField] = useState<string>("");
+  const [sortOrder, setSortOrder] = useState<string>("asc");
 
   useEffect(() => {
     if (currentState !== undefined) setFCurrentState(currentState);
@@ -135,12 +137,19 @@ export default function ListPage({
       if (getTaskState(t)?.label !== fCurrentState) return false;
     }
     return true;
+  }).sort((a, b) => {
+    if (!sortField) return 0;
+    const aVal = sortField === "deadline" ? (a.deadline ? new Date(a.deadline).getTime() : (sortOrder === "desc" ? -Infinity : Infinity)) : a.title.toLowerCase();
+    const bVal = sortField === "deadline" ? (b.deadline ? new Date(b.deadline).getTime() : (sortOrder === "desc" ? -Infinity : Infinity)) : b.title.toLowerCase();
+    if (aVal < bVal) return sortOrder === "desc" ? 1 : -1;
+    if (aVal > bVal) return sortOrder === "desc" ? -1 : 1;
+    return 0;
   });
 
   const clearAll = () => {
     setSearch(""); setFSector([]); setFContract(""); setFCity(""); setFNeighbor("");
     setFPriority(""); setFType(""); setFResponsible(""); setFDateFrom(undefined); setFDateTo(undefined);
-    setFCurrentState("");
+    setFCurrentState(""); setSortField(""); setSortOrder("asc");
   };
 
   const TeamModal = ({ task, onClose }: { task: Task; onClose: () => void }) => {
@@ -264,7 +273,10 @@ export default function ListPage({
           </div>
 
           <div className="text-[12px] text-slate-600 dark:text-gray-300 font-medium">
-            {t.deadline || "—"}
+            {t.deadline ? (() => {
+              const d = new Date(t.deadline);
+              return !isNaN(d.getTime()) ? d.toLocaleDateString("pt-BR", { timeZone: "UTC" }) : t.deadline;
+            })() : "—"}
           </div>
 
           <div className="text-[11px] truncate pr-2 text-slate-500 dark:text-gray-400">
@@ -340,6 +352,10 @@ export default function ListPage({
         setDateTo={setFDateTo}
         currentState={fCurrentState}
         setCurrentState={setFCurrentState}
+        sortField={sortField}
+        setSortField={setSortField}
+        sortOrder={sortOrder}
+        setSortOrder={setSortOrder}
         contracts={contracts}
         taskTypes={taskTypes}
         sectors={sectors as any}

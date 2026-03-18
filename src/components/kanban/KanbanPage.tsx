@@ -302,6 +302,8 @@ export default function KanbanPage({
   const [fDateFrom, setFDateFrom] = useState<DateRange | undefined>(undefined);
   const [fDateTo, setFDateTo] = useState<DateRange | undefined>(undefined);
   const [fCurrentState, setFCurrentState] = useState(currentState || "");
+  const [sortField, setSortField] = useState<string>("");
+  const [sortOrder, setSortOrder] = useState<string>("asc");
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   const cityNeighborhoods = fCity ? citiesNeighborhoods[fCity] || [] : [];
@@ -356,6 +358,13 @@ export default function KanbanPage({
       if (getTaskState(t)?.label !== fCurrentState) return false;
     }
     return true;
+  }).sort((a, b) => {
+    if (!sortField) return 0;
+    const aVal = sortField === "deadline" ? (a.deadline ? new Date(a.deadline).getTime() : (sortOrder === "desc" ? -Infinity : Infinity)) : a.title.toLowerCase();
+    const bVal = sortField === "deadline" ? (b.deadline ? new Date(b.deadline).getTime() : (sortOrder === "desc" ? -Infinity : Infinity)) : b.title.toLowerCase();
+    if (aVal < bVal) return sortOrder === "desc" ? 1 : -1;
+    if (aVal > bVal) return sortOrder === "desc" ? -1 : 1;
+    return 0;
   });
 
   const totalActiveFilters = [
@@ -389,6 +398,8 @@ export default function KanbanPage({
     setFDateFrom(undefined);
     setFDateTo(undefined);
     setFCurrentState("");
+    setSortField("");
+    setSortOrder("asc");
   };
 
   // mini select helper for filters bar
@@ -447,6 +458,10 @@ export default function KanbanPage({
         setDateTo={setFDateTo}
         showSubtasks={showSubtasks}
         setShowSubtasks={setShowSubtasks}
+        sortField={sortField}
+        setSortField={setSortField}
+        sortOrder={sortOrder}
+        setSortOrder={setSortOrder}
         contracts={contracts}
         taskTypes={taskTypes}
         sectors={sectors}
@@ -591,7 +606,10 @@ export default function KanbanPage({
                           <Calendar size={9} />
                           Prazo:{" "}
                           <b className="text-slate-900 dark:text-gray-50">
-                            {t.deadline}
+                            {(() => {
+                              const d = new Date(t.deadline);
+                              return !isNaN(d.getTime()) ? d.toLocaleDateString("pt-BR", { timeZone: "UTC" }) : t.deadline;
+                            })()}
                           </b>
                         </div>
                       )}
