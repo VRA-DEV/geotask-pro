@@ -1337,7 +1337,7 @@ export default function TaskDetailModal({
           )}
         </div>
 
-        {tab === "dados" && ["Admin", "Gestor", "Liderado", "Gerente", "Coordenador"].includes(
+        {tab === "dados" && ["Admin", "Gestor", "Liderado", "Gerente", "Coordenador", "Coordenador de Polo", "Coordenador de Setores"].includes(
           user.role?.name || "",
         ) && (
           <div className="mt-5 border-t border-slate-200 dark:border-gray-700 pt-4 flex gap-2.5 justify-end flex-wrap items-center shrink-0 mb-4 md:mb-0">

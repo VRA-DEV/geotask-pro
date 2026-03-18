@@ -132,8 +132,10 @@ const PERMISSION_GROUPS = [
     items: [
       { id: "manage_users", label: "Gerenciar Usuários" },
       { id: "manage_roles", label: "Gerenciar Cargos" },
-      { id: "manage_locations", label: "Gerenciar Cidades e Contratos" },
+      { id: "manage_locations", label: "Gerenciar Localidades" },
       { id: "manage_task_types", label: "Gerenciar Tipos de Tarefas" },
+      { id: "manage_teams", label: "Gerenciar Equipes" },
+      { id: "manage_user_sectors", label: "Gerenciar Setores de Usuários" },
     ],
   },
 ];
@@ -186,7 +188,7 @@ export function SettingsPage({
 
   const isAdmin = currentUser?.role?.name === "Admin";
   const isManager = currentUser?.role?.name === "Gerente";
-  const isCoordinator = currentUser?.role?.name === "Coordenador";
+  const isCoordinator = currentUser?.role?.name === "Coordenador" || currentUser?.role?.name === "Coordenador de Polo" || currentUser?.role?.name === "Coordenador de Setores";
   const canManageLocations = isAdmin || isManager || isCoordinator;
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
