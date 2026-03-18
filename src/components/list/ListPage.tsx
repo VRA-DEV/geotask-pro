@@ -364,12 +364,13 @@ export default function ListPage({
         totalTasks={tasks.length}
         filteredTasks={filtered.length}
         canViewAllSectors={canViewAllSectors}
-        showSubtasks={false}
         createdByMe={createdByMe}
         setCreatedByMe={setCreatedByMe}
         team={team}
         setTeam={setTeam}
         teams={teams}
+        users={users}
+        displayedTasks={filtered}
       />
 
       <div className="flex-1 min-h-0 overflow-hidden rounded-[14px] bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 flex flex-col shadow-sm">

@@ -476,6 +476,8 @@ export default function KanbanPage({
         teams={teams}
         currentState={fCurrentState}
         setCurrentState={setFCurrentState}
+        users={users}
+        displayedTasks={filtered}
       />
 
       {/* Colunas */}

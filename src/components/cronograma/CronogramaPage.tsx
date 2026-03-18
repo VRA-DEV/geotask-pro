@@ -258,6 +258,8 @@ export default function CronogramaPage({
         setSortField={setSortField}
         sortOrder={sortOrder}
         setSortOrder={setSortOrder}
+        users={users}
+        displayedTasks={filtered}
       />
 
       <div className="mb-4 flex flex-wrap gap-4 rounded-[10px] px-3.5 py-2.5 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700">

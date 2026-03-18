@@ -53,6 +53,7 @@ interface TaskFiltersProps {
   setSortField?: (v: string) => void;
   sortOrder?: string;
   setSortOrder?: (v: string) => void;
+  displayedTasks?: any[];
 }
 
 export function TaskFilters({
@@ -101,6 +102,7 @@ export function TaskFilters({
   setSortField,
   sortOrder,
   setSortOrder,
+  displayedTasks,
 }: TaskFiltersProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -126,10 +128,31 @@ export function TaskFilters({
   const groupedUsers = React.useMemo(() => {
     if (!users || users.length === 0) return [];
     
+    // Filter users dynamically
+    let filteredUsers = users;
+    if (sector && sector.length > 0) {
+      filteredUsers = users.filter((u: any) => {
+        const sName = u.sector?.name || u.Sector?.name || "Sem Setor";
+        return sector.includes(sName);
+      });
+    } else if (displayedTasks) {
+      const responsibleNames = new Set<string>();
+      displayedTasks.forEach((t: any) => {
+        const rName = t.responsible && typeof t.responsible === "object" ? t.responsible.name : t.responsible;
+        if (rName) responsibleNames.add(rName);
+        if (t.coworkers) {
+          t.coworkers.forEach((cw: any) => {
+            if (cw.name) responsibleNames.add(cw.name);
+          });
+        }
+      });
+      filteredUsers = users.filter((u: any) => responsibleNames.has(u.name));
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const userGroups: Record<string, any[]> = { "Sem Setor": [] };
     
-    users.forEach((u: any) => {
+    filteredUsers.forEach((u: any) => {
        const sectorName = u.sector?.name || u.Sector?.name || "Sem Setor";
        if (!userGroups[sectorName]) userGroups[sectorName] = [];
        userGroups[sectorName].push(u);
