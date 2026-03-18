@@ -1337,6 +1337,66 @@ export async function PATCH(req: Request) {
         }
       }
       return NextResponse.json({ message: "Subtarefa atualizada" });
+    } else if (action === "reset_status") {
+      const { password } = data;
+      // Permission Validation
+      const userRequesting = await prisma.user.findUnique({
+        where: { id: Number(userId) },
+        include: { Role: true },
+      });
+      const roleName = userRequesting?.Role?.name || "";
+      if (!["Admin", "Gerente"].includes(roleName)) {
+        return NextResponse.json({ error: "Apenas Admin ou Gerente pode resetar uma tarefa." }, { status: 403 });
+      }
+
+      // Password Validation
+      if (!userRequesting) {
+        return NextResponse.json({ error: "Usuário não encontrado." }, { status: 404 });
+      }
+      const bcrypt = require("bcryptjs");
+      let passwordValid = false;
+      if (userRequesting.password_hash.startsWith("$2")) {
+        passwordValid = await bcrypt.compare(password, userRequesting.password_hash);
+      } else {
+        passwordValid = userRequesting.password_hash === password;
+      }
+
+      if (!passwordValid) {
+        return NextResponse.json({ error: "Senha incorreta." }, { status: 401 });
+      }
+
+      // Action: Reset task
+      await prisma.task.update({
+        where: { id: Number(id) },
+        data: {
+          status: "A Fazer",
+          started_at: null,
+          completed_at: null,
+          paused_at: null,
+          time_spent: 0,
+        }
+      });
+
+      // Clear pauses
+      await prisma.taskPause.deleteMany({
+        where: { task_id: Number(id) }
+      });
+
+      // Log History
+      await logHistory(task.id, userId, "status", task.status, "A Fazer (Reset)");
+
+      // Activity Log
+      logActivity(
+        userId,
+        userRequesting.name,
+        "task_reset",
+        "task",
+        task.id,
+        `Tarefa resetada para "A Fazer" — "${task.title}"`,
+      );
+
+      broadcast("TASK_UPDATED", { taskId: Number(id), userId });
+      return NextResponse.json({ message: "Tarefa resetada com sucesso." });
     }
     broadcast("TASK_UPDATED", { taskId: Number(id), userId });
     return NextResponse.json({ message: "Atualizado com sucesso" });

@@ -1,7 +1,7 @@
 "use client";
 
 import { getPermissions } from "@/lib/permissions";
-import { CheckCircle, Eye, Pause, Play, X, Send, Paperclip, FileText, Image, Trash2, Upload, Download, Plus, Clock } from "lucide-react";
+import { CheckCircle, Eye, Pause, Play, X, Send, Paperclip, FileText, Image, Trash2, Upload, Download, Plus, Clock, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TeamSelectionModal from "./TeamSelectionModal";
 
@@ -96,6 +96,42 @@ export default function TaskDetailModal({
     coworkers: (t.coworkers || []).map((c: any) => c.id),
   });
   const [saving, setSaving] = useState(false);
+  const [showResetTaskModal, setShowResetTaskModal] = useState(false);
+  const [resetPassword, setResetPassword] = useState("");
+  const [resettingTask, setResettingTask] = useState(false);
+
+  const handleResetTask = async () => {
+    if (!resetPassword) {
+      alert("Digite sua senha para confirmar.");
+      return;
+    }
+    setResettingTask(true);
+    try {
+      const res = await fetch(`/api/tasks`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          id: t.id, 
+          action: "reset_status", 
+          password: resetPassword, 
+          user_id: user.id 
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "Erro ao resetar tarefa. Senha incorreta?");
+      } else {
+        setShowResetTaskModal(false);
+        setResetPassword("");
+        onClose();
+        window.location.reload();
+      }
+    } catch (err) {
+      alert("Erro ao conectar.");
+    } finally {
+      setResettingTask(false);
+    }
+  };
 
   // History State
   const [history, setHistory] = useState<any[]>([]);
@@ -1399,6 +1435,14 @@ export default function TaskDetailModal({
                     <CheckCircle size={14} /> Concluir
                   </button>
                 )}
+                {["Admin", "Gerente"].includes(user.role?.name || "") && (
+                  <button
+                    onClick={() => setShowResetTaskModal(true)}
+                    className="flex-1 md:flex-none justify-center flex items-center gap-1.5 px-4 py-3 md:py-2 bg-red-600 dark:bg-red-700 text-white border-none rounded-lg text-[13px] font-semibold cursor-pointer"
+                  >
+                    <RotateCcw size={14} /> Resetar Status
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -1568,6 +1612,53 @@ export default function TaskDetailModal({
               className="flex-[2] p-2.5 bg-amber-500 text-white border-none rounded-lg text-[13px] font-bold cursor-pointer disabled:opacity-60 shadow-lg shadow-amber-500/20"
             >
               {savingTiming ? "Salvando..." : "Salvar Cronologia"}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {showResetTaskModal && (
+      <div
+        onClick={() => setShowResetTaskModal(false)}
+        className="fixed inset-0 z-200 flex items-center justify-center p-4 bg-black/60"
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="w-full max-w-[400px] bg-white dark:bg-gray-800 rounded-[16px] p-5 flex flex-col border border-slate-200 dark:border-gray-700 shadow-2xl"
+        >
+          <div className="flex items-center gap-2 text-red-600 dark:text-red-500 mb-2">
+            <RotateCcw size={20} />
+            <h3 className="text-[16px] font-bold m-0">Resetar Status</h3>
+          </div>
+          <p className="text-[13px] text-slate-600 dark:text-gray-300 mb-4 leading-relaxed">
+            Esta ação retornará a tarefa para <strong className="text-slate-900 dark:text-white">A Fazer</strong> e excluirá todos os registros de cronometria (Início, Fim e Pausas).
+            <br/><br/>
+            Digite sua senha para confirmar:
+          </p>
+          <input
+            type="password"
+            value={resetPassword}
+            onChange={(e) => setResetPassword(e.target.value)}
+            placeholder="Sua senha"
+            className="w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-gray-700 bg-slate-50 dark:bg-gray-900 text-slate-900 dark:text-gray-50 text-[13px] mb-5 focus:border-red-500 outline-none"
+          />
+          <div className="flex gap-3">
+            <button
+              onClick={() => {
+                setShowResetTaskModal(false);
+                setResetPassword("");
+              }}
+              className="flex-1 p-2.5 bg-transparent text-slate-500 dark:text-gray-400 border border-slate-200 dark:border-gray-700 rounded-lg text-[13px] font-semibold cursor-pointer hover:bg-slate-50 dark:hover:bg-gray-700"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleResetTask}
+              disabled={resettingTask || !resetPassword}
+              className="flex-1 p-2.5 bg-red-600 hover:bg-red-700 text-white border-none rounded-lg text-[13px] font-bold cursor-pointer disabled:opacity-60 transition-colors"
+            >
+              {resettingTask ? "Resetando..." : "Confirmar"}
             </button>
           </div>
         </div>
