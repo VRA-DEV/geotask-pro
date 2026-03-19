@@ -887,6 +887,14 @@ export async function PATCH(req: Request) {
       });
       const roleName = userRequesting?.Role?.name || "";
       const isCreator = task.created_by_id === userId;
+      const isLeadership = [
+        "Gestor",
+        "Gerente",
+        "Coordenador de Setores",
+        "Coordenador de Polo",
+        "Diretor",
+        "Admin",
+      ].includes(roleName);
 
       // "apenas quem criou a tarefa poderá editar o campo do prazo"
       if (data.deadline !== undefined && !isCreator) {
@@ -896,10 +904,16 @@ export async function PATCH(req: Request) {
         );
       }
 
-      // "gestores podem editar as informações de uma tarefa mas sómente as criadas por ele"
-      if (roleName === "Gestor" && !isCreator) {
+      // Check if trying to reassign
+      const isReassigning =
+        data.responsible_id !== undefined ||
+        data.sector_id !== undefined ||
+        data.team_id !== undefined ||
+        data.coworkers !== undefined;
+
+      if (isReassigning && !isCreator && !isLeadership) {
         return NextResponse.json(
-          { error: "Você só tem permissão para editar tarefas que você mesmo criou." },
+          { error: "Apenas o criador da tarefa, ou perfis de liderança, podem reatribuir esta tarefa." },
           { status: 403 },
         );
       }
