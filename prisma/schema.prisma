@@ -195,9 +195,10 @@ model Notification {
 }
 
 model Contract {
-  id    Int    @id @default(autoincrement())
-  name  String @unique
-  tasks Task[]
+  id            Int            @id @default(autoincrement())
+  name          String         @unique
+  tasks         Task[]
+  neighborhoods Neighborhood[]
 }
 
 model City {
@@ -208,11 +209,13 @@ model City {
 }
 
 model Neighborhood {
-  id      Int    @id @default(autoincrement())
-  name    String
-  city_id Int
-  city    City   @relation(fields: [city_id], references: [id], onDelete: Cascade)
-  tasks   Task[]
+  id          Int       @id @default(autoincrement())
+  name        String
+  city_id     Int
+  contract_id Int?
+  city        City      @relation(fields: [city_id], references: [id], onDelete: Cascade)
+  contract    Contract? @relation(fields: [contract_id], references: [id], onDelete: SetNull)
+  tasks       Task[]
 
   @@unique([city_id, name])
 }

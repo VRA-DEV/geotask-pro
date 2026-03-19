@@ -898,18 +898,35 @@ export async function PATCH(req: Request) {
 
       // "apenas quem criou a tarefa poderá editar o campo do prazo"
       if (data.deadline !== undefined && !isCreator) {
-        return NextResponse.json(
-          { error: "Apenas o criador da tarefa pode editar o prazo de entrega." },
-          { status: 403 },
-        );
+        const d = parseBackendDate(data.deadline);
+        const oldD = task.deadline ? new Date(task.deadline) : null;
+        if (d?.getTime() !== oldD?.getTime()) {
+          return NextResponse.json(
+            { error: "Apenas o criador da tarefa pode editar o prazo de entrega." },
+            { status: 403 },
+          );
+        }
       }
 
-      // Check if trying to reassign
-      const isReassigning =
-        data.responsible_id !== undefined ||
-        data.sector_id !== undefined ||
-        data.team_id !== undefined ||
-        data.coworkers !== undefined;
+      // Check if trying to reassign (only if value actually changed)
+      let isReassigning = false;
+      
+      if (data.responsible_id !== undefined && data.responsible_id !== task.responsible_id) {
+        isReassigning = true;
+      }
+      if (data.sector_id !== undefined && data.sector_id !== task.sector_id) {
+        isReassigning = true;
+      }
+      if (data.team_id !== undefined && data.team_id !== task.team_id) {
+        isReassigning = true;
+      }
+      if (data.coworkers !== undefined) {
+        const currentCoworkers = (task.coworkers || []).map((c: any) => c.user_id).sort();
+        const newCoworkers = data.coworkers.map(Number).sort();
+        if (JSON.stringify(currentCoworkers) !== JSON.stringify(newCoworkers)) {
+          isReassigning = true;
+        }
+      }
 
       if (isReassigning && !isCreator && !isLeadership) {
         return NextResponse.json(

@@ -17,6 +17,7 @@ export function useLookups() {
     sectors: data?.sectors || [],
     taskTypes: data?.task_types || [],
     citiesNeighborhoods: data?.cities_neighborhoods || {},
+    contractCitiesNeighborhoods: data?.contract_cities_neighborhoods || {},
     isLoading,
     error,
     mutate,

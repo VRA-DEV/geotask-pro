@@ -31,6 +31,7 @@ interface TaskDetailModalProps {
   contracts?: string[];
   taskTypes?: { id: number; name: string; sector_id?: number | null }[];
   citiesNeighborhoods?: CitiesNeighborhoods;
+  contractCitiesNeighborhoods?: Record<string, Record<string, string[]>>;
   sectors?: (Sector | string)[];
   tasks?: Task[];
   setSelectedTask: (t: Task) => void;
@@ -82,6 +83,7 @@ export default function TaskDetailModal({
   contracts = [],
   taskTypes = [],
   citiesNeighborhoods = {},
+  contractCitiesNeighborhoods = {},
   sectors = [],
   tasks = [],
   setSelectedTask,
@@ -378,19 +380,14 @@ export default function TaskDetailModal({
   const canEdit = (field: string) => {
     const role = user.role?.name || "";
     const isCreator = t.created_by_id === user.id;
-    const isSuper = ["Admin", "Gerente", "Diretor", "Coordenador de Polo", "Coordenador de Setores"].includes(role);
+    const isSuper = ["Admin", "Gerente", "Diretor", "Coordenador de Polo", "Coordenador de Setores", "Gestor"].includes(role);
 
     // "apenas quem criou a tarefa poderá editar o campo do prazo"
     if (field === "deadline") {
       return isCreator;
     }
 
-    // "gestores podem editar as informações de uma tarefa mas sómente as criadas por ele"
-    if (role === "Gestor") {
-      return isCreator;
-    }
-
-    // Admin, Gerente, Coordenadores, Diretor can edit everything else
+    // Admin, Gerente, Coordenadores, Diretor, Gestor can edit everything else
     if (isSuper) return true;
 
     // Liderado/Others restrictions
@@ -712,8 +709,22 @@ export default function TaskDetailModal({
                   })),
                 },
                 { l: "Contrato", f: "contract", o: contracts },
-                { l: "Cidade", f: "city", o: Object.keys(citiesNeighborhoods) },
-                { l: "Núcleo/Bairro", f: "nucleus" },
+                { 
+                  l: "Cidade", 
+                  f: "city", 
+                  o: form.contract && contractCitiesNeighborhoods[String(form.contract)] 
+                    ? Object.keys(contractCitiesNeighborhoods[String(form.contract)]).sort() 
+                    : Object.keys(citiesNeighborhoods).sort() 
+                },
+                { 
+                  l: "Núcleo/Bairro", 
+                  f: "nucleus", 
+                  o: form.city 
+                    ? (form.contract && contractCitiesNeighborhoods[String(form.contract)]
+                        ? contractCitiesNeighborhoods[String(form.contract)][String(form.city)] || []
+                        : citiesNeighborhoods[String(form.city)] || [])
+                    : [] 
+                },
                 { l: "Quadra", f: "quadra" },
                 { l: "Lote", f: "lote" },
                 { l: "Prazo", f: "deadline", type: "date-picker" },
@@ -751,6 +762,19 @@ export default function TaskDetailModal({
                             setForm((prev) => ({
                               ...prev,
                               responsible_id: null,
+                            }));
+                          }
+                          if (f === "city") {
+                            setForm((prev) => ({
+                              ...prev,
+                              nucleus: "",
+                            }));
+                          }
+                          if (f === "contract") {
+                            setForm((prev) => ({
+                              ...prev,
+                              city: "" as any,
+                              nucleus: "",
                             }));
                           }
                         }}

@@ -101,6 +101,7 @@ interface NewTaskModalProps {
   contracts?: string[];
   taskTypes?: { id: number; name: string }[];
   citiesNeighborhoods?: CitiesNeighborhoods;
+  contractCitiesNeighborhoods?: Record<string, Record<string, string[]>>;
   templates?: EnrichedTemplate[];
   sectors?: Sector[];
 }
@@ -114,6 +115,7 @@ export default function NewTaskModal({
   contracts = [],
   taskTypes = [],
   citiesNeighborhoods = {},
+  contractCitiesNeighborhoods = {},
   templates = [],
   sectors = [],
 }: NewTaskModalProps) {
@@ -292,7 +294,15 @@ export default function NewTaskModal({
     }
   }, [dateVal]);
 
-  const neighborhoods = form.city ? citiesNeighborhoods[form.city] || [] : [];
+  const availableCities = form.contract && contractCitiesNeighborhoods[form.contract]
+    ? Object.keys(contractCitiesNeighborhoods[form.contract]).sort()
+    : Object.keys(citiesNeighborhoods).sort();
+
+  const neighborhoods = form.city 
+    ? (form.contract && contractCitiesNeighborhoods[form.contract]
+        ? contractCitiesNeighborhoods[form.contract][form.city] || []
+        : citiesNeighborhoods[form.city] || [])
+    : [];
   const sectorUsers = useMemo(() => {
     if (!form.sector) return [];
     return users.filter((u: User) => {
@@ -582,7 +592,11 @@ export default function NewTaskModal({
                 <FormSelect
                   T={T}
                   val={form.contract}
-                  onChange={(v) => set("contract", v)}
+                  onChange={(v) => {
+                    set("contract", v);
+                    set("city", "");
+                    set("nucleus", "");
+                  }}
                   opts={contracts}
                   placeholder="Selecione o contrato..."
                   err={errors.contract}
@@ -596,7 +610,7 @@ export default function NewTaskModal({
                     set("city", v);
                     set("nucleus", "");
                   }}
-                  opts={Object.keys(citiesNeighborhoods).sort()}
+                  opts={availableCities}
                   placeholder="Selecione a cidade..."
                 />
               </FormField>

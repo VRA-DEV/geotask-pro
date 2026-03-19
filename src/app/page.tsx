@@ -128,6 +128,7 @@ export default function GeoTask() {
     contracts,
     sectors: dbSectors,
     citiesNeighborhoods,
+    contractCitiesNeighborhoods,
     taskTypes,
   } = useLookups();
   const { templates, saveTemplate, deleteTemplate } = useTemplates(user?.id);
@@ -590,6 +591,7 @@ export default function GeoTask() {
           users={dbUsers}
           contracts={contracts}
           citiesNeighborhoods={citiesNeighborhoods}
+          contractCitiesNeighborhoods={contractCitiesNeighborhoods}
           tasks={tasks}
           setSelectedTask={setSelectedTask}
           sectors={mergedSectors}
@@ -606,6 +608,7 @@ export default function GeoTask() {
           users={dbUsers}
           contracts={contracts}
           citiesNeighborhoods={citiesNeighborhoods}
+          contractCitiesNeighborhoods={contractCitiesNeighborhoods}
           templates={templates}
           sectors={mergedSectors}
           taskTypes={visibleTaskTypes}

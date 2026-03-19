@@ -28,9 +28,39 @@ export async function GET() {
       {} as Record<string, string[]>,
     );
 
+    // New nested mapping: Contract -> City -> Neighborhood[]
+    const contractCitiesNeighborhoods: Record<string, Record<string, string[]>> = {};
+    contracts.forEach(c => {
+      contractCitiesNeighborhoods[c.name] = {};
+    });
+
+    cities.forEach(city => {
+      const mappedContractsForCity = new Set<number>();
+      city.neighborhoods.forEach(n => {
+        if (n.contract_id) mappedContractsForCity.add(n.contract_id);
+      });
+
+      contracts.forEach(contract => {
+        // A city is in a contract if it has at least one mapped neighborhood to it,
+        // or if it has NO mapped neighborhoods at all (global city).
+        const isCityInContract = mappedContractsForCity.size === 0 || mappedContractsForCity.has(contract.id);
+        
+        if (isCityInContract) {
+          contractCitiesNeighborhoods[contract.name][city.name] = [];
+          city.neighborhoods.forEach(n => {
+            if (n.contract_id === contract.id || n.contract_id === null) {
+              contractCitiesNeighborhoods[contract.name][city.name].push(n.name);
+            }
+          });
+          contractCitiesNeighborhoods[contract.name][city.name].sort();
+        }
+      });
+    });
+
     return NextResponse.json({
       contracts: contracts.map((c) => c.name),
       cities_neighborhoods: citiesNeighborhoods,
+      contract_cities_neighborhoods: contractCitiesNeighborhoods,
       sectors: sectors, // Returns {id, name}
       roles: roles, // Returns {id, name}
       task_types: taskTypes, // Returns {id, name, sector_id}

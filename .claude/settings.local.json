@@ -29,7 +29,8 @@
       "Bash(find C:UsersviniciusaraujoDocumentsGDriveprojectsGeoTask-Progeotask-pro -type f -name *settings*)",
       "Bash(npx prisma:*)",
       "Bash(npx tsx:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npx skills:*)"
     ]
   }
 }
