@@ -40,7 +40,10 @@
       "Bash(wc -l /c/Users/viniciusaraujo/Documents/GDrive/projects/Geoboard/geogis-contratos/api/src/**/*.ts)",
       "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --no-turbopack --import-alias \"@/*\" --use-npm)",
       "Bash(rm package.json)",
-      "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --no-turbopack --import-alias \"@/*\" --use-npm --yes)"
+      "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --no-turbopack --import-alias \"@/*\" --use-npm --yes)",
+      "Bash(docker compose:*)",
+      "Bash(netstat -ano)",
+      "Bash(findstr \"543\")"
     ]
   }
 }

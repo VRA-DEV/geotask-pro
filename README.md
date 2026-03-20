@@ -1,6 +1,6 @@
 # GeoTask Pro
 
-Sistema de gestao de tarefas georreferenciadas para gerenciamento de operacoes em campo, contratos, equipes e setores.
+Sistema de gestao de tarefas para gerenciamento de operacoes em campo, contratos, equipes e setores.
 
 ---
 
