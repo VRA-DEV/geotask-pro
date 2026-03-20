@@ -135,6 +135,13 @@ export default function GeoTask() {
   const [fDateTo, setFDateTo] = useState<DateRange | undefined>(undefined);
   const [fShowSubtasks, setFShowSubtasks] = useState(true);
 
+  // ── Dashboard Filter states (Isolated from TasksHub) ──
+  const [dCreatedByMe, setDCreatedByMe] = useState(false);
+  const [dTeam, setDTeam] = useState("");
+  const [dCurrentState, setDCurrentState] = useState("");
+  const [dDateFrom, setDDateFrom] = useState<DateRange | undefined>(undefined);
+  const [dDateTo, setDDateTo] = useState<DateRange | undefined>(undefined);
+
   // ── SWR hooks (cached data fetching) ────────────────────────────────
   const { mutate: globalMutate } = useSWRConfig();
   const { tasks, mutate: mutateTasks } = useTasks({
@@ -352,7 +359,26 @@ export default function GeoTask() {
   }, [tasks, user]);
 
   // ── Additional filters (createdByMe, team) applied on top of visibleTasks
-  const filteredVisibleTasks = useMemo(() => {
+  // ── Dashboard focused tasks
+  const dashboardTasks = useMemo(() => {
+    let result = visibleTasks;
+    if (dCreatedByMe && user) {
+      result = result.filter((t: any) => Number(t.created_by_id) === Number(user.id));
+    }
+    if (dTeam) {
+      result = result.filter((t: any) => 
+        Number(t.team_id) === Number(dTeam) || 
+        (t.responsible?.team_id && Number(t.responsible.team_id) === Number(dTeam))
+      );
+    }
+    if (dCurrentState) {
+      result = result.filter((t: any) => t.latest_history?.state === dCurrentState);
+    }
+    return result;
+  }, [visibleTasks, dCreatedByMe, dTeam, dCurrentState, user]);
+
+  // ── TasksHub focused tasks (Minhas Tarefas)
+  const tasksHubTasks = useMemo(() => {
     let result = visibleTasks;
     if (fCreatedByMe && user) {
       result = result.filter((t: any) => Number(t.created_by_id) === Number(user.id));
@@ -439,7 +465,7 @@ export default function GeoTask() {
           {page === "dashboard" && (
             <DashboardPage
               T={T}
-              tasks={filteredVisibleTasks}
+              tasks={dashboardTasks}
               user={user}
               onSelect={setSelectedTask}
               users={dbUsers}
@@ -448,13 +474,20 @@ export default function GeoTask() {
               sectors={dbSectors}
               taskTypes={visibleTaskTypes}
               canViewAllSectors={appPerms.tasks.view_all_sectors}
-              createdByMe={fCreatedByMe}
-              setCreatedByMe={setFCreatedByMe}
-              team={fTeam}
-              setTeam={setFTeam}
+              createdByMe={dCreatedByMe}
+              setCreatedByMe={setDCreatedByMe}
+              team={dTeam}
+              setTeam={setDTeam}
               teams={teams}
-              currentState={fCurrentState}
-              setCurrentState={setFCurrentState}
+              currentState={dCurrentState}
+              setCurrentState={setDCurrentState}
+              onClearFilters={() => {
+                setDCreatedByMe(false);
+                setDTeam("");
+                setDCurrentState("");
+                setDDateFrom(undefined);
+                setDDateTo(undefined);
+              }}
             />
           )}
 
@@ -463,7 +496,7 @@ export default function GeoTask() {
               T={T}
               activeTab={tasksTab}
               setActiveTab={setTasksTab}
-              tasks={filteredVisibleTasks}
+              tasks={tasksHubTasks}
               user={user}
               onSelect={setSelectedTask}
               canCreate={canCreate}

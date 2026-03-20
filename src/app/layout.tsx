@@ -26,6 +26,7 @@ export default function RootLayout({
         className={`${inter.variable} ${jakarta.variable} ${jetbrains.variable} font-sans antialiased`}
       >
         {children}
+        <div id="tooltip-root" />
       </body>
     </html>
   );

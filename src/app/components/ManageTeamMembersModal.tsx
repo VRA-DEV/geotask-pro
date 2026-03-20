@@ -1,5 +1,6 @@
 "use client";
 
+import { authFetch } from "@/lib/authFetch";
 import { Search, UserCheck, UserPlus, X, Loader2, Check } from "lucide-react";
 import { useEffect, useState, useMemo } from "react";
 import type { User, Team, ThemeColors } from "@/types";
@@ -36,7 +37,7 @@ export function ManageTeamMembersModal({
   const handleToggleMember = async (userId: number, isMember: boolean) => {
     setUpdatingIds(prev => [...prev, userId]);
     try {
-      const res = await fetch("/api/users", {
+      const res = await authFetch("/api/users", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

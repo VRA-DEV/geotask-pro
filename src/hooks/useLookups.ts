@@ -3,7 +3,7 @@ import { authFetcher } from "@/lib/authFetch";
 
 export function useLookups() {
   const { data, error, isLoading, mutate } = useSWR(
-    typeof window !== "undefined" && localStorage.getItem("geotask_userId") ? "/api/lookups" : null,
+    typeof window !== "undefined" && localStorage.getItem("geotask_user") ? "/api/lookups" : null,
     authFetcher,
     {
       revalidateOnFocus: false,

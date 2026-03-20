@@ -1,5 +1,6 @@
 "use client";
 
+import { authFetch } from "@/lib/authFetch";
 import { AlertCircle, Save, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -52,7 +53,7 @@ export function TeamModal({
         body.id = team.id;
       }
 
-      const res = await fetch("/api/teams", {
+      const res = await authFetch("/api/teams", {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

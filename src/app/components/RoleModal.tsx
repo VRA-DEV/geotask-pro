@@ -1,5 +1,6 @@
 "use client";
 
+import { authFetch } from "@/lib/authFetch";
 import { AlertCircle, Save, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -52,7 +53,7 @@ export function RoleModal({
         body.id = role.id;
       }
 
-      const res = await fetch("/api/roles", {
+      const res = await authFetch("/api/roles", {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

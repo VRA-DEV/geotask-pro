@@ -1,5 +1,6 @@
 "use client";
 
+import { authFetch } from "@/lib/authFetch";
 import {
   AlertCircle,
   BarChart2,
@@ -298,7 +299,7 @@ export default function AIReportModal({ user }: AIReportModalProps) {
     setShowConfig(false);
 
     try {
-      const res = await fetch("/api/ai/analyze", {
+      const res = await authFetch("/api/ai/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

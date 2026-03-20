@@ -1,5 +1,6 @@
 "use client";
 
+import { authFetch } from "@/lib/authFetch";
 import { AlertCircle, CheckCircle, Lock, Save, X } from "lucide-react";
 import { useState } from "react";
 
@@ -69,7 +70,7 @@ export function ChangePasswordModal({
     try {
       if (isAdmin) {
         // Admin reseta via PATCH /api/users (resetPassword flag)
-        const res = await fetch("/api/users", {
+        const res = await authFetch("/api/users", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: userId, password: newPassword }),
@@ -80,7 +81,7 @@ export function ChangePasswordModal({
         }
       } else {
         // Usuário altera própria senha
-        const res = await fetch("/api/auth/change-password", {
+        const res = await authFetch("/api/auth/change-password", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userId, currentPassword, newPassword }),

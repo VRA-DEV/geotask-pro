@@ -1,5 +1,6 @@
 "use client";
 
+import { authFetch } from "@/lib/authFetch";
 import React, { useState } from "react";
 import { X, Upload, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import * as XLSX from "xlsx";
@@ -50,7 +51,7 @@ export const ImportUsersModal: React.FC<ImportUsersModalProps> = ({
     if (data.length === 0) return;
     setLoading(true);
     try {
-      const res = await fetch("/api/users/import", {
+      const res = await authFetch("/api/users/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ users: data }),

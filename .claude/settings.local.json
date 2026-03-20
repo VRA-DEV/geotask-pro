@@ -43,7 +43,10 @@
       "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --no-turbopack --import-alias \"@/*\" --use-npm --yes)",
       "Bash(docker compose:*)",
       "Bash(netstat -ano)",
-      "Bash(findstr \"543\")"
+      "Bash(findstr \"543\")",
+      "Bash(gh repo:*)",
+      "Bash(where gh:*)",
+      "Bash(find C:UsersviniciusaraujoDocumentsGDriveprojectsGeoTask-Progeotask-proprisma -name *.prisma)"
     ]
   }
 }

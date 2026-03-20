@@ -119,6 +119,7 @@ interface DashboardPageProps {
   teams?: { id: number; name: string }[];
   currentState?: string;
   setCurrentState?: (v: string) => void;
+  onClearFilters?: () => void;
 }
 
 export default function DashboardPage({
@@ -139,6 +140,7 @@ export default function DashboardPage({
   teams,
   currentState,
   setCurrentState,
+  onClearFilters,
 }: DashboardPageProps) {
   const [fSearch, setFSearch] = useState("");
   const [fContract, setFContract] = useState("");
@@ -263,6 +265,7 @@ export default function DashboardPage({
     setFDateFrom(undefined);
     setFDateTo(undefined);
     setFCurrentState("");
+    if (onClearFilters) onClearFilters();
   };
 
   // KPIs

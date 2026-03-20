@@ -1,5 +1,6 @@
 "use client";
 
+import { authFetch } from "@/lib/authFetch";
 import { AlertCircle, RefreshCw, Save, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -47,7 +48,7 @@ export function UserModal({
         setResetPassword(false);
 
         // Fetch user sectors
-        fetch(`/api/user-sectors?user_id=${user.id}`)
+        authFetch(`/api/user-sectors?user_id=${user.id}`)
           .then((r) => r.json())
           .then((data) => {
             if (Array.isArray(data)) {
@@ -96,7 +97,7 @@ export function UserModal({
         }
       }
 
-      const res = await fetch("/api/users", {
+      const res = await authFetch("/api/users", {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -110,7 +111,7 @@ export function UserModal({
       const savedUser = await res.json();
 
       // Sync secondary sectors
-      await fetch("/api/user-sectors", {
+      await authFetch("/api/user-sectors", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
