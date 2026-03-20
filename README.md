@@ -115,7 +115,7 @@ Next.js App Router (SSR + CSR)
 ### 1. Clonar o repositorio
 
 ```bash
-git clone https://github.com/SEU_USUARIO/geotask-pro.git
+git clone https://github.com/VRA-DEV/geotask-pro.git
 cd geotask-pro
 ```
 

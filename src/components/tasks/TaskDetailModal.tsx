@@ -1,13 +1,14 @@
 "use client";
 
 import { getPermissions } from "@/lib/permissions";
-import { CheckCircle, Eye, Pause, Play, X, Send, Paperclip, FileText, Image, Trash2, Upload, Download, Plus, Clock, RotateCcw } from "lucide-react";
+import { CheckCircle, Eye, Pause, Play, X, Send, Paperclip, FileText, Image, Trash2, Upload, Download, Plus, Clock, RotateCcw, Calendar, Check } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TeamSelectionModal from "./TeamSelectionModal";
 
 import { DatePicker } from "@/app/components/DatePicker";
-import { SECTORS, STATUS_COLOR } from "@/lib/constants";
+import { STATUS_COLOR } from "@/lib/constants";
 import { getTaskState, parseDateStr } from "@/lib/helpers";
+import { authFetch } from "@/lib/authFetch";
 import type {
   CitiesNeighborhoods,
   Sector,
@@ -97,6 +98,7 @@ export default function TaskDetailModal({
     sector: (typeof t.sector === "object" ? t.sector?.name : t.sector) || "",
     coworkers: (t.coworkers || []).map((c: any) => c.id),
   });
+  const subtasks = form.subtasks || [];
   const [saving, setSaving] = useState(false);
   const [showResetTaskModal, setShowResetTaskModal] = useState(false);
   const [resetPassword, setResetPassword] = useState("");
@@ -109,7 +111,7 @@ export default function TaskDetailModal({
     }
     setResettingTask(true);
     try {
-      const res = await fetch(`/api/tasks`, {
+      const res = await authFetch(`/api/tasks`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
@@ -258,14 +260,14 @@ export default function TaskDetailModal({
 
   useEffect(() => {
     if (tab === "comentarios") {
-      fetch(`/api/comments?task_id=${t.id}`)
+      authFetch(`/api/comments?task_id=${t.id}`)
         .then((r) => r.json())
         .then((data) => setComments(Array.isArray(data) ? data : []))
         .catch(() => {});
     }
     if (tab === "historico") {
       setLoadingHistory(true);
-      fetch(`/api/tasks/history?task_id=${t.id}`)
+      authFetch(`/api/tasks/history?task_id=${t.id}`)
         .then((r) => r.json())
         .then((data) => setHistory(Array.isArray(data) ? data : []))
         .catch(() => {})
@@ -273,7 +275,7 @@ export default function TaskDetailModal({
     }
     if (tab === "anexos") {
       setLoadingAttachments(true);
-      fetch(`/api/tasks/${t.id}/attachments`)
+      authFetch(`/api/tasks/${t.id}/attachments`)
         .then((r) => r.json())
         .then((data) => setAttachments(Array.isArray(data) ? data : []))
         .catch(() => {})
@@ -296,7 +298,7 @@ export default function TaskDetailModal({
     }
     setCreatingSubtask(true);
     try {
-      const res = await fetch("/api/tasks", {
+      const res = await authFetch("/api/tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -407,7 +409,7 @@ export default function TaskDetailModal({
       const query = val.slice(lastAt + 1).toLowerCase();
       if (query.startsWith("#")) {
         const sectorQ = query.slice(1);
-        const activeSectors = sectors.length > 0 ? sectors : SECTORS;
+        const activeSectors = sectors || [];
         const matches = activeSectors
           .filter((s: Sector | string) => {
             const name = typeof s === "string" ? s : s.name || "";
@@ -438,7 +440,7 @@ export default function TaskDetailModal({
   };
 
   const refreshAttachments = useCallback(async () => {
-    const res = await fetch(`/api/tasks/${t.id}/attachments`);
+    const res = await authFetch(`/api/tasks/${t.id}/attachments`);
     const data = await res.json();
     setAttachments(Array.isArray(data) ? data : []);
   }, [t.id]);
@@ -451,7 +453,7 @@ export default function TaskDetailModal({
       const fd = new FormData();
       fd.append("file", file);
       fd.append("uploaded_by_id", String(user?.id || ""));
-      const res = await fetch(`/api/tasks/${t.id}/attachments`, {
+      const res = await authFetch(`/api/tasks/${t.id}/attachments`, {
         method: "POST",
         body: fd,
       });
@@ -472,7 +474,7 @@ export default function TaskDetailModal({
   const handleDeleteAttachment = async (attachmentId: number) => {
     if (!confirm("Tem certeza que deseja remover este anexo?")) return;
     try {
-      const res = await fetch(
+      const res = await authFetch(
         `/api/tasks/${t.id}/attachments?attachment_id=${attachmentId}&user_id=${user?.id || ""}`,
         { method: "DELETE" },
       );
@@ -505,7 +507,7 @@ export default function TaskDetailModal({
     setSavingTiming(true);
     try {
       // 1. Update pauses
-      const resP = await fetch("/api/tasks", {
+      const resP = await authFetch("/api/tasks", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -517,7 +519,7 @@ export default function TaskDetailModal({
       });
 
       // 2. Update start/complete dates
-      const resD = await fetch("/api/tasks", {
+      const resD = await authFetch("/api/tasks", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -552,7 +554,7 @@ export default function TaskDetailModal({
     if (!commentText.trim()) return;
     setSendingComment(true);
     try {
-      await fetch("/api/comments", {
+      await authFetch("/api/comments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -565,7 +567,7 @@ export default function TaskDetailModal({
       });
       setCommentText("");
       setMentionSuggestions([]);
-      const res = await fetch(`/api/comments?task_id=${t.id}`);
+      const res = await authFetch(`/api/comments?task_id=${t.id}`);
       const data = await res.json();
       setComments(Array.isArray(data) ? data : []);
     } catch (e) {
@@ -574,86 +576,74 @@ export default function TaskDetailModal({
       setSendingComment(false);
     }
   };
-
   return (
-    <>
-    <div
-      onClick={onClose}
-      className="fixed inset-0 z-100 flex items-center justify-center p-0 md:p-4 font-sans bg-black/60"
-    >
-      <div
+    <div className="task-detail-modal-root leading-normal">
+    <div className="fixed inset-0 z-100 flex items-center justify-center bg-slate-900/40 backdrop-blur-[6px] transition-all duration-300 p-4">
+      <div 
+        className="relative bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl w-full max-w-[800px] max-h-[90vh] flex flex-col rounded-3xl shadow-[0_32px_64px_-12px_rgba(0,0,0,0.2)] border border-white/40 dark:border-gray-800/40 overflow-hidden transition-all duration-300"
         onClick={(e) => e.stopPropagation()}
-        className="w-full h-full md:max-w-[600px] md:max-h-[90vh] md:rounded-[20px] rounded-none p-4 md:p-6 flex flex-col bg-white dark:bg-gray-800 border-0 md:border md:border-slate-200 dark:border-gray-700"
       >
         {/* Header */}
-        <div className="flex justify-between mb-5">
-          <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <span
-                className="text-[11px] font-semibold px-2.5 py-[3px] rounded-full"
-                style={{
-                  background: sc + "22",
-                  color: sc,
-                }}
-              >
-                {t.status}
-              </span>
-              <span className="text-[11px] text-slate-500 dark:text-gray-400">
-                ID: #{t.id}
-              </span>
-              {getTaskState(t) && (
-                <span
-                  className="text-[10px] font-semibold px-2 py-[2px] rounded ml-2"
-                  style={{
-                    background: getTaskState(t)!.color + "22",
-                    color: getTaskState(t)!.color,
-                  }}
-                >
-                  {getTaskState(t)!.label}
-                </span>
-              )}
+        <div className="px-8 pt-7 pb-5 flex items-start justify-between shrink-0 relative">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2.5 mb-2">
+                 <span className="text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider shadow-sm" style={{ background: sc + "22", color: sc, border: `1px solid ${sc}44` }}>
+                   {t.status}
+                 </span>
+                 {t.priority && (
+                   <span className="text-[10px] bg-slate-100 dark:bg-gray-800 text-slate-500 dark:text-gray-400 px-2.5 py-1 rounded-full font-bold border border-slate-200 dark:border-gray-700">
+                     {t.priority}
+                   </span>
+                 )}
+                 {getTaskState(t) && (
+                   <span className="text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider" style={{ background: getTaskState(t)!.color + "22", color: getTaskState(t)!.color }}>
+                     {getTaskState(t)!.label}
+                   </span>
+                 )}
             </div>
-            <input
-              value={form.title}
-              disabled={!canEdit("title")}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              className="text-lg font-bold bg-transparent border-none w-full outline-none text-slate-900 dark:text-gray-50"
-            />
+            <h2 className="m-0 text-2xl font-bold tracking-tight text-slate-900 dark:text-gray-50 leading-tight pr-8">
+              {t.title}
+            </h2>
+            <div className="flex items-center gap-3 mt-2 text-slate-500 dark:text-gray-400 text-[12px]">
+                <span className="flex items-center gap-1"><Clock size={13} /> {t.created || "---"}</span>
+                {t.deadline && <span className="flex items-center gap-1 font-semibold text-primary"><Calendar size={13} /> {t.deadline}</span>}
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="bg-slate-100 dark:bg-gray-700 border-none rounded-lg p-1.5 cursor-pointer h-fit"
+            className="w-10 h-10 flex items-center justify-center rounded-full border-none bg-slate-100 hover:bg-slate-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-slate-500 transition-all duration-200 cursor-pointer shrink-0 ml-4"
           >
-            <X size={16} className="text-slate-500 dark:text-gray-400" />
+            <X size={20} />
           </button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-1 border-b border-slate-200 dark:border-gray-700 mb-5">
-          {["dados", "subtarefas", "comentarios", "anexos", "historico"].map((tb) => (
-            <button
-              key={tb}
-              onClick={() => setTab(tb)}
-              className={`flex-1 md:flex-none px-2 md:px-4 py-2.5 bg-transparent border-none text-[12px] md:text-[13px] font-semibold cursor-pointer capitalize flex items-center justify-center gap-1 ${
-                tab === tb
-                  ? "border-b-2 border-primary text-primary"
-                  : "border-b-2 border-transparent text-slate-500 dark:text-gray-400"
-              }`}
-            >
-              {tb === "anexos" && <Paperclip size={13} />}
-              {tb === "comentarios"
-                ? "Comentários"
-                : tb === "historico"
-                  ? "Histórico"
-                  : tb === "subtarefas"
-                    ? "Subtarefas"
-                    : tb === "anexos"
-                      ? "Anexos"
-                      : "Dados Padrão"}
-            </button>
-          ))}
+        {/* Tab Selection */}
+        <div className="px-8 pb-4 border-b border-slate-100 dark:border-gray-800/50 shrink-0">
+           <div className="flex bg-slate-100/50 dark:bg-gray-800/30 p-1 rounded-2xl gap-1">
+             {[
+               { id: "dados", label: "Dados" },
+               { id: "subtarefas", label: `Subtarefas (${subtasks.length})` },
+               { id: "comentarios", label: "Comentários" },
+               { id: "anexos", label: "Anexos" },
+               { id: "historico", label: "Histórico" },
+             ].map((bt) => (
+               <button
+                 key={bt.id}
+                 onClick={() => setTab(bt.id)}
+                 className={`flex-1 py-2.5 rounded-xl text-[11px] font-bold transition-all duration-300 border-none cursor-pointer ${
+                   tab === bt.id
+                     ? "bg-white dark:bg-gray-800 text-primary shadow-sm"
+                     : "text-slate-400 dark:text-gray-500 hover:text-slate-600 dark:hover:text-gray-300"
+                 }`}
+               >
+                 {bt.label}
+               </button>
+             ))}
+           </div>
         </div>
-        <div className="flex-1 overflow-y-auto overflow-x-hidden pr-1 md:pr-2 -mr-1">
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-8 py-7 flex flex-col no-scrollbar">
           {tab === "dados" && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="col-span-full">
@@ -961,7 +951,7 @@ export default function TaskDetailModal({
                         {child.title}
                         {getTaskState(child) && (
                           <span
-                            className="text-[9px] font-bold px-1.5 py-[1px] rounded"
+                            className="text-[9px] font-bold px-1.5 py-px rounded"
                             style={{
                               background: getTaskState(child)!.color + "22",
                               color: getTaskState(child)!.color,
@@ -1114,7 +1104,7 @@ export default function TaskDetailModal({
                         !newSubtask.title ||
                         !newSubtask.sector
                       }
-                      className="flex-[2] p-2 bg-primary text-white border-none rounded-lg text-[13px] font-semibold cursor-pointer disabled:opacity-60"
+                      className="flex-2 p-2 bg-primary text-white border-none rounded-lg text-[13px] font-semibold cursor-pointer disabled:opacity-60"
                     >
                       {creatingSubtask ? "Salvando..." : "Salvar Subtarefa"}
                     </button>
@@ -1326,7 +1316,7 @@ export default function TaskDetailModal({
                     ) => (
                       <div
                         key={idx}
-                        className="z-[1] flex flex-col items-center gap-1.5"
+                        className="z-1 flex flex-col items-center gap-1.5"
                       >
                         <div className="w-2.5 h-2.5 rounded-full bg-primary ring-4 ring-white dark:ring-gray-800" />
                         <div className="text-center">
@@ -1397,16 +1387,18 @@ export default function TaskDetailModal({
           )}
         </div>
 
+        {/* Action Bar Footer */}
         {tab === "dados" && ["Admin", "Gestor", "Liderado", "Gerente", "Coordenador", "Coordenador de Polo", "Coordenador de Setores"].includes(
           user.role?.name || "",
         ) && (
-          <div className="mt-5 border-t border-slate-200 dark:border-gray-700 pt-4 flex gap-2.5 justify-end flex-wrap items-center shrink-0 mb-4 md:mb-0">
+          <div className="px-8 py-6 border-t border-slate-100 dark:border-gray-800/50 flex gap-3 justify-end flex-wrap items-center shrink-0 bg-slate-50/30 dark:bg-gray-900/30">
             {(form.subtasks || []).length > 0 ? (
-              <div className="flex-1 text-[13px] text-amber-600 dark:text-amber-500 font-medium bg-amber-50 dark:bg-amber-900/20 px-4 py-2 rounded-lg flex items-center gap-2">
-                <span className="text-base uppercase font-bold">⚠️</span>
+              <div className="flex-1 text-[13px] text-amber-600 dark:text-amber-500 font-bold bg-amber-50 dark:bg-amber-900/20 px-5 py-3 rounded-2xl flex items-center gap-2.5 border border-amber-200/50 dark:border-amber-900/40">
+                <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center shrink-0">
+                    <Clock size={16} />
+                </div>
                 <span>
-                  O status desta tarefa é gerenciado automaticamente pelas suas
-                  subtarefas.
+                  O status desta tarefa é gerenciado automaticamente pelas suas subtarefas.
                 </span>
               </div>
             ) : (
@@ -1419,9 +1411,9 @@ export default function TaskDetailModal({
                       });
                       onClose();
                     }}
-                    className="flex-1 md:flex-none justify-center flex items-center gap-1.5 px-4 py-3 md:py-2 bg-emerald-500 text-white border-none rounded-lg text-[13px] font-semibold cursor-pointer"
+                    className="flex-1 md:flex-none justify-center flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white border-none rounded-xl text-[13px] font-bold cursor-pointer transition-all hover:brightness-110 active:scale-95 shadow-lg shadow-emerald-600/20"
                   >
-                    <Play size={14} /> Iniciar
+                    <Play size={16} fill="currentColor" /> Iniciar
                   </button>
                 )}
                 {t.status === "Em Andamento" && (
@@ -1430,9 +1422,9 @@ export default function TaskDetailModal({
                       onUpdate(t.id, "update_status", { status: "Pausado" });
                       onClose();
                     }}
-                    className="flex-1 md:flex-none justify-center flex items-center gap-1.5 px-4 py-3 md:py-2 bg-amber-500 text-white border-none rounded-lg text-[13px] font-semibold cursor-pointer"
+                    className="flex-1 md:flex-none justify-center flex items-center gap-2 px-6 py-3 bg-amber-500 text-white border-none rounded-xl text-[13px] font-bold cursor-pointer transition-all hover:brightness-110 active:scale-95 shadow-lg shadow-amber-500/20"
                   >
-                    <Pause size={14} /> Pausar
+                    <Pause size={16} fill="currentColor" /> Pausar
                   </button>
                 )}
                 {t.status === "Pausado" && (
@@ -1443,9 +1435,9 @@ export default function TaskDetailModal({
                       });
                       onClose();
                     }}
-                    className="flex-1 md:flex-none justify-center flex items-center gap-1.5 px-4 py-3 md:py-2 bg-primary text-white border-none rounded-lg text-[13px] font-semibold cursor-pointer"
+                    className="flex-1 md:flex-none justify-center flex items-center gap-2 px-6 py-3 bg-primary text-white border-none rounded-xl text-[13px] font-bold cursor-pointer transition-all hover:brightness-110 active:scale-95 shadow-lg shadow-primary/20"
                   >
-                    <Play size={14} /> Retomar
+                    <Play size={16} fill="currentColor" /> Retomar
                   </button>
                 )}
                 {["Em Andamento", "Pausado"].includes(t.status) && (
@@ -1454,17 +1446,17 @@ export default function TaskDetailModal({
                       onUpdate(t.id, "update_status", { status: "Concluído" });
                       onClose();
                     }}
-                    className="flex-1 md:flex-none justify-center flex items-center gap-1.5 px-4 py-3 md:py-2 bg-emerald-600 text-white border-none rounded-lg text-[13px] font-semibold cursor-pointer"
+                    className="flex-1 md:flex-none justify-center flex items-center gap-2 px-6 py-3 bg-emerald-700 text-white border-none rounded-xl text-[13px] font-bold cursor-pointer transition-all hover:brightness-110 active:scale-95 shadow-lg shadow-emerald-700/20"
                   >
-                    <CheckCircle size={14} /> Concluir
+                    <CheckCircle size={16} /> Concluir
                   </button>
                 )}
                 {["Admin", "Gerente"].includes(user.role?.name || "") && (
                   <button
                     onClick={() => setShowResetTaskModal(true)}
-                    className="flex-1 md:flex-none justify-center flex items-center gap-1.5 px-4 py-3 md:py-2 bg-red-600 dark:bg-red-700 text-white border-none rounded-lg text-[13px] font-semibold cursor-pointer"
+                    className="flex-1 md:flex-none justify-center flex items-center gap-2 px-6 py-3 bg-red-600 dark:bg-red-700 text-white border-none rounded-xl text-[13px] font-bold cursor-pointer transition-all hover:brightness-110 active:scale-95 shadow-lg shadow-red-600/20"
                   >
-                    <RotateCcw size={14} /> Resetar Status
+                    <RotateCcw size={16} /> Reset
                   </button>
                 )}
               </>
@@ -1633,7 +1625,7 @@ export default function TaskDetailModal({
             <button
               onClick={handleSaveTiming}
               disabled={savingTiming}
-              className="flex-[2] p-2.5 bg-amber-500 text-white border-none rounded-lg text-[13px] font-bold cursor-pointer disabled:opacity-60 shadow-lg shadow-amber-500/20"
+              className="flex-2 p-2.5 bg-amber-500 text-white border-none rounded-lg text-[13px] font-bold cursor-pointer disabled:opacity-60 shadow-lg shadow-amber-500/20"
             >
               {savingTiming ? "Salvando..." : "Salvar Cronologia"}
             </button>
@@ -1688,6 +1680,6 @@ export default function TaskDetailModal({
         </div>
       </div>
     )}
-    </>
+    </div>
   );
 }

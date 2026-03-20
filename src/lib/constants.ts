@@ -7,25 +7,10 @@ import {
   Map,
 } from "lucide-react";
 
-export const SECTORS = [
-  "Administrativo",
-  "Atendimento ao Cliente",
-  "Assistência Social",
-  "Cadastro",
-  "Controladoria",
-  "Coordenação",
-  "Engenharia",
-  "Financeiro",
-  "Gerência",
-  "Reurb",
-  "RH",
-  "TI",
-];
-
 export const SECTOR_ENUM_TO_DISPLAY: Record<string, string> = {
   AtendimentoAoCliente: "Atendimento ao Cliente",
-  AtendimentoSocial: "Assistência Social",
-  AssistenciaSocial: "Assistência Social",
+  AtendimentoSocial: "Social",
+  AssistenciaSocial: "Social",
   Administrativo: "Administrativo",
   Cadastro: "Cadastro",
   Engenharia: "Engenharia",

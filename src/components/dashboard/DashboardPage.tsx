@@ -1,6 +1,13 @@
 "use client";
 
-import { Eye, FileText } from "lucide-react";
+import {
+  Building2,
+  Calendar,
+  Check,
+  ChevronDown,
+  Eye,
+  FileText,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { DateRange } from "react-day-picker";
 import {
@@ -18,7 +25,8 @@ import useSWR from "swr";
 
 import AIReportModal from "@/components/AIReportModal";
 import { TaskFilters } from "@/components/shared/TaskFilters";
-import { PRIO_COLOR, PRIORITIES, SECTORS, STATUS_COLOR } from "@/lib/constants";
+import { authFetch } from "@/lib/authFetch";
+import { PRIO_COLOR, PRIORITIES, STATUS_COLOR } from "@/lib/constants";
 import { exportToExcel, getKpiData, type ExportKPIs } from "@/lib/exportUtils";
 import { getTaskState, parseDate, parseDateStr } from "@/lib/helpers";
 import type {
@@ -28,6 +36,7 @@ import type {
   ThemeColors,
   User,
 } from "@/types";
+import { PageHeader } from "../shared/PageHeader";
 
 // ── DashboardTask: extends the shared Task type with extra runtime aliases ──
 interface DashboardTask extends Task {
@@ -79,9 +88,9 @@ const ExportButtons = ({
       onClick={() =>
         exportToExcel(filtered, kpi, user, filterLabel, "dashboard")
       }
-      className="bg-emerald-500 text-white border-none px-3 py-1.5 rounded-lg text-[11px] font-semibold cursor-pointer flex items-center gap-1 transition-[filter] duration-100 hover:brightness-90"
+      className="bg-emerald-600 text-white border-none h-9 px-4 rounded-lg text-[13px] font-semibold cursor-pointer flex items-center gap-2 transition-all duration-200 hover:brightness-110 active:scale-95 shadow-sm shadow-emerald-500/20"
     >
-      <FileText size={13} /> EXCEL
+      <FileText size={15} /> EXCEL
     </button>
   </div>
 );
@@ -155,7 +164,7 @@ export default function DashboardPage({
 
   const { data: stats, isLoading: statsLoading } = useSWR(
     `/api/dashboard/stats?team_id=${team || ""}&sector_id=${fSector.join(",")}`,
-    (url) => fetch(url).then((res) => res.json()),
+    (url) => authFetch(url).then((res) => res.json()),
     { refreshInterval: 10000 }
   );
 
@@ -163,12 +172,15 @@ export default function DashboardPage({
 
   const filtered = tasks.filter((t: DashboardTask) => {
     const txt = (fSearch || "").toLowerCase();
-    if (
-      txt &&
-      !t.title.toLowerCase().includes(txt) &&
-      !(t.description || "").toLowerCase().includes(txt)
-    )
-      return false;
+    if (txt) {
+      const titleMatch = t.title.toLowerCase().includes(txt);
+      const descMatch = (t.description || "").toLowerCase().includes(txt);
+      const parentTitle = t.parent?.title || tasks.find((p: DashboardTask) => p.id === t.parent_id)?.title || "";
+      const parentMatch = parentTitle.toLowerCase().includes(txt);
+      const childMatch = (t.subtasks || []).some((st: any) => st.title.toLowerCase().includes(txt));
+      
+      if (!titleMatch && !descMatch && !parentMatch && !childMatch) return false;
+    }
     const contractVal =
       t.contract && typeof t.contract === "object"
         ? t.contract.name
@@ -296,30 +308,28 @@ export default function DashboardPage({
     ? Object.entries(stats.sectorStats as Record<string, { total: number }>)
         .map(([name, data]) => ({ name, v: data.total }))
         .sort((a, b) => b.v - a.v)
-    : SECTORS.map((s) => ({
-        name: s,
+    : (sectors || []).map((s: any) => ({
+        name: typeof s === "string" ? s : s.name,
         v: filtered.filter(
           (t: DashboardTask) =>
             (t.sector && typeof t.sector === "object"
-              ? t.sector.name
-              : t.sector || "") === s,
+              ? t.sector?.name
+              : t.sector) === (typeof s === "string" ? s : s.name),
         ).length,
-      }))
-        .filter((x: SectorDataEntry) => x.v > 0)
-        .sort((a: SectorDataEntry, b: SectorDataEntry) => b.v - a.v);
+      })).filter((d: any) => d.v > 0);
 
   const sectorRank = stats?.sectorStats
     ? Object.entries(stats.sectorStats as Record<string, { completed: number }>)
         .map(([name, data]) => ({ name, v: data.completed }))
         .filter((x) => x.v > 0)
         .sort((a, b) => b.v - a.v)
-    : SECTORS.map((s) => ({
-        name: s,
+    : (sectors || []).map((s: any) => ({
+        name: typeof s === "string" ? s : s.name,
         v: filtered.filter(
           (t: DashboardTask) =>
             (t.sector && typeof t.sector === "object"
-              ? t.sector.name
-              : t.sector || "") === s && t.status === "Concluído",
+              ? t.sector?.name
+              : t.sector) === (typeof s === "string" ? s : s.name) && t.status === "Concluído",
         ).length,
       }))
         .filter((x: SectorDataEntry) => x.v > 0)
@@ -420,50 +430,38 @@ export default function DashboardPage({
 
   return (
     <div>
-      {/* Header */}
-      <div className="flex justify-between items-start mb-4">
-        <div>
-          <h1 className="m-0 text-[22px] font-bold text-slate-900 dark:text-gray-50">
-            Dashboard
-          </h1>
-          <p className="mt-1 mb-0 text-[13px] text-slate-500 dark:text-gray-400">
-            Olá, {user.name.split(" ")[0]}! Veja o resumo das atividades.
-          </p>
-        </div>
-        <div className="flex gap-2.5 items-center">
-          <ExportButtons
-            filtered={filtered}
-            kpi={kpi}
-            users={users}
-            user={user}
-            filterLabel={
-              [
-                fContract && `Contrato: ${fContract}`,
-                fCity && `Cidade: ${fCity}`,
-                fNeighbor && `Bairro: ${fNeighbor}`,
-                fStatus && `Status: ${fStatus}`,
-                fType && `Tipo: ${fType}`,
-                fPriority && `Prioridade: ${fPriority}`,
-                fSector.length > 0 && `Setores: ${fSector.join(", ")}`,
-                fUser && `Responsável: ${fUser}`,
-                (fDateFrom?.from || fDateFrom?.to) && "Filtro de Prazo",
-                (fDateTo?.from || fDateTo?.to) && "Filtro de Criação",
-                fCurrentState && `Estado: ${fCurrentState}`,
-              ]
-                .filter(Boolean)
-                .join(" | ") || "Nenhum"
-            }
-          />
-          <AIReportModal user={user} />
-          <span className="text-xs text-slate-500 dark:text-gray-400 bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5">
-            {new Date().toLocaleDateString("pt-BR", {
-              day: "2-digit",
-              month: "short",
-              year: "numeric",
-            })}
-          </span>
-        </div>
-      </div>
+      <PageHeader
+        title="Dashboard"
+        subtitle={`${filtered.length} de ${tasks?.length || 0} tarefas`}
+        actionButtons={
+          <>
+            <ExportButtons
+              filtered={filtered}
+              kpi={kpi}
+              users={users}
+              user={user}
+              filterLabel={
+                [
+                  fContract && `Contrato: ${fContract}`,
+                  fCity && `Cidade: ${fCity}`,
+                  fNeighbor && `Bairro: ${fNeighbor}`,
+                  fStatus && `Status: ${fStatus}`,
+                  fType && `Tipo: ${fType}`,
+                  fPriority && `Prioridade: ${fPriority}`,
+                  fSector.length > 0 && `Setores: ${fSector.join(", ")}`,
+                  fUser && `Responsável: ${fUser}`,
+                  (fDateFrom?.from || fDateFrom?.to) && "Filtro de Prazo",
+                  (fDateTo?.from || fDateTo?.to) && "Filtro de Criação",
+                  fCurrentState && `Estado: ${fCurrentState}`,
+                ]
+                  .filter(Boolean)
+                  .join(" | ") || "Nenhum"
+              }
+            />
+            <AIReportModal user={user} />
+          </>
+        }
+      />
 
       <TaskFilters
         T={T}
@@ -509,13 +507,13 @@ export default function DashboardPage({
       {/* -- KPIs -- */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3.5 mb-5">
         {/* Total (Merged with Priority) - Spans 2 cols */}
-        <div className="col-span-2 bg-white dark:bg-gray-800 rounded-[14px] p-4 border border-slate-200 dark:border-gray-700 flex flex-col gap-3">
+        <div className="col-span-2 bg-white dark:bg-(--t-card) rounded-2xl p-4 border border-slate-200 dark:border-(--t-border) flex flex-col gap-3 animate-fade-in-up">
           <div className="flex justify-between items-start">
             <div>
               <div className="text-[11px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-wide mb-1">
                 Total de Tarefas
               </div>
-              <div className="text-[34px] font-extrabold text-primary leading-none">
+              <div className="text-[34px] font-extrabold text-gradient-primary leading-none font-kpi">
                 {total}
               </div>
               <div className="text-[11px] text-slate-500 dark:text-gray-400 mt-1">
@@ -537,7 +535,7 @@ export default function DashboardPage({
                     />
                     {p.name}
                   </div>
-                  <span className="font-bold text-slate-900 dark:text-gray-50">
+                  <span className="font-bold text-slate-900 dark:text-gray-50 font-kpi">
                     {p.val}
                   </span>
                 </div>
@@ -547,7 +545,7 @@ export default function DashboardPage({
         </div>
 
         {/* Por tipo - Spans 2 cols */}
-        <div className="col-span-2 bg-white dark:bg-gray-800 rounded-[14px] p-4 border border-slate-200 dark:border-gray-700">
+        <div className="col-span-2 bg-white dark:bg-(--t-card) rounded-2xl p-4 border border-slate-200 dark:border-(--t-border) animate-fade-in-up stagger-2">
           <div className="text-[11px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-wide mb-2.5">
             Por Tipo
           </div>
@@ -565,7 +563,7 @@ export default function DashboardPage({
                 <span className="text-slate-500 dark:text-gray-400 whitespace-nowrap overflow-hidden text-ellipsis">
                   {tp.name}
                 </span>
-                <span className="font-bold text-slate-900 dark:text-gray-50 bg-slate-200 dark:bg-gray-700 rounded-full px-2 py-px text-[10px]">
+                <span className="font-bold text-slate-900 dark:text-gray-50 bg-slate-100 dark:bg-(--t-tag) rounded-full px-2 py-px text-[10px] font-kpi">
                   {tp.val}
                 </span>
               </div>
@@ -574,11 +572,11 @@ export default function DashboardPage({
         </div>
 
         {/* Tempo medio - Spans 1 col */}
-        <div className="col-span-1 bg-white dark:bg-gray-800 rounded-[14px] p-4 border border-slate-200 dark:border-gray-700 flex flex-col gap-1.5">
+        <div className="col-span-1 bg-white dark:bg-(--t-card) rounded-2xl p-4 border border-slate-200 dark:border-(--t-border) flex flex-col gap-1.5 animate-fade-in-up stagger-3">
           <div className="text-[11px] font-bold text-slate-500 dark:text-gray-400 uppercase tracking-wide">
             Tempo M&eacute;dio
           </div>
-          <div className="text-2xl font-extrabold text-emerald-500 leading-none mt-1">
+          <div className="text-2xl font-extrabold text-emerald-500 leading-none mt-1 font-kpi">
             {avgTime > 0
               ? `${Math.floor(avgTime / 60)}h ${avgTime % 60}m`
               : "\u2014"}
@@ -592,8 +590,8 @@ export default function DashboardPage({
       {/* -- GRAFICOS LINHA 1 -- */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 mb-3.5">
         {/* Status */}
-        <div className="bg-white dark:bg-gray-800 rounded-[14px] p-4 border border-slate-200 dark:border-gray-700">
-          <div className="text-[13px] font-semibold text-slate-900 dark:text-gray-50 mb-3">
+        <div className="bg-white dark:bg-(--t-card) rounded-2xl p-4 border border-slate-200 dark:border-(--t-border) animate-fade-in-up stagger-4">
+          <div className="text-[13px] font-semibold text-slate-900 dark:text-gray-50 mb-3 font-display">
             Tarefas por Status
           </div>
           <ResponsiveContainer width="100%" height={160}>
@@ -643,8 +641,8 @@ export default function DashboardPage({
         </div>
 
         {/* Por setor */}
-        <div className="bg-white dark:bg-gray-800 rounded-[14px] p-4 border border-slate-200 dark:border-gray-700 h-full flex flex-col">
-          <div className="text-[13px] font-semibold text-slate-900 dark:text-gray-50 mb-4">
+        <div className="bg-white dark:bg-(--t-card) rounded-2xl p-4 border border-slate-200 dark:border-(--t-border) h-full flex flex-col animate-fade-in-up stagger-5">
+          <div className="text-[13px] font-semibold text-slate-900 dark:text-gray-50 mb-4 font-display">
             Tarefas por Setor
           </div>
           <div className="flex flex-col gap-3 overflow-y-auto pr-1 flex-1 max-h-[220px] pb-2">
@@ -699,8 +697,8 @@ export default function DashboardPage({
         </div>
 
         {/* Rankings */}
-        <div className="bg-white dark:bg-gray-800 rounded-[14px] p-4 border border-slate-200 dark:border-gray-700">
-          <div className="text-[13px] font-semibold text-slate-900 dark:text-gray-50 mb-2.5">
+        <div className="bg-white dark:bg-(--t-card) rounded-2xl p-4 border border-slate-200 dark:border-(--t-border) animate-fade-in-up stagger-6">
+          <div className="text-[13px] font-semibold text-slate-900 dark:text-gray-50 mb-2.5 font-display">
             {"\uD83C\uDFC6"} Rankings (Conclu&iacute;das)
           </div>
           <div className="text-[11px] font-bold text-slate-500 dark:text-gray-400 mb-1.5 uppercase">

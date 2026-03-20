@@ -876,9 +876,9 @@ export default function AIReportModal({ user }: AIReportModalProps) {
       <button
         id="ai-report-btn"
         onClick={() => setIsOpen(true)}
-        className="flex items-center gap-1.5 bg-gradient-to-br from-[#3b43af] via-indigo-500 to-violet-500 text-white border-none rounded-lg px-3.5 py-1.5 text-xs font-semibold cursor-pointer shadow-[0_2px_8px_rgba(99,102,241,0.4)] transition-all duration-200 hover:-translate-y-px"
+        className="flex items-center gap-2 bg-linear-to-br from-[#3b43af] via-indigo-600 to-violet-600 text-white border-none rounded-lg h-9 px-4 text-[13px] font-bold cursor-pointer shadow-[0_4px_12px_rgba(99,102,241,0.3)] transition-all duration-200 hover:-translate-y-px hover:brightness-110 active:scale-95"
       >
-        <Sparkles size={14} />
+        <Sparkles size={15} />
         Análise IA
       </button>
     );
@@ -886,13 +886,13 @@ export default function AIReportModal({ user }: AIReportModalProps) {
 
   // ─── Modal ──────────────────────────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-5 backdrop-blur-sm">
+    <div className="fixed inset-0 bg-black/60 z-9999 flex items-center justify-center p-5 backdrop-blur-sm">
       <div
         id="ai-report-modal"
         className="bg-white dark:bg-gray-900 w-full max-w-[760px] max-h-[92vh] rounded-[20px] flex flex-col border border-slate-200 dark:border-gray-700 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.35)] overflow-hidden"
       >
         {/* ── Header ── */}
-        <div className="px-5 py-4 bg-gradient-to-br from-[#1e1b4b] via-[#312e81] to-[#1e1b4b] flex justify-between items-center shrink-0">
+        <div className="px-5 py-4 bg-linear-to-br from-[#1e1b4b] via-[#312e81] to-[#1e1b4b] flex justify-between items-center shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="bg-indigo-500/30 p-2 rounded-[10px] border border-indigo-500/40">
               <Sparkles size={18} color="#a5b4fc" />
@@ -1046,7 +1046,7 @@ export default function AIReportModal({ user }: AIReportModalProps) {
                 className={`w-full flex items-center justify-center gap-2 px-5 py-3 rounded-[10px] border-none text-white text-sm font-bold transition-all duration-200 ${
                   selectedAnalyses.length === 0 && !customMessage.trim()
                     ? "bg-indigo-500/30 cursor-not-allowed shadow-none"
-                    : "bg-gradient-to-br from-[#3b43af] via-indigo-500 to-violet-500 cursor-pointer shadow-[0_4px_15px_rgba(99,102,241,0.4)]"
+                    : "bg-linear-to-br from-[#3b43af] via-indigo-500 to-violet-500 cursor-pointer shadow-[0_4px_15px_rgba(99,102,241,0.4)]"
                 }`}
               >
                 <Send size={16} />
@@ -1058,7 +1058,7 @@ export default function AIReportModal({ user }: AIReportModalProps) {
           {/* === CARREGANDO === */}
           {loading && (
             <div className="flex flex-col items-center justify-center px-6 py-[60px] gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-violet-500/20 flex items-center justify-center border border-indigo-500/30">
+              <div className="w-16 h-16 rounded-2xl bg-linear-to-br from-indigo-500/20 to-violet-500/20 flex items-center justify-center border border-indigo-500/30">
                 <Loader2 size={28} className="animate-spin text-indigo-500" />
               </div>
               <div className="text-center">
@@ -1089,7 +1089,7 @@ export default function AIReportModal({ user }: AIReportModalProps) {
             <div>
               {/* Stats rápidos */}
               {stats && (
-                <div className="px-6 py-4 bg-gradient-to-br from-[#1e1b4b] to-[#312e81] flex gap-2.5 flex-wrap">
+                <div className="px-6 py-4 bg-linear-to-br from-[#1e1b4b] to-[#312e81] flex gap-2.5 flex-wrap">
                   <StatCard
                     label="Total"
                     value={stats.total}

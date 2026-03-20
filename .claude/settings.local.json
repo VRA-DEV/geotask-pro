@@ -30,7 +30,17 @@
       "Bash(npx prisma:*)",
       "Bash(npx tsx:*)",
       "Bash(npx tsc:*)",
-      "Bash(npx skills:*)"
+      "Bash(npx skills:*)",
+      "Bash(find /c/Users/viniciusaraujo/Documents/GDrive/projects/GeoTask-Pro/geotask-pro/src -type f \\\\\\(-name *.ts -o -name *.tsx \\\\\\))",
+      "Bash(find src/app/api -name \"route.ts\" -exec basename -a {})",
+      "Bash(xargs dirname:*)",
+      "Bash(ls -la /c/Users/viniciusaraujo/Documents/GDrive/projects/GeoTask-Pro/geotask-pro/src/app/api/*/route.ts)",
+      "Bash(npm install:*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(wc -l /c/Users/viniciusaraujo/Documents/GDrive/projects/Geoboard/geogis-contratos/api/src/**/*.ts)",
+      "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --no-turbopack --import-alias \"@/*\" --use-npm)",
+      "Bash(rm package.json)",
+      "Bash(npx create-next-app@latest . --typescript --tailwind --eslint --app --src-dir --no-turbopack --import-alias \"@/*\" --use-npm --yes)"
     ]
   }
 }

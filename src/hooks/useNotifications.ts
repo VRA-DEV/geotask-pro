@@ -1,11 +1,10 @@
 import useSWR from "swr";
-
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+import { authFetcher, authFetch } from "@/lib/authFetch";
 
 export function useNotifications(userId: number | null) {
   const { data, error, isLoading, mutate } = useSWR(
     userId ? `/api/notifications?user_id=${userId}` : null,
-    fetcher,
+    authFetcher,
     {
       refreshInterval: 30000,
       revalidateOnFocus: true,
@@ -27,7 +26,7 @@ export function useNotifications(userId: number | null) {
     };
     mutate(optimistic, false);
 
-    await fetch("/api/notifications", {
+    await authFetch("/api/notifications", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
@@ -45,7 +44,7 @@ export function useNotifications(userId: number | null) {
     };
     mutate(optimistic, false);
 
-    await fetch("/api/notifications", {
+    await authFetch("/api/notifications", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ user_id: userId, mark_all: true }),

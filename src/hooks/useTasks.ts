@@ -1,7 +1,6 @@
 import type { Task } from "@/types";
 import useSWR from "swr";
-
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+import { authFetcher } from "@/lib/authFetch";
 
 interface UseTasksOptions {
   /** Server-side filters (optional — omit for all tasks) */
@@ -17,6 +16,8 @@ interface UseTasksOptions {
   teamId?: number;
   /** Server-side filter for creator */
   createdById?: number;
+  /** Server-side filter for search */
+  search?: string;
 }
 
 function buildUrl(opts: UseTasksOptions = {}): string {
@@ -33,15 +34,15 @@ function buildUrl(opts: UseTasksOptions = {}): string {
     params.set("created_by_me", "true");
     params.set("created_by_id", String(opts.createdById));
   }
+  if (opts.search) params.set("search", opts.search);
   const qs = params.toString();
   return qs ? `/api/tasks?${qs}` : "/api/tasks";
 }
 
 export function useTasks(opts: UseTasksOptions = {}) {
   const url = buildUrl(opts);
-  const isPaginated = !!opts.limit;
 
-  const { data, error, isLoading, mutate } = useSWR(url, fetcher, {
+  const { data, error, isLoading, mutate } = useSWR(url, authFetcher, {
     revalidateOnFocus: false,
     dedupingInterval: 5000,
   });

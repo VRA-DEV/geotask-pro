@@ -26,6 +26,8 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { DateRange } from "react-day-picker";
 import { TaskFilters } from "../shared/TaskFilters";
+import { PageHeader } from "../shared/PageHeader";
+import { Tooltip } from "../shared/Tooltip";
 
 // ── KanbanTask: extends shared Task with runtime alias ──
 interface KanbanTask extends Task {
@@ -66,7 +68,7 @@ interface KanbanPageProps {
   onSelect: (task: KanbanTask) => void;
   canCreate: boolean;
   onNew: () => void;
-  users?: UserType[];
+  users: UserType[];
   contracts?: string[];
   citiesNeighborhoods?: CitiesNeighborhoods;
   sectors?: Sector[];
@@ -79,6 +81,32 @@ interface KanbanPageProps {
   teams?: { id: number; name: string }[];
   currentState?: string;
   setCurrentState?: (v: string) => void;
+  externalFilters?: boolean;
+  externalQuery?: {
+    search: string;
+    sector: string[];
+    contract: string;
+    city: string;
+    neighbor: string;
+    priority: string;
+    type: string;
+    responsible: string;
+    createdByMe: boolean;
+    team: string;
+    currentState: string;
+    dateFrom: DateRange | undefined;
+    dateTo: DateRange | undefined;
+  };
+  setSearch?: (v: string) => void;
+  setSector?: (v: string[]) => void;
+  setPriority?: (v: string) => void;
+  setType?: (v: string) => void;
+  setResponsible?: (v: string) => void;
+  setContract?: (v: string) => void;
+  setCity?: (v: string) => void;
+  setNeighbor?: (v: string) => void;
+  setDateFrom?: (v: DateRange | undefined) => void;
+  setDateTo?: (v: DateRange | undefined) => void;
 }
 
 // ── Inline helper components ────────────────────────────────────
@@ -262,9 +290,9 @@ const ExportButtons = ({
   <div className="flex gap-2 items-center">
     <button
       onClick={() => exportToExcel(filtered, kpi, user, filterLabel, "kanban")}
-      className="bg-emerald-500 text-white border-none px-3 py-1.5 rounded-lg text-[11px] h-8 font-semibold cursor-pointer flex items-center gap-1 transition-[filter] duration-100 hover:brightness-90"
+      className="bg-emerald-600 text-white border-none h-9 px-4 rounded-lg text-[13px] font-semibold cursor-pointer flex items-center gap-2 transition-all duration-200 hover:brightness-110 active:scale-95 shadow-sm shadow-emerald-500/20"
     >
-      <FileText size={13} /> EXCEL
+      <FileText size={15} /> EXCEL
     </button>
   </div>
 );
@@ -282,6 +310,7 @@ export default function KanbanPage({
   citiesNeighborhoods = {},
   sectors = [],
   taskTypes = [],
+  canViewAllSectors,
   createdByMe,
   setCreatedByMe,
   team,
@@ -289,19 +318,50 @@ export default function KanbanPage({
   teams,
   currentState,
   setCurrentState,
+  setSearch: setSearchProp,
+  setSector: setSectorProp,
+  setPriority: setPriorityProp,
+  setType: setTypeProp,
+  setResponsible: setResponsibleProp,
+  setContract: setContractProp,
+  setCity: setCityProp,
+  setNeighbor: setNeighborProp,
+  setDateFrom: setDateFromProp,
+  setDateTo: setDateToProp,
+  externalFilters = false,
+  externalQuery,
 }: KanbanPageProps) {
-  const [search, setSearch] = useState("");
-  const [fSector, setFSector] = useState<string[]>([]);
-  const [fContract, setFContract] = useState("");
-  const [fCity, setFCity] = useState("");
-  const [fNeighbor, setFNeighbor] = useState("");
-  const [fPriority, setFPriority] = useState("");
-  const [fType, setFType] = useState("");
-  const [fResponsible, setFResponsible] = useState("");
-  const [showSubtasks, setShowSubtasks] = useState(true);
-  const [fDateFrom, setFDateFrom] = useState<DateRange | undefined>(undefined);
-  const [fDateTo, setFDateTo] = useState<DateRange | undefined>(undefined);
-  const [fCurrentState, setFCurrentState] = useState(currentState || "");
+  // ── INTERNAL FILTER STATES (Used if not external) ──────────────────
+  const [internalSearch, setInternalSearch] = useState("");
+  const [internalSector, setInternalSector] = useState<string[]>([]);
+  const [internalContract, setInternalContract] = useState("");
+  const [internalCity, setInternalCity] = useState("");
+  const [internalNeighbor, setInternalNeighbor] = useState("");
+  const [internalPriority, setInternalPriority] = useState("");
+  const [internalType, setInternalType] = useState("");
+  const [internalResponsible, setInternalResponsible] = useState("");
+  const [internalDateFrom, setInternalDateFrom] = useState<DateRange | undefined>(undefined);
+  const [internalDateTo, setInternalDateTo] = useState<DateRange | undefined>(undefined);
+  const [internalShowSubtasks, setInternalShowSubtasks] = useState(true);
+
+  // ── RESOLVE FILTER VALUES ──────────────────────────────────────────
+  const search = externalFilters ? (externalQuery?.search || "") : internalSearch;
+  const fSector = externalFilters ? (externalQuery?.sector || []) : internalSector;
+  const fContract = externalFilters ? (externalQuery?.contract || "") : internalContract;
+  const fCity = externalFilters ? (externalQuery?.city || "") : internalCity;
+  const fNeighbor = externalFilters ? (externalQuery?.neighbor || "") : internalNeighbor;
+  const fPriority = externalFilters ? (externalQuery?.priority || "") : internalPriority;
+  const fType = externalFilters ? (externalQuery?.type || "") : internalType;
+  const fResponsible = externalFilters ? (externalQuery?.responsible || "") : internalResponsible;
+  const fDateFrom = externalFilters ? externalQuery?.dateFrom : internalDateFrom;
+  const fDateTo = externalFilters ? externalQuery?.dateTo : internalDateTo;
+  const fCurrentState = externalFilters ? (externalQuery?.currentState || "") : (currentState || "");
+  const showSubtasks = internalShowSubtasks; 
+
+  const handleSetSearch = (v: string) => {
+    if (externalFilters && setSearchProp) setSearchProp(v);
+    else setInternalSearch(v);
+  };
   const [sortField, setSortField] = useState<string>("");
   const [sortOrder, setSortOrder] = useState<string>("asc");
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -309,19 +369,22 @@ export default function KanbanPage({
   const cityNeighborhoods = fCity ? citiesNeighborhoods[fCity] || [] : [];
 
   useEffect(() => {
-    if (currentState !== undefined) setFCurrentState(currentState);
-  }, [currentState]);
-
-  useEffect(() => {
-    if (setCurrentState) setCurrentState(fCurrentState);
-  }, [fCurrentState, setCurrentState]);
+    if (currentState !== undefined && !externalFilters) {
+        // If external, the hub handles this
+    }
+  }, [currentState, externalFilters]);
 
   const cols = ["A Fazer", "Em Andamento", "Pausado", "Concluído"];
 
   const filtered = tasks.filter((t: KanbanTask) => {
     if (!showSubtasks && (t.parent_id || t.isLegacy)) return false;
-    if (search && !t.title.toLowerCase().includes(search.toLowerCase()))
-      return false;
+    if (search) {
+      const s = search.toLowerCase();
+      const titleMatch = t.title.toLowerCase().includes(s);
+      const parentTitle = t.parent?.title || tasks.find((p: KanbanTask) => p.id === t.parent_id)?.title || "";
+      const parentMatch = parentTitle.toLowerCase().includes(s);
+      if (!titleMatch && !parentMatch) return false;
+    }
     const sectorVal =
       t.sector && typeof t.sector === "object"
         ? t.sector?.name
@@ -388,16 +451,18 @@ export default function KanbanPage({
   ].filter(Boolean).length;
 
   const clearAll = () => {
-    setSearch("");
-    setFSector([]);
-    setFContract("");
-    setFCity("");
-    setFNeighbor("");
-    setFPriority("");
-    setFType("");
-    setFDateFrom(undefined);
-    setFDateTo(undefined);
-    setFCurrentState("");
+    if (externalFilters) return;
+    setInternalSearch("");
+    setInternalSector([]);
+    setInternalContract("");
+    setInternalCity("");
+    setInternalNeighbor("");
+    setInternalPriority("");
+    setInternalType("");
+    setInternalResponsible("");
+    setInternalDateFrom(undefined);
+    setInternalDateTo(undefined);
+    if (setCurrentState) setCurrentState("");
     setSortField("");
     setSortOrder("asc");
   };
@@ -407,120 +472,142 @@ export default function KanbanPage({
   return (
     <div>
       {/* Header */}
-      <div className="flex justify-between items-start mb-4">
-        <div>
-          <h1 className="m-0 text-[22px] font-bold text-slate-900 dark:text-gray-50">
-            Quadro de Tarefas
-          </h1>
-          <p className="mt-1 mb-0 text-[13px] text-slate-500 dark:text-gray-400">
-            {filtered.length} de {tasks.length} tarefas
-          </p>
-        </div>
-        <div className="flex gap-2 items-center">
-          <ExportButtons
-            filtered={filtered}
-            kpi={getKpiData(filtered, users)}
-            users={users}
-          />
-          {canCreate && (
-            <button
-              onClick={onNew}
-              className="flex items-center h-8 gap-1.5 px-4 py-2.5 bg-primary text-white border-none rounded-lg text-[13px] font-semibold cursor-pointer"
-            >
-              <Plus size={15} />
-              Nova Tarefa
-            </button>
-          )}
-        </div>
-      </div>
-
-      <TaskFilters
-        T={T}
-        search={search}
-        setSearch={setSearch}
-        sector={fSector}
-        setSector={setFSector}
-        priority={fPriority}
-        setPriority={setFPriority}
-        type={fType}
-        setType={setFType}
-        responsible={fResponsible}
-        setResponsible={setFResponsible}
-        contract={fContract}
-        setContract={setFContract}
-        city={fCity}
-        setCity={setFCity}
-        neighbor={fNeighbor}
-        setNeighbor={setFNeighbor}
-        dateFrom={fDateFrom}
-        setDateFrom={setFDateFrom}
-        dateTo={fDateTo}
-        setDateTo={setFDateTo}
-        showSubtasks={showSubtasks}
-        setShowSubtasks={setShowSubtasks}
-        sortField={sortField}
-        setSortField={setSortField}
-        sortOrder={sortOrder}
-        setSortOrder={setSortOrder}
-        contracts={contracts}
-        taskTypes={taskTypes}
-        sectors={sectors}
-        citiesNeighborhoods={citiesNeighborhoods}
-        onClear={clearAll}
-        totalTasks={tasks.length}
-        filteredTasks={filtered.length}
-        createdByMe={createdByMe}
-        setCreatedByMe={setCreatedByMe}
-        team={team}
-        setTeam={setTeam}
-        teams={teams}
-        currentState={fCurrentState}
-        setCurrentState={setFCurrentState}
-        users={users}
-        displayedTasks={filtered}
+      <PageHeader
+        title="Quadro de Tarefas"
+        subtitle={`${filtered.length} de ${tasks.length} tarefas`}
+        actionButtons={
+          <>
+            <ExportButtons
+              filtered={filtered}
+              kpi={getKpiData(filtered, users)}
+              users={users}
+            />
+            {canCreate && (
+              <button
+                id="kanban-nova-tarefa-btn"
+                onClick={onNew}
+                className="flex items-center h-9 gap-2 px-4 text-white border-none rounded-lg text-[13px] font-bold cursor-pointer btn-primary active:scale-95 shadow-sm"
+              >
+                <Plus size={16} />
+                NOVA TAREFA
+              </button>
+            )}
+          </>
+        }
       />
+
+      {!externalFilters && (
+        <TaskFilters
+          T={T}
+          search={search}
+          setSearch={externalFilters ? () => {} : setInternalSearch}
+          sector={fSector}
+          setSector={externalFilters ? () => {} : setInternalSector}
+          priority={fPriority}
+          setPriority={externalFilters ? () => {} : setInternalPriority}
+          type={fType}
+          setType={externalFilters ? () => {} : setInternalType}
+          responsible={fResponsible}
+          setResponsible={externalFilters ? () => {} : setInternalResponsible}
+          contract={fContract}
+          setContract={externalFilters ? () => {} : setInternalContract}
+          city={fCity}
+          setCity={externalFilters ? () => {} : setInternalCity}
+          neighbor={fNeighbor}
+          setNeighbor={externalFilters && setNeighborProp ? setNeighborProp : setInternalNeighbor}
+          dateFrom={fDateFrom}
+          setDateFrom={externalFilters && setDateFromProp ? setDateFromProp : setInternalDateFrom}
+          dateTo={fDateTo}
+          setDateTo={externalFilters && setDateToProp ? setDateToProp : setInternalDateTo}
+          showSubtasks={showSubtasks}
+          setShowSubtasks={setInternalShowSubtasks}
+          sortField={sortField}
+          setSortField={setSortField}
+          sortOrder={sortOrder}
+          setSortOrder={setSortOrder}
+          contracts={contracts}
+          taskTypes={taskTypes}
+          sectors={sectors}
+          citiesNeighborhoods={citiesNeighborhoods}
+          onClear={clearAll}
+          totalTasks={tasks.length}
+          filteredTasks={filtered.length}
+          createdByMe={createdByMe}
+          setCreatedByMe={setCreatedByMe}
+          team={team}
+          setTeam={setTeam}
+          teams={teams}
+          currentState={fCurrentState}
+          setCurrentState={setCurrentState}
+          users={users}
+          canViewAllSectors={canViewAllSectors}
+          displayedTasks={filtered}
+        />
+      )}
 
       {/* Colunas */}
       <div className="flex gap-3.5 overflow-x-auto pb-2">
-        {cols.map((col) => {
+        {cols.map((col, colIdx) => {
           const colTasks = filtered.filter((t: KanbanTask) => t.status === col);
+          const getPriorityBorder = (priority: string | null | undefined) => {
+            switch (priority?.toLowerCase()) {
+              case 'urgente': return 'priority-border-urgente';
+              case 'alta': return 'priority-border-alta';
+              case 'média': case 'media': return 'priority-border-media';
+              case 'baixa': return 'priority-border-baixa';
+              default: return '';
+            }
+          };
           return (
-            <div key={col} className="shrink-0 w-[272px]">
+            <div key={col} className="shrink-0 w-[272px] animate-fade-in-up" style={{ animationDelay: `${colIdx * 0.08}s` }}>
               <div className="flex items-center gap-2 mb-2.5">
                 <div
                   className="w-2.5 h-2.5 rounded-full"
                   style={{ background: STATUS_COLOR[col] }}
                 />
-                <span className="text-[13px] font-semibold text-slate-900 dark:text-gray-50">
+                <span className="text-[13px] font-semibold text-slate-900 dark:text-gray-50 font-display">
                   {col}
                 </span>
-                <span className="ml-auto text-[11px] px-2 py-px rounded-[20px] bg-slate-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold">
+                <span className="ml-auto text-[11px] px-2 py-px rounded-[20px] bg-slate-200 dark:bg-(--t-tag) text-gray-700 dark:text-gray-300 font-semibold font-kpi">
                   {colTasks.length}
                 </span>
               </div>
-              <div className="bg-slate-100 dark:bg-gray-900 rounded-xl p-2 min-h-[200px] flex flex-col gap-2">
-                {colTasks.map((t: KanbanTask) => {
+              <div className="bg-slate-50 dark:bg-[var(--t-col)] rounded-xl p-2 min-h-[200px] flex flex-col gap-2">
+                {colTasks.map((t: KanbanTask, cardIdx: number) => {
+                  const taskState = getTaskState(t);
+                  const stateColor = taskState?.color || "#cbd5e1";
                   const prog = t.subtasks?.length
                     ? (t.subtasks.filter((s: Subtask) => s.done).length /
                         t.subtasks.length) *
                       100
                     : 0;
+                  const respName = t.responsible && typeof t.responsible === "object"
+                    ? (t.responsible as any).name
+                    : String(t.responsible || "") || "";
+                  const respInitials = respName ? respName.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase() : '?';
                   return (
-                    <div
-                      key={t.id}
-                      onClick={() => onSelect(t)}
-                      className={`bg-white dark:bg-gray-800 rounded-[10px] p-3 border transition-all duration-150 hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] hover:-translate-y-px cursor-pointer ${
-                        t.parent_id
-                          ? "border-primary/50 border-l-4 shadow-sm bg-primary/5 dark:bg-primary/5"
-                          : "border-slate-200 dark:border-gray-700"
-                      }`}
+                    <Tooltip content={t.description} key={t.id}>
+                      <div
+                        onClick={() => onSelect(t)}
+                        className="bg-white dark:bg-(--t-card) rounded-xl p-3 card-hover cursor-pointer animate-fade-in-up border-l-4 shadow-sm h-full"
+                      style={{ 
+                        animationDelay: `${(colIdx * 0.08) + (cardIdx * 0.04)}s`,
+                        borderLeftColor: stateColor,
+                      }}
                     >
                       {t.parent_id && (
-                        <div className="text-[10px] text-primary/80 dark:text-primary font-medium mb-1.5 flex items-center gap-1">
+                        <div 
+                          className="text-[10px] text-primary/70 dark:text-primary-light font-medium mb-2 flex items-center gap-1 hover:text-primary transition-colors group/parent"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const pTitle = t.parent?.title || tasks.find((p: KanbanTask) => p.id === t.parent_id)?.title;
+                            if (pTitle) handleSetSearch(pTitle);
+                          }}
+                        >
                           <span className="text-xs">↳</span>
                           <span>
-                            de:{" "}
-                            <b>
+                            Tarefa Principal:{" "}
+                            <b className="underline decoration-primary/20 group-hover/parent:decoration-primary/50 underline-offset-2">
                               {t.parent?.title ||
                                 tasks.find(
                                   (p: KanbanTask) => p.id === t.parent_id,
@@ -531,13 +618,13 @@ export default function KanbanPage({
                         </div>
                       )}
                       <div className="flex justify-between mb-[7px]">
-                        <span className="text-[10px] px-[7px] py-0.5 rounded-md bg-slate-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold flex items-center gap-1">
+                        <span className="text-[10px] px-[7px] py-0.5 rounded-md bg-slate-100 dark:bg-(--t-tag) text-gray-600 dark:text-gray-300 font-semibold flex items-center gap-1">
                           {t.type}
-                          {getTaskState(t) && (
+                          {taskState && (
                             <span
                               className="w-1.5 h-1.5 rounded-full"
                               style={{
-                                background: getTaskState(t)!.color,
+                                background: taskState.color,
                               }}
                             />
                           )}
@@ -545,31 +632,26 @@ export default function KanbanPage({
                         <span
                           className="text-[10px] px-[7px] py-0.5 rounded-md font-bold"
                           style={{
-                            background: PRIO_COLOR[t.priority || ""] + "22",
+                            background: PRIO_COLOR[t.priority || ""] + "18",
                             color: PRIO_COLOR[t.priority || ""],
                           }}
                         >
                           {t.priority}
                         </span>
                       </div>
-                      <div className="text-[13px] font-semibold text-slate-900 dark:text-gray-50 mb-[7px] leading-[1.3]">
+                      <div className="text-[13px] font-semibold text-slate-900 dark:text-(--t-text) mb-[7px] leading-[1.3]">
                         {t.title}
                       </div>
-                      {t.description && (
-                        <div className="text-[11px] text-slate-500 dark:text-gray-400 mb-[7px] overflow-hidden text-ellipsis whitespace-nowrap">
-                          {t.description}
-                        </div>
-                      )}
-                      {getTaskState(t) && (
+                      {taskState && (
                         <div className="mb-[7px]">
                           <span
                             className="text-[9px] font-bold px-1.5 py-0.5 rounded"
                             style={{
-                              background: getTaskState(t)!.color + "22",
-                              color: getTaskState(t)!.color,
+                              background: taskState.color + "18",
+                              color: taskState.color,
                             }}
                           >
-                            {getTaskState(t)!.label}
+                            {taskState.label}
                           </span>
                         </div>
                       )}
@@ -578,26 +660,26 @@ export default function KanbanPage({
                           <Building2 size={9} />
                           {sectorDisplay(t.sector)}
                         </span>
-                        <span className="text-[11px] text-slate-500 dark:text-gray-400 flex items-center gap-1">
-                          <User size={9} />
-                          {t.responsible && typeof t.responsible === "object"
-                            ? t.responsible.name
-                            : t.responsible || "Não atribuído"}
+                        <span className="text-[11px] text-slate-500 dark:text-gray-400 flex items-center gap-1.5">
+                          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-linear-to-br from-primary to-primary-hover text-[7px] font-bold text-white shrink-0">
+                            {respInitials}
+                          </span>
+                          {respName || "Não atribuído"}
                         </span>
                         <span className="text-[11px] text-slate-500 dark:text-gray-400 flex items-center gap-1">
                           <MapPin size={9} />
-                          {typeof t.contract === "object"
-                            ? t.contract?.name
+                          {t.contract && typeof t.contract === "object"
+                            ? (t.contract as any).name
                             : t.contract}
                         </span>
                         {t.city && (
                           <span className="text-[11px] text-slate-500 dark:text-gray-400 flex items-center gap-1 pl-[13px]">
-                            {typeof t.city === "object" ? t.city?.name : t.city}
+                            {typeof t.city === "object" ? (t.city as any).name : t.city}
                             {t.nucleus ? ` · ${t.nucleus}` : ""}
                           </span>
                         )}
                         {(t.quadra || t.lote) && (
-                          <span className="text-[10px] text-slate-500 dark:text-gray-400 pl-[13px]">
+                          <span className="text-[10px] text-slate-400 dark:text-gray-500 pl-[13px]">
                             {t.quadra ? `Q: ${t.quadra} ` : ""}
                             {t.lote ? `L: ${t.lote}` : ""}
                           </span>
@@ -607,7 +689,7 @@ export default function KanbanPage({
                         <div className="text-[10px] text-slate-500 dark:text-gray-400 flex items-center gap-[3px] mb-1.5">
                           <Calendar size={9} />
                           Prazo:{" "}
-                          <b className="text-slate-900 dark:text-gray-50">
+                          <b className="text-slate-800 dark:text-(--t-text)">
                             {(() => {
                               const d = new Date(t.deadline);
                               return !isNaN(d.getTime()) ? d.toLocaleDateString("pt-BR", { timeZone: "UTC" }) : t.deadline;
@@ -619,7 +701,7 @@ export default function KanbanPage({
                         <div>
                           <div className="flex justify-between text-[10px] text-slate-500 dark:text-gray-400 mb-[3px]">
                             <span>Subtarefas</span>
-                            <span>
+                            <span className="font-kpi">
                               {
                                 t.subtasks!.filter((s: Subtask) => s.done)
                                   .length
@@ -627,10 +709,10 @@ export default function KanbanPage({
                               /{t.subtasks!.length}
                             </span>
                           </div>
-                          <div className="h-[3px] bg-slate-200 dark:bg-gray-700 rounded">
+                          <div className="h-[3px] bg-slate-200 dark:bg-[var(--t-border)] rounded-full overflow-hidden">
                             <div
-                              className="h-full bg-primary rounded"
-                              style={{ width: `${prog}%` }}
+                              className="h-full rounded-full transition-all duration-500"
+                              style={{ width: `${prog}%`, background: 'linear-gradient(90deg, #98af3b, #7a9e2e)' }}
                             />
                           </div>
                         </div>
@@ -638,14 +720,15 @@ export default function KanbanPage({
                       {(t.time ?? 0) > 0 && (
                         <div className="text-[10px] text-slate-500 dark:text-gray-400 flex items-center gap-[3px] mt-1.5">
                           <Clock size={9} />
-                          {fmtTime(t.time ?? 0)}
+                          <span className="font-kpi">{fmtTime(t.time ?? 0)}</span>
                         </div>
                       )}
                     </div>
+                  </Tooltip>
                   );
                 })}
                 {colTasks.length === 0 && (
-                  <div className="text-center py-[30px] text-xs text-slate-500 dark:text-gray-400">
+                  <div className="text-center py-[30px] text-xs text-slate-400 dark:text-gray-500">
                     Sem tarefas
                   </div>
                 )}

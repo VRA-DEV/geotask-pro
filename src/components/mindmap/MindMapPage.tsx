@@ -1,6 +1,7 @@
 "use client";
 
 import { TaskFilters } from "@/components/shared/TaskFilters";
+import { PageHeader } from "../shared/PageHeader";
 import { exportToExcel, getKpiData, type ExportKPIs } from "@/lib/exportUtils";
 import type {
   CitiesNeighborhoods,
@@ -9,7 +10,7 @@ import type {
   ThemeColors,
   User,
 } from "@/types";
-import { ArrowLeft, Check, Eye, FileText, X } from "lucide-react";
+import { ArrowLeft, Calendar, Check, Eye, FileText, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { DateRange } from "react-day-picker";
 
@@ -65,6 +66,8 @@ interface MindMapPageProps {
   users?: User[];
   contracts?: string[];
   citiesNeighborhoods?: CitiesNeighborhoods;
+  externalFilters?: boolean;
+  externalQuery?: any;
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -84,9 +87,9 @@ const ExportButtons = ({
   <div className="flex gap-2 items-center">
     <button
       onClick={() => exportToExcel(filtered, kpi, user, filterLabel, "kanban")}
-      className="bg-emerald-500 text-white border-none px-3 py-1.5 rounded-lg text-[11px] h-8 font-semibold cursor-pointer flex items-center gap-1 transition-[filter] duration-100 hover:brightness-90"
+      className="bg-emerald-600 text-white border-none h-9 px-4 rounded-lg text-[13px] font-semibold cursor-pointer flex items-center gap-2 transition-all duration-200 hover:brightness-110 active:scale-95 shadow-sm shadow-emerald-500/20"
     >
-      <FileText size={13} /> EXCEL
+      <FileText size={15} /> EXCEL
     </button>
   </div>
 );
@@ -97,6 +100,8 @@ export default function MindMapPage({
   users = [],
   contracts = [],
   citiesNeighborhoods = {},
+  externalFilters = false,
+  externalQuery,
 }: MindMapPageProps) {
   // ── Filter States ──
   const [fSearch, setFSearch] = useState("");
@@ -147,7 +152,7 @@ export default function MindMapPage({
     return new Date(year, month - 1, day);
   };
 
-  const filteredTasks = tasks.filter((t) => {
+  const filteredTasks = externalFilters ? tasks : tasks.filter((t) => {
     if (fSearch && !t.title.toLowerCase().includes(fSearch.toLowerCase()))
       return false;
     if (fStatus && t.status !== fStatus) return false;
@@ -357,71 +362,68 @@ export default function MindMapPage({
 
   return (
     <div>
-      <div className="flex justify-between items-start mb-3">
-        <div>
-          <h1 className="m-0 text-[22px] font-bold text-slate-900 dark:text-gray-50">
-            Mapa de Tarefas
-          </h1>
-          <p className="mt-1 mb-0 text-[13px] text-slate-500 dark:text-gray-400">
-            Clique nos nos para expandir a hierarquia
-          </p>
-        </div>
-        <div className="flex items-center gap-2.5">
-          <ExportButtons
-            filtered={filteredTasks}
-            kpi={getKpiData(filteredTasks, users)}
-            users={users}
-          />
-          {sel.contractId != null && (
-            <button
-              onClick={() =>
-                setSel({
-                  contractId: null,
-                  cityId: null,
-                  neighborhoodId: null,
-                  taskId: null,
-                })
-              }
-              className="flex items-center gap-[5px] px-3 py-[7px] rounded-lg text-xs cursor-pointer bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400"
-            >
-              <ArrowLeft size={13} />
-              Resetar
-            </button>
-          )}
-        </div>
-      </div>
-
-      <TaskFilters
-        T={T}
-        search={fSearch}
-        setSearch={setFSearch}
-        status={fStatus}
-        setStatus={setFStatus}
-        sector={fSector}
-        setSector={setFSector}
-        priority={fPriority}
-        setPriority={setFPriority}
-        type={fType}
-        setType={setFType}
-        contract={fContract}
-        setContract={setFContract}
-        city={fCity}
-        setCity={setFCity}
-        neighbor={fNeighbor}
-        setNeighbor={setFNeighbor}
-        responsible={fUser}
-        setResponsible={setFUser}
-        dateFrom={fDateFrom}
-        setDateFrom={setFDateFrom}
-        dateTo={fDateTo}
-        setDateTo={setFDateTo}
-        users={users}
-        contracts={contracts}
-        citiesNeighborhoods={citiesNeighborhoods}
-        onClear={clearAll}
-        totalTasks={tasks.length}
-        filteredTasks={filteredTasks.length}
+      <PageHeader
+        title="Mapa de Tarefas"
+        subtitle={sel.contractId != null ? "Navegando na hierarquia" : "Clique nos nós para expandir a hierarquia"}
+        actionButtons={
+          <>
+            {sel.contractId != null && (
+              <button
+                onClick={() =>
+                  setSel({
+                    contractId: null,
+                    cityId: null,
+                    neighborhoodId: null,
+                    taskId: null,
+                  })
+                }
+                className="flex items-center h-9 gap-2 px-3 rounded-lg text-[13px] font-medium cursor-pointer bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-700 text-slate-500 dark:text-gray-400 hover:bg-slate-50 dark:hover:bg-gray-700 transition-colors shadow-sm"
+              >
+                <ArrowLeft size={14} /> Resetar
+              </button>
+            )}
+            <ExportButtons
+              filtered={filteredTasks}
+              kpi={getKpiData(filteredTasks, users)}
+              users={users}
+            />
+          </>
+        }
       />
+
+      {!externalFilters && (
+        <TaskFilters
+          T={T}
+          search={fSearch}
+          setSearch={setFSearch}
+          status={fStatus}
+          setStatus={setFStatus}
+          sector={fSector}
+          setSector={setFSector}
+          priority={fPriority}
+          setPriority={setFPriority}
+          type={fType}
+          setType={setFType}
+          contract={fContract}
+          setContract={setFContract}
+          city={fCity}
+          setCity={setFCity}
+          neighbor={fNeighbor}
+          setNeighbor={setFNeighbor}
+          responsible={fUser}
+          setResponsible={setFUser}
+          dateFrom={fDateFrom}
+          setDateFrom={setFDateFrom}
+          dateTo={fDateTo}
+          setDateTo={setFDateTo}
+          users={users}
+          contracts={contracts}
+          citiesNeighborhoods={citiesNeighborhoods}
+          onClear={clearAll}
+          totalTasks={tasks.length}
+          filteredTasks={filteredTasks.length}
+        />
+      )}
       <div
         ref={containerRef}
         className="relative overflow-x-auto overflow-y-auto max-h-[calc(100vh-260px)] min-h-[300px] rounded-2xl p-7 px-5 border"

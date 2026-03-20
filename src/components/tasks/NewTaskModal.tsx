@@ -499,31 +499,33 @@ export default function NewTaskModal({
         </div>
 
         {/* Step tabs */}
-        <div className="flex px-2 md:px-[22px] border-b border-gray-200 dark:border-gray-700 shrink-0 overflow-x-auto no-scrollbar">
-          {STEPS.map((s, i) => (
-            <button
-              key={i}
-              onClick={() => {
-                if (i < step) setStep(i);
-              }}
-              className={`flex-none md:flex-1 whitespace-nowrap px-4 md:px-0 py-2.5 text-[11px] font-bold bg-none border-none border-b-2 transition-all duration-150 ${
-                i <= step ? "cursor-pointer" : "cursor-default"
-              } ${
-                i === step
-                  ? "text-primary border-b-primary"
-                  : i < step
-                    ? "text-emerald-500 border-b-emerald-500"
-                    : "text-gray-500 dark:text-gray-400 border-b-transparent"
-              }`}
-            >
-              {i < step ? "✓ " : ""}
-              {s}
-            </button>
-          ))}
+        <div className="px-8 pb-4 border-b border-slate-100 dark:border-gray-800/50 shrink-0">
+          <div className="flex bg-slate-100/50 dark:bg-gray-800/30 p-1.5 rounded-2xl gap-1">
+            {STEPS.map((s, i) => (
+              <button
+                key={i}
+                onClick={() => {
+                  if (i < step) setStep(i);
+                }}
+                className={`flex-1 py-2.5 rounded-xl text-[11px] font-bold transition-all duration-300 border-none ${
+                  i === step
+                    ? "bg-white dark:bg-gray-800 text-primary shadow-sm"
+                    : i < step
+                      ? "text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 cursor-pointer"
+                      : "text-slate-400 dark:text-gray-500 cursor-default"
+                }`}
+              >
+                <div className="flex items-center justify-center gap-1.5">
+                  {i < step ? <Check size={12} strokeWidth={3} /> : null}
+                  {s}
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-[22px] py-5 flex flex-col gap-3.5">
+        <div className="flex-1 overflow-y-auto px-8 py-7 flex flex-col gap-5 no-scrollbar">
           {step === 0 && (
             <>
               <FormField label="Título da Tarefa" req err={errors.title}>
@@ -930,7 +932,7 @@ export default function NewTaskModal({
                       responsible: "",
                     })
                   }
-                  className="p-2.5 bg-transparent border-[1.5px] border-dashed border-primary rounded-[10px] text-[13px] font-semibold text-primary cursor-pointer flex items-center justify-center gap-1.5 hover:bg-primary/[0.03]"
+                  className="p-2.5 bg-transparent border-[1.5px] border-dashed border-primary rounded-[10px] text-[13px] font-semibold text-primary cursor-pointer flex items-center justify-center gap-1.5 hover:bg-primary/3"
                 >
                   <Plus size={15} />
                   Adicionar Subtarefa
@@ -941,22 +943,22 @@ export default function NewTaskModal({
         </div>
 
         {/* Footer */}
-        <div className="px-[22px] py-3.5 border-t border-gray-200 dark:border-gray-700 flex gap-2 shrink-0">
+        <div className="px-8 py-6 border-t border-slate-100 dark:border-gray-800/50 flex gap-3 shrink-0 bg-slate-50/30 dark:bg-gray-900/30">
           {step > 0 && (
             <button
               onClick={prev}
-              className="px-[18px] py-[9px] bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 border-none rounded-lg text-[13px] font-semibold cursor-pointer"
+              className="px-6 py-2.5 bg-slate-100 dark:bg-gray-800 text-slate-600 dark:text-gray-400 border-none rounded-xl text-[13px] font-bold cursor-pointer transition-all duration-200 hover:bg-slate-200 dark:hover:bg-gray-700"
             >
-              {"\u2190"} Voltar
+              Voltar
             </button>
           )}
           <div className="flex-1" />
           {step < 3 ? (
             <button
               onClick={next}
-              className="px-[22px] py-[9px] bg-primary text-white border-none rounded-lg text-[13px] font-semibold cursor-pointer"
+              className="px-8 py-2.5 bg-primary text-white border-none rounded-xl text-[13px] font-bold cursor-pointer transition-all duration-200 hover:brightness-110 active:scale-95 shadow-lg shadow-primary/25"
             >
-              Próximo {"\u2192"}
+              Próximo
             </button>
           ) : (
             <button
@@ -1008,9 +1010,9 @@ export default function NewTaskModal({
                 });
                 onClose();
               }}
-              className="px-[22px] py-[9px] bg-emerald-500 text-white border-none rounded-lg text-[13px] font-semibold cursor-pointer flex items-center gap-1.5"
+              className="px-8 py-2.5 bg-emerald-600 text-white border-none rounded-xl text-[13px] font-bold cursor-pointer flex items-center gap-2 transition-all duration-200 hover:brightness-110 active:scale-95 shadow-lg shadow-emerald-500/25"
             >
-              <Check size={14} />
+              <Check size={16} strokeWidth={3} />
               Criar Tarefa
             </button>
           )}

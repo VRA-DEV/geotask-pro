@@ -12,6 +12,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { authFetch } from "@/lib/authFetch";
 
 interface ActivityLogPageProps {
   T: ThemeColors;
@@ -132,8 +133,8 @@ export default function ActivityLogPage({
       setLoading(true);
       try {
         const [logsRes, summaryRes] = await Promise.all([
-          fetch(`/api/activity-log?${buildParams(page)}`),
-          fetch(`/api/activity-log?${buildParams(page, { summary: "true" })}`),
+          authFetch(`/api/activity-log?${buildParams(page)}`),
+          authFetch(`/api/activity-log?${buildParams(page, { summary: "true" })}`),
         ]);
 
         if (!logsRes.ok || !summaryRes.ok) {

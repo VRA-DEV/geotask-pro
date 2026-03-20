@@ -12,11 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
  * e feita por `requireAuth()` em cada route handler.
  */
 
-const PUBLIC_PATHS = new Set([
-  "/login",
-  "/api/auth/login",
-  "/api/setup",
-]);
+const PUBLIC_PATHS = new Set(["/login", "/api/auth/login", "/api/setup"]);
 
 const PUBLIC_API_PATHS = new Set([
   "/api/auth/login",
@@ -54,7 +50,13 @@ export function middleware(request: NextRequest) {
     }
 
     // Require X-User-Id header
-    const userId = request.headers.get("X-User-Id");
+    let userId = request.headers.get("X-User-Id");
+
+    // Fallback for SSE: allow userId query param for /api/events
+    if (!userId && pathname === "/api/events") {
+      userId = request.nextUrl.searchParams.get("userId");
+    }
+
     if (!userId || isNaN(Number(userId))) {
       return NextResponse.json(
         { error: "Autenticação necessária" },
@@ -70,7 +72,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico).*)",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };

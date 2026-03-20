@@ -126,6 +126,7 @@ export async function GET(request: NextRequest) {
     const createdByMe = url.searchParams.get("created_by_me");
     const createdById = Number(url.searchParams.get("created_by_id")) || undefined;
     const summary = url.searchParams.get("summary") === "true";
+    const search = url.searchParams.get("search");
 
     // Build optional where clause
     const where: Prisma.TaskWhereInput = {
@@ -141,6 +142,12 @@ export async function GET(request: NextRequest) {
       ...((createdByMe === "true" && createdById)
         ? { created_by_id: createdById }
         : {}),
+      ...(search ? {
+        OR: [
+          { title: { contains: search, mode: 'insensitive' } },
+          { parent: { title: { contains: search, mode: 'insensitive' } } }
+        ]
+      } : {}),
     };
 
     if (summary) {

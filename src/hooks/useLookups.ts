@@ -1,10 +1,12 @@
 import useSWR from "swr";
-
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+import { authFetcher } from "@/lib/authFetch";
 
 export function useLookups() {
-  const { data, error, isLoading, mutate } = useSWR("/api/lookups", fetcher, {
-    revalidateOnFocus: false,
+  const { data, error, isLoading, mutate } = useSWR(
+    typeof window !== "undefined" && localStorage.getItem("geotask_userId") ? "/api/lookups" : null,
+    authFetcher,
+    {
+      revalidateOnFocus: false,
     revalidateOnReconnect: false,
     dedupingInterval: 5000,
   });
@@ -18,6 +20,7 @@ export function useLookups() {
     taskTypes: data?.task_types || [],
     citiesNeighborhoods: data?.cities_neighborhoods || {},
     contractCitiesNeighborhoods: data?.contract_cities_neighborhoods || {},
+    users: data?.users || [],
     isLoading,
     error,
     mutate,

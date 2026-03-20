@@ -25,6 +25,7 @@ import { ImportUsersModal } from "./ImportUsersModal";
 import { TeamModal } from "./TeamModal";
 import { ManageTeamMembersModal } from "./ManageTeamMembersModal";
 import { Search, ChevronDown, ChevronRight, Copy } from "lucide-react";
+import { authFetch } from "@/lib/authFetch";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -206,16 +207,16 @@ export function SettingsPage({
     try {
       const proms: Promise<any>[] = [];
       if (isAdmin) {
-        proms.push(fetch("/api/users").then((r) => r.json()));
-        proms.push(fetch("/api/roles").then((r) => r.json()));
+        proms.push(authFetch("/api/users").then((r) => r.json()));
+        proms.push(authFetch("/api/roles").then((r) => r.json()));
       }
       if (isAdmin || canManageLocations) {
-        proms.push(fetch("/api/sectors").then((r) => r.json()));
-        proms.push(fetch("/api/task-types").then((r) => r.json()));
-        proms.push(fetch("/api/contracts").then((r) => r.json()));
-        proms.push(fetch("/api/cities").then((r) => r.json()));
-        proms.push(fetch("/api/neighborhoods").then((r) => r.json()));
-        proms.push(fetch("/api/teams").then((r) => r.json()));
+        proms.push(authFetch("/api/sectors").then((r) => r.json()));
+        proms.push(authFetch("/api/task-types").then((r) => r.json()));
+        proms.push(authFetch("/api/contracts").then((r) => r.json()));
+        proms.push(authFetch("/api/cities").then((r) => r.json()));
+        proms.push(authFetch("/api/neighborhoods").then((r) => r.json()));
+        proms.push(authFetch("/api/teams").then((r) => r.json()));
       }
 
       const results = await Promise.all(proms);
@@ -245,7 +246,7 @@ export function SettingsPage({
     if (!confirm("Reativar este usuário? Ele voltará a acessar o sistema."))
       return;
     try {
-      const res = await fetch("/api/users", {
+      const res = await authFetch("/api/users", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, active: true }),
@@ -265,7 +266,7 @@ export function SettingsPage({
     )
       return;
     try {
-      const res = await fetch(`/api/users?id=${id}`, { method: "DELETE" });
+      const res = await authFetch(`/api/users?id=${id}`, { method: "DELETE" });
       if (res.ok) fetchData();
       else alert("Erro ao desativar usuário");
     } catch {
@@ -276,7 +277,7 @@ export function SettingsPage({
   const handleDeleteRole = async (id: number) => {
     if (!confirm("Tem certeza que deseja excluir este cargo?")) return;
     try {
-      const res = await fetch(`/api/roles?id=${id}`, { method: "DELETE" });
+      const res = await authFetch(`/api/roles?id=${id}`, { method: "DELETE" });
       if (res.ok) fetchData();
       else {
         const data = await res.json();
@@ -290,7 +291,7 @@ export function SettingsPage({
   const handleDeleteSector = async (id: number) => {
     if (!confirm("Tem certeza que deseja excluir este setor?")) return;
     try {
-      const res = await fetch(`/api/sectors?id=${id}`, { method: "DELETE" });
+      const res = await authFetch(`/api/sectors?id=${id}`, { method: "DELETE" });
       if (res.ok) fetchData();
       else {
         const data = await res.json();
@@ -304,7 +305,7 @@ export function SettingsPage({
   const handleDeleteTeam = async (id: number) => {
     if (!confirm("Tem certeza que deseja excluir este time?")) return;
     try {
-      const res = await fetch(`/api/teams?id=${id}`, { method: "DELETE" });
+      const res = await authFetch(`/api/teams?id=${id}`, { method: "DELETE" });
       if (res.ok) fetchData();
       else {
         const data = await res.json();
@@ -319,7 +320,7 @@ export function SettingsPage({
     const name = prompt("Nome do novo contrato:");
     if (!name) return;
     try {
-      const res = await fetch("/api/contracts", {
+      const res = await authFetch("/api/contracts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
@@ -337,7 +338,7 @@ export function SettingsPage({
     const newName = prompt("Editar nome do contrato:", currentName);
     if (!newName || newName === currentName) return;
     try {
-      const res = await fetch("/api/contracts", {
+      const res = await authFetch("/api/contracts", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, name: newName }),
@@ -354,7 +355,7 @@ export function SettingsPage({
   const handleDeleteContract = async (id: number) => {
     if (!confirm("Excluir este contrato?")) return;
     try {
-      const res = await fetch(`/api/contracts?id=${id}`, { method: "DELETE" });
+      const res = await authFetch(`/api/contracts?id=${id}`, { method: "DELETE" });
       if (res.ok) {
         fetchData();
         mutate("/api/lookups");
@@ -368,7 +369,7 @@ export function SettingsPage({
     const name = prompt("Nome da nova cidade:");
     if (!name) return;
     try {
-      const res = await fetch("/api/cities", {
+      const res = await authFetch("/api/cities", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
@@ -386,7 +387,7 @@ export function SettingsPage({
     const newName = prompt("Editar nome da cidade:", currentName);
     if (!newName || newName === currentName) return;
     try {
-      const res = await fetch("/api/cities", {
+      const res = await authFetch("/api/cities", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, name: newName }),
@@ -403,7 +404,7 @@ export function SettingsPage({
   const handleDeleteCity = async (id: number) => {
     if (!confirm("Excluir esta cidade?")) return;
     try {
-      const res = await fetch(`/api/cities?id=${id}`, { method: "DELETE" });
+      const res = await authFetch(`/api/cities?id=${id}`, { method: "DELETE" });
       if (res.ok) {
         fetchData();
         mutate("/api/lookups");
@@ -424,7 +425,7 @@ export function SettingsPage({
     if (!city) return alert("Cidade inválida");
 
     try {
-      const res = await fetch("/api/neighborhoods", {
+      const res = await authFetch("/api/neighborhoods", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, cityId: city.id }),
@@ -442,7 +443,7 @@ export function SettingsPage({
     const newName = prompt("Editar nome do bairro:", currentName);
     if (!newName || newName === currentName) return;
     try {
-      const res = await fetch("/api/neighborhoods", {
+      const res = await authFetch("/api/neighborhoods", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, name: newName }),
@@ -459,7 +460,7 @@ export function SettingsPage({
   const handleDeleteNeighborhood = async (id: number) => {
     if (!confirm("Excluir este bairro?")) return;
     try {
-      const res = await fetch(`/api/neighborhoods?id=${id}`, {
+      const res = await authFetch(`/api/neighborhoods?id=${id}`, {
         method: "DELETE",
       });
       if (res.ok) {
@@ -499,7 +500,7 @@ export function SettingsPage({
     }
 
     try {
-      const res = await fetch("/api/task-types", {
+      const res = await authFetch("/api/task-types", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, sector_id: sectorId }),
@@ -516,7 +517,7 @@ export function SettingsPage({
   const handleDeleteTaskType = async (id: number) => {
     if (!confirm("Excluir este Tipo de Tarefa?")) return;
     try {
-      const res = await fetch(`/api/task-types?id=${id}`, {
+      const res = await authFetch(`/api/task-types?id=${id}`, {
         method: "DELETE",
       });
       if (res.ok) {
@@ -568,7 +569,7 @@ export function SettingsPage({
     setLoading(true);
     try {
       for (const roleId of changedRoleIds) {
-        const res = await fetch("/api/roles", {
+        const res = await authFetch("/api/roles", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: roleId, permissions: pendingPermissions[roleId] }),

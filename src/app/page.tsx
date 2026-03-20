@@ -15,6 +15,8 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSWRConfig } from "swr";
+import { DateRange } from "react-day-picker";
+
 
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
@@ -30,13 +32,14 @@ import { useTasks } from "@/hooks/useTasks";
 import { useTeams } from "@/hooks/useTeams";
 import { useTemplates } from "@/hooks/useTemplates";
 import { useUsers } from "@/hooks/useUsers";
-import { SECTORS } from "@/lib/constants";
 import { getTheme } from "@/lib/helpers";
 import { useAuthStore } from "@/stores/authStore";
 import { useUIStore } from "@/stores/uiStore";
+import { authFetch } from "@/lib/authFetch";
 
 import { ChangePasswordModal } from "./components/ChangePasswordModal";
 import { SettingsPage } from "./components/SettingsPage";
+import TasksHub from "@/components/tasks/TasksHub";
 
 // ── Dynamic imports with contextual skeletons ────────────────────────
 const DashboardPage = dynamic(
@@ -107,21 +110,37 @@ export default function GeoTask() {
     setShowNotifPopover,
     toggleNotifPopover,
     setShowTemplateModal,
+    tasksTab,
+    setTasksTab,
   } = useUIStore();
   
   // ── Local state ─────────────────────────────────────────────────────
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [activeTemplate, setActiveTemplate] = useState<any>(null);
   const [editingTemplate, setEditingTemplate] = useState<any>(null);
-  const [createdByMe, setCreatedByMe] = useState(false);
-  const [teamFilter, setTeamFilter] = useState("");
   const [fCurrentState, setFCurrentState] = useState("");
+  
+  // ── Unified Filter States (Persistent across Hub Tabs) ─────────────
+  const [fSearch, setFSearch] = useState("");
+  const [fSector, setFSector] = useState<string[]>([]);
+  const [fContract, setFContract] = useState("");
+  const [fCity, setFCity] = useState("");
+  const [fNeighbor, setFNeighbor] = useState("");
+  const [fPriority, setFPriority] = useState("");
+  const [fType, setFType] = useState("");
+  const [fResponsible, setFResponsible] = useState("");
+  const [fCreatedByMe, setFCreatedByMe] = useState(false);
+  const [fTeam, setFTeam] = useState("");
+  const [fDateFrom, setFDateFrom] = useState<DateRange | undefined>(undefined);
+  const [fDateTo, setFDateTo] = useState<DateRange | undefined>(undefined);
+  const [fShowSubtasks, setFShowSubtasks] = useState(true);
 
   // ── SWR hooks (cached data fetching) ────────────────────────────────
   const { mutate: globalMutate } = useSWRConfig();
   const { tasks, mutate: mutateTasks } = useTasks({
-    teamId: teamFilter ? Number(teamFilter) : undefined,
-    createdById: createdByMe ? user?.id : undefined
+    teamId: fTeam ? Number(fTeam) : undefined,
+    createdById: fCreatedByMe ? user?.id : undefined,
+    search: fSearch
   });
   const { users: dbUsers } = useUsers();
   const {
@@ -139,23 +158,6 @@ export default function GeoTask() {
   // T is still needed by legacy components (Dashboard, Kanban, etc.)
   const T = getTheme(dark);
 
-  // ── Derived: merged sectors ─────────────────────────────────────────
-  const mergedSectors = useMemo(() => {
-    const combined = [...dbSectors];
-    SECTORS.forEach((s) => {
-      if (
-        !combined.some(
-          (ds: any) =>
-            (ds.name || ds).toLowerCase().trim() === s.toLowerCase().trim(),
-        )
-      ) {
-        combined.push({ id: s, name: s });
-      }
-    });
-    return combined.sort((a: any, b: any) =>
-      String(a.name || a).localeCompare(String(b.name || b)),
-    );
-  }, [dbSectors]);
 
   // ── Sync dark class on <html> for Tailwind dark: variants ──────────
   useEffect(() => {
@@ -174,16 +176,12 @@ export default function GeoTask() {
       try {
         const parsed = JSON.parse(saved);
         if (!parsed?.id) throw new Error("invalid");
-        const res = await fetch("/api/auth/me", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: parsed.id }),
-        });
-        if (!res.ok) throw new Error("unauthorized");
+        const res = await authFetch(`/api/users?id=${parsed.id}`);
+        if (!res.ok) throw new Error("failed");
         const refreshedUser = await res.json();
         setUser(refreshedUser);
         localStorage.setItem("geotask_user", JSON.stringify(refreshedUser));
-        if (refreshedUser?.role?.name === "Liderado") setPage("kanban");
+        if (refreshedUser?.role?.name === "Liderado") setPage("tasks");
         setLoading(false);
       } catch {
         localStorage.removeItem("geotask_user");
@@ -202,7 +200,7 @@ export default function GeoTask() {
   useEffect(() => {
     if (!user) return;
 
-    const eventSource = new EventSource("/api/events");
+    const eventSource = new EventSource(`/api/events?userId=${user.id}`);
 
     eventSource.onmessage = (event) => {
       try {
@@ -232,12 +230,12 @@ export default function GeoTask() {
   // ── Task actions ────────────────────────────────────────────────────
   const handleCreateTask = async (newTask: any) => {
     try {
-      const res = await fetch("/api/tasks", {
+      const resp = await authFetch("/api/tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...newTask, created_by: user?.id }),
       });
-      if (res.ok) {
+      if (resp.ok) {
         await mutateTasks();
         setShowNewTask(false);
       } else alert("Erro ao criar tarefa");
@@ -257,12 +255,12 @@ export default function GeoTask() {
         await mutateTasks();
         return;
       }
-      const res = await fetch("/api/tasks", {
+      const resp = await authFetch("/api/tasks", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, action, user_id: user?.id, ...data }),
       });
-      if (res.ok) {
+      if (resp.ok) {
         await mutateTasks();
         setSelectedTask(null);
       }
@@ -356,17 +354,17 @@ export default function GeoTask() {
   // ── Additional filters (createdByMe, team) applied on top of visibleTasks
   const filteredVisibleTasks = useMemo(() => {
     let result = visibleTasks;
-    if (createdByMe && user) {
+    if (fCreatedByMe && user) {
       result = result.filter((t: any) => Number(t.created_by_id) === Number(user.id));
     }
-    if (teamFilter) {
+    if (fTeam) {
       result = result.filter((t: any) => 
-        Number(t.team_id) === Number(teamFilter) || 
-        (t.responsible?.team_id && Number(t.responsible.team_id) === Number(teamFilter))
+        Number(t.team_id) === Number(fTeam) || 
+        (t.responsible?.team_id && Number(t.responsible.team_id) === Number(fTeam))
       );
     }
     return result;
-  }, [visibleTasks, createdByMe, teamFilter, user]);
+  }, [visibleTasks, fCreatedByMe, fTeam, user]);
 
   const visibleTaskTypes = useMemo(() => {
     if (appPerms.tasks.view_all_sectors) return taskTypes;
@@ -381,20 +379,21 @@ export default function GeoTask() {
       </div>
     );
   }
+
   if (!user) return null;
 
   // ── Nav items (role-filtered) ───────────────────────────────────────
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { id: "kanban", label: "Quadro de Tarefas", icon: Layers },
-    { id: "list", label: "Tabela de Tarefas", icon: List },
-    { id: "cronograma", label: "Cronograma", icon: Calendar },
-    { id: "mindmap", label: "Mapa de Tarefas", icon: FileText },
+    { id: "tasks", label: "Minhas Tarefas", icon: Layers },
     { id: "notifications", label: "Notificações", icon: Bell },
     { id: "templates", label: "Templates", icon: FileText },
     { id: "activity_log", label: "Log de Atividades", icon: ClipboardList },
     { id: "settings", label: "Configurações", icon: Settings },
-  ].filter(({ id }) => canAccess(id as any));
+  ].filter(({ id }) => {
+    if (id === "tasks") return canAccess("kanban") || canAccess("list") || canAccess("cronograma") || canAccess("mindmap");
+    return canAccess(id as any);
+  });
 
   // ── RENDER ──────────────────────────────────────────────────────────
   return (
@@ -414,24 +413,29 @@ export default function GeoTask() {
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar
-          dark={dark}
-          toggleDark={toggleDark}
-          toggleSidebar={toggleSidebar}
-          notifications={notifications}
-          unreadCount={unreadCount}
-          markRead={markRead}
-          markAllRead={markAllRead}
-          showNotifPopover={showNotifPopover}
-          toggleNotifPopover={toggleNotifPopover}
-          setShowNotifPopover={setShowNotifPopover}
-          tasks={tasks}
-          setSelectedTask={setSelectedTask}
-          setPage={setPage}
-        />
+        <div className="sticky top-0 z-40 bg-slate-50/80 dark:bg-gray-950/80 backdrop-blur-md">
+          <TopBar
+            dark={dark}
+            toggleDark={toggleDark}
+            toggleSidebar={toggleSidebar}
+            notifications={notifications}
+            unreadCount={unreadCount}
+            markRead={markRead}
+            markAllRead={markAllRead}
+            showNotifPopover={showNotifPopover}
+            toggleNotifPopover={toggleNotifPopover}
+            setShowNotifPopover={setShowNotifPopover}
+            tasks={tasks}
+            setSelectedTask={setSelectedTask}
+            setPage={setPage}
+            activeTab={tasksTab}
+            setActiveTab={setTasksTab}
+            isTasksPage={page === "tasks"}
+          />
+        </div>
 
         {/* ── PAGE CONTENT ──────────────────────────────────────────── */}
-        <div className="flex-1 overflow-auto p-4 md:p-6">
+        <div className="p-2 md:p-3 pb-10">
           {page === "dashboard" && (
             <DashboardPage
               T={T}
@@ -441,93 +445,82 @@ export default function GeoTask() {
               users={dbUsers}
               contracts={contracts}
               citiesNeighborhoods={citiesNeighborhoods}
-              sectors={mergedSectors}
+              sectors={dbSectors}
               taskTypes={visibleTaskTypes}
               canViewAllSectors={appPerms.tasks.view_all_sectors}
-              createdByMe={createdByMe}
-              setCreatedByMe={setCreatedByMe}
-              team={teamFilter}
-              setTeam={setTeamFilter}
+              createdByMe={fCreatedByMe}
+              setCreatedByMe={setFCreatedByMe}
+              team={fTeam}
+              setTeam={setFTeam}
               teams={teams}
               currentState={fCurrentState}
               setCurrentState={setFCurrentState}
             />
           )}
-          {page === "kanban" && (
-            <KanbanPage
+
+          {page === "tasks" && (
+            <TasksHub
               T={T}
+              activeTab={tasksTab}
+              setActiveTab={setTasksTab}
               tasks={filteredVisibleTasks}
               user={user}
               onSelect={setSelectedTask}
               canCreate={canCreate}
-              onNew={() => setShowNewTask(true)}
               users={dbUsers}
               contracts={contracts}
               citiesNeighborhoods={citiesNeighborhoods}
-              sectors={mergedSectors}
+              sectors={dbSectors}
               taskTypes={visibleTaskTypes}
               canViewAllSectors={appPerms.tasks.view_all_sectors}
-              createdByMe={createdByMe}
-              setCreatedByMe={setCreatedByMe}
-              team={teamFilter}
-              setTeam={setTeamFilter}
-              teams={teams}
+              search={fSearch}
+              setSearch={setFSearch}
+              sector={fSector}
+              setSector={setFSector}
+              contract={fContract}
+              setContract={setFContract}
+              city={fCity}
+              setCity={setFCity}
+              neighbor={fNeighbor}
+              setNeighbor={setFNeighbor}
+              priority={fPriority}
+              setPriority={setFPriority}
+              type={fType}
+              setType={setFType}
+              responsible={fResponsible}
+              setResponsible={setFResponsible}
+              createdByMe={fCreatedByMe}
+              setCreatedByMe={setFCreatedByMe}
+              team={fTeam}
+              setTeam={setFTeam}
               currentState={fCurrentState}
               setCurrentState={setFCurrentState}
+              dateFrom={fDateFrom}
+              setDateFrom={setFDateFrom}
+              dateTo={fDateTo}
+              setDateTo={setFDateTo}
+              showSubtasks={fShowSubtasks}
+              setShowSubtasks={setFShowSubtasks}
+              onNewTask={() => setShowNewTask(true)}
+              onClearFilters={() => {
+                setFSearch("");
+                setFSector([]);
+                setFContract("");
+                setFCity("");
+                setFNeighbor("");
+                setFPriority("");
+                setFType("");
+                setFResponsible("");
+                setFCreatedByMe(false);
+                setFShowSubtasks(true);
+                setFTeam("");
+                setFDateFrom(undefined);
+                setFDateTo(undefined);
+                setFCurrentState("");
+              }}
             />
           )}
-          {page === "map" && (
-            <div className="flex h-full items-center justify-center text-slate-500 dark:text-gray-400">
-              Interface do Mapa em desenvolvimento.
-            </div>
-          )}
-          {page === "mindmap" && (
-            <MindMapPage
-              T={T}
-              tasks={filteredVisibleTasks}
-              users={dbUsers}
-              contracts={contracts}
-              citiesNeighborhoods={citiesNeighborhoods}
-            />
-          )}
-          {page === "list" && (
-            <ListPage
-              T={T}
-              tasks={filteredVisibleTasks}
-              onSelect={setSelectedTask}
-              users={dbUsers}
-              contracts={contracts}
-              citiesNeighborhoods={citiesNeighborhoods}
-              sectors={mergedSectors}
-              taskTypes={visibleTaskTypes}
-              canViewAllSectors={appPerms.tasks.view_all_sectors}
-              createdByMe={createdByMe}
-              setCreatedByMe={setCreatedByMe}
-              team={teamFilter}
-              setTeam={setTeamFilter}
-              teams={teams}
-              currentState={fCurrentState}
-              setCurrentState={setFCurrentState}
-            />
-          )}
-          {page === "cronograma" && (
-            <CronogramaPage
-              T={T}
-              tasks={filteredVisibleTasks}
-              onSelect={setSelectedTask}
-              users={dbUsers}
-              contracts={contracts}
-              citiesNeighborhoods={citiesNeighborhoods}
-              sectors={mergedSectors}
-              createdByMe={createdByMe}
-              setCreatedByMe={setCreatedByMe}
-              team={teamFilter}
-              setTeam={setTeamFilter}
-              teams={teams}
-              currentState={fCurrentState}
-              setCurrentState={setFCurrentState}
-            />
-          )}
+
           {page === "templates" && canAccess("templates") && (
             <TemplatesPage
               active={activeTemplate}
@@ -544,6 +537,7 @@ export default function GeoTask() {
               onDelete={handleDeleteTemplate}
             />
           )}
+
           {page === "settings" && canAccess("settings") && (
             <SettingsPage
               T={T}
@@ -552,6 +546,7 @@ export default function GeoTask() {
               currentUser={user as any}
             />
           )}
+
           {page === "notifications" && (
             <NotificationsPage
               dark={dark}
@@ -561,20 +556,20 @@ export default function GeoTask() {
               markRead={markRead}
               markAllRead={markAllRead}
               setSelectedTask={async (t: any) => {
-                // If the task object is a shallow one from notifications, fetch full details
                 if (!t.description && t.id) {
-                   const res = await fetch(`/api/tasks?id=${t.id}`);
-                   if (res.ok) {
-                     const full = await res.json();
-                     setSelectedTask(full);
-                   }
+                  const res = await authFetch(`/api/tasks?id=${t.id}`);
+                  if (res.ok) {
+                    const full = await res.json();
+                    setSelectedTask(full);
+                  }
                 } else {
                   setSelectedTask(t);
                 }
               }}
             />
           )}
-          {page === "activity_log" && canAccess("activity_log" as any) && (
+
+          {page === "activity_log" && canAccess("activity_log") && (
             <ActivityLogPage T={T} user={user} users={dbUsers} />
           )}
         </div>
@@ -594,11 +589,12 @@ export default function GeoTask() {
           contractCitiesNeighborhoods={contractCitiesNeighborhoods}
           tasks={tasks}
           setSelectedTask={setSelectedTask}
-          sectors={mergedSectors}
+          sectors={dbSectors}
           taskTypes={visibleTaskTypes}
           canViewAllSectors={appPerms.tasks.view_all_sectors}
         />
       )}
+
       {showNewTask && (
         <NewTaskModal
           T={T}
@@ -610,10 +606,11 @@ export default function GeoTask() {
           citiesNeighborhoods={citiesNeighborhoods}
           contractCitiesNeighborhoods={contractCitiesNeighborhoods}
           templates={templates}
-          sectors={mergedSectors}
+          sectors={dbSectors}
           taskTypes={visibleTaskTypes}
         />
       )}
+
       {showMustChangePassword && user && (
         <ChangePasswordModal
           isOpen={showMustChangePassword}
@@ -628,6 +625,7 @@ export default function GeoTask() {
           isMandatory={true}
         />
       )}
+
       {showTemplateModal && (
         <TemplateModal
           template={editingTemplate}
@@ -636,7 +634,7 @@ export default function GeoTask() {
             setEditingTemplate(null);
           }}
           onSave={handleSaveTemplate}
-          sectors={mergedSectors.map((s: any) => s.name)}
+          sectors={dbSectors.map((s: any) => s.name)}
         />
       )}
     </div>

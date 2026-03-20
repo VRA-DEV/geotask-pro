@@ -10,7 +10,18 @@ export async function GET(req: NextRequest) {
       // Send initial keep-alive
       controller.enqueue(new TextEncoder().encode("retry: 10000\n\n"));
       
+      // Heartbeat every 15s to keep connection alive
+      const interval = setInterval(() => {
+        try {
+          controller.enqueue(new TextEncoder().encode(": heartbeat\n\n"));
+        } catch (e) {
+          clearInterval(interval);
+          clients.delete(controller);
+        }
+      }, 15000);
+
       req.signal.addEventListener("abort", () => {
+        clearInterval(interval);
         clients.delete(controller);
       });
     },

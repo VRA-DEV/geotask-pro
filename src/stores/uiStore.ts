@@ -10,12 +10,14 @@ interface UIState {
   showNotifPopover: boolean;
   showTemplateModal: boolean;
 
+  tasksTab: string;
   setDark: (dark: boolean) => void;
   toggleDark: () => void;
   setPage: (page: string) => void;
   setSidebarOpen: (open: boolean) => void;
   toggleSidebar: () => void;
   setSettingsTab: (tab: string) => void;
+  setTasksTab: (tab: string) => void;
   setShowNewTask: (show: boolean) => void;
   setShowMustChangePassword: (show: boolean) => void;
   setShowNotifPopover: (show: boolean) => void;
@@ -33,12 +35,14 @@ export const useUIStore = create<UIState>((set) => ({
   showNotifPopover: false,
   showTemplateModal: false,
 
+  tasksTab: "kanban",
   setDark: (dark) => set({ dark }),
   toggleDark: () => set((s) => ({ dark: !s.dark })),
   setPage: (page) => set({ page }),
   setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
   setSettingsTab: (settingsTab) => set({ settingsTab }),
+  setTasksTab: (tasksTab) => set({ tasksTab }),
   setShowNewTask: (showNewTask) => set({ showNewTask }),
   setShowMustChangePassword: (showMustChangePassword) =>
     set({ showMustChangePassword }),

@@ -6,8 +6,33 @@ import { NextResponse } from "next/server";
 const DEFAULT_PASSWORD = process.env.DEFAULT_USER_PASSWORD || "Mudar@123";
 
 // GET /api/users
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+
+    if (id) {
+      const u = await prisma.user.findUnique({
+        where: { id: Number(id) },
+        include: {
+          Role: true,
+          Sector: true,
+          Team: true,
+          user_sectors: { include: { sector: true } },
+        },
+      });
+      if (!u) return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
+      
+      return NextResponse.json({
+        ...u,
+        password_hash: undefined,
+        role: u.Role,
+        sector: u.Sector,
+        team: u.Team,
+        user_sectors: u.user_sectors,
+      });
+    }
+
     const users = await prisma.user.findMany({
       include: {
         Role: true,

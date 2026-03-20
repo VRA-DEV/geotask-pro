@@ -1,9 +1,8 @@
 import useSWR from "swr";
-
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+import { authFetcher } from "@/lib/authFetch";
 
 export function useUsers() {
-  const { data, error, isLoading, mutate } = useSWR("/api/users", fetcher, {
+  const { data, error, isLoading, mutate } = useSWR("/api/users", authFetcher, {
     revalidateOnFocus: false,
     dedupingInterval: 30000,
   });
