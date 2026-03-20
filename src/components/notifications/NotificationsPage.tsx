@@ -84,12 +84,7 @@ export function NotificationsPage({
                     <button
                       onClick={() => {
                         markRead(n.id);
-                        const taskToOpen = tasks.find((t: any) => t.id === n.task_id);
-                        if (taskToOpen) {
-                          setSelectedTask(taskToOpen);
-                        } else {
-                          alert("Tarefa não encontrada na listagem atual.");
-                        }
+                        setSelectedTask({ id: n.task_id });
                       }}
                       className="flex cursor-pointer items-center gap-1.5 rounded-md border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs text-slate-900 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-50"
                     >

@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
@@ -334,11 +335,13 @@ async function main() {
     throw new Error("Failed to seed roles/sectors");
 
   const adminEmail = "admin@admin.com";
+  const passwordHash = await bcrypt.hash("997578", 10);
+
   const admin = await prisma.user.upsert({
     where: { email: adminEmail },
     update: {
       name: "Vinicios Araújo",
-      password_hash: "997578",
+      password_hash: passwordHash,
       Role: { connect: { id: adminRole.id } },
       Sector: { connect: { id: controlSector.id } },
       active: true,
@@ -347,7 +350,7 @@ async function main() {
     create: {
       email: adminEmail,
       name: "Vinicios Araújo",
-      password_hash: "997578",
+      password_hash: passwordHash,
       Role: { connect: { id: adminRole.id } },
       Sector: { connect: { id: controlSector.id } },
       avatar: "VA",

@@ -134,6 +134,8 @@ export default function GeoTask() {
   const [fDateFrom, setFDateFrom] = useState<DateRange | undefined>(undefined);
   const [fDateTo, setFDateTo] = useState<DateRange | undefined>(undefined);
   const [fShowSubtasks, setFShowSubtasks] = useState(true);
+  const [fSortField, setFSortField] = useState("");
+  const [fSortOrder, setFSortOrder] = useState("");
 
   // ── Dashboard Filter states (Isolated from TasksHub) ──
   const [dCreatedByMe, setDCreatedByMe] = useState(false);
@@ -141,13 +143,24 @@ export default function GeoTask() {
   const [dCurrentState, setDCurrentState] = useState("");
   const [dDateFrom, setDDateFrom] = useState<DateRange | undefined>(undefined);
   const [dDateTo, setDDateTo] = useState<DateRange | undefined>(undefined);
+  const [dSortField, setDSortField] = useState("");
+  const [dSortOrder, setDSortOrder] = useState("");
 
   // ── SWR hooks (cached data fetching) ────────────────────────────────
   const { mutate: globalMutate } = useSWRConfig();
-  const { tasks, mutate: mutateTasks } = useTasks({
+  const { tasks: dashboardTasksRaw, mutate: mutateDashboardTasks } = useTasks({
+    teamId: dTeam ? Number(dTeam) : undefined,
+    createdById: dCreatedByMe ? user?.id : undefined,
+    summary: true,
+    sortField: dSortField || undefined,
+    sortOrder: dSortOrder || undefined,
+  });
+  const { tasks: tasksHubTasksRaw, mutate: mutateTasksHub } = useTasks({
     teamId: fTeam ? Number(fTeam) : undefined,
     createdById: fCreatedByMe ? user?.id : undefined,
-    search: fSearch
+    search: fSearch,
+    sortField: fSortField || undefined,
+    sortOrder: fSortOrder || undefined,
   });
   const { users: dbUsers } = useUsers();
   const {
@@ -215,7 +228,8 @@ export default function GeoTask() {
         console.log("Real-time event received:", data);
 
         if (data.type === "TASK_CREATED" || data.type === "TASK_UPDATED" || data.type === "TASK_DELETED") {
-          mutateTasks();
+          mutateDashboardTasks();
+          mutateTasksHub();
           globalMutate((key: string) => typeof key === 'string' && key.startsWith('/api/dashboard/stats'));
         }
 
@@ -232,7 +246,7 @@ export default function GeoTask() {
     };
 
     return () => eventSource.close();
-  }, [user, mutateTasks, globalMutate]);
+  }, [user, mutateDashboardTasks, mutateTasksHub, globalMutate]);
 
   // ── Task actions ────────────────────────────────────────────────────
   const handleCreateTask = async (newTask: any) => {
@@ -243,7 +257,8 @@ export default function GeoTask() {
         body: JSON.stringify({ ...newTask, created_by: user?.id }),
       });
       if (resp.ok) {
-        await mutateTasks();
+        await mutateDashboardTasks();
+        await mutateTasksHub();
         setShowNewTask(false);
       } else alert("Erro ao criar tarefa");
     } catch (err) {
@@ -259,7 +274,8 @@ export default function GeoTask() {
   ) => {
     try {
       if (action === "refresh") {
-        await mutateTasks();
+        await mutateDashboardTasks();
+        await mutateTasksHub();
         return;
       }
       const resp = await authFetch("/api/tasks", {
@@ -268,7 +284,8 @@ export default function GeoTask() {
         body: JSON.stringify({ id, action, user_id: user?.id, ...data }),
       });
       if (resp.ok) {
-        await mutateTasks();
+        await mutateDashboardTasks();
+        await mutateTasksHub();
         setSelectedTask(null);
       }
     } catch (err) {
@@ -306,7 +323,7 @@ export default function GeoTask() {
   // ── Task visibility (role-based filtering) ──────────────────────────
   const userSectorId = user?.sector?.id || user?.sector_id;
 
-  const visibleTasks = useMemo(() => {
+  const filterTasksByRole = useCallback((tasksToFilter: any[]) => {
     if (!user) return [];
 
     const roleName = user?.role?.name || "";
@@ -315,9 +332,9 @@ export default function GeoTask() {
 
     // Roles that see ALL tasks
     const fullAccessRoles = ["Admin", "Gerente", "Socio", "Diretor"];
-    if (fullAccessRoles.includes(roleName)) return tasks;
+    if (fullAccessRoles.includes(roleName)) return tasksToFilter;
 
-    let filtered = tasks.filter((t: any) => {
+    let filtered = tasksToFilter.filter((t: any) => {
       const isCreator = Number(t.created_by_id) === uId;
       const isResponsible = Number(t.responsible_id) === uId || Number(t.responsible?.id) === uId;
       const isInCoworkers = (t.coworkers || []).some((cw: any) => Number(cw.id) === uId);
@@ -356,41 +373,26 @@ export default function GeoTask() {
     });
 
     return filtered;
-  }, [tasks, user]);
+  }, [user]);
 
   // ── Additional filters (createdByMe, team) applied on top of visibleTasks
   // ── Dashboard focused tasks
   const dashboardTasks = useMemo(() => {
-    let result = visibleTasks;
-    if (dCreatedByMe && user) {
-      result = result.filter((t: any) => Number(t.created_by_id) === Number(user.id));
-    }
-    if (dTeam) {
-      result = result.filter((t: any) => 
-        Number(t.team_id) === Number(dTeam) || 
-        (t.responsible?.team_id && Number(t.responsible.team_id) === Number(dTeam))
-      );
-    }
+    let result = filterTasksByRole(dashboardTasksRaw);
     if (dCurrentState) {
       result = result.filter((t: any) => t.latest_history?.state === dCurrentState);
     }
     return result;
-  }, [visibleTasks, dCreatedByMe, dTeam, dCurrentState, user]);
+  }, [dashboardTasksRaw, dCurrentState, filterTasksByRole]);
 
   // ── TasksHub focused tasks (Minhas Tarefas)
   const tasksHubTasks = useMemo(() => {
-    let result = visibleTasks;
-    if (fCreatedByMe && user) {
-      result = result.filter((t: any) => Number(t.created_by_id) === Number(user.id));
-    }
-    if (fTeam) {
-      result = result.filter((t: any) => 
-        Number(t.team_id) === Number(fTeam) || 
-        (t.responsible?.team_id && Number(t.responsible.team_id) === Number(fTeam))
-      );
-    }
+    let result = filterTasksByRole(tasksHubTasksRaw);
+    // Additional filters for TasksHub (fSearch, fSector, fContract, etc.)
+    // These are already applied in the useTasks hook for tasksHubTasksRaw
+    // No need to re-filter here unless there are client-side only filters
     return result;
-  }, [visibleTasks, fCreatedByMe, fTeam, user]);
+  }, [tasksHubTasksRaw, filterTasksByRole]);
 
   const visibleTaskTypes = useMemo(() => {
     if (appPerms.tasks.view_all_sectors) return taskTypes;
@@ -451,8 +453,22 @@ export default function GeoTask() {
             showNotifPopover={showNotifPopover}
             toggleNotifPopover={toggleNotifPopover}
             setShowNotifPopover={setShowNotifPopover}
-            tasks={tasks}
-            setSelectedTask={setSelectedTask}
+            tasks={tasksHubTasksRaw} // Use the raw tasks for notifications popover
+            setSelectedTask={async (t: any) => {
+              if (t.id && (!t.description || t.description === "")) {
+                const res = await authFetch(`/api/tasks?id=${t.id}`);
+                if (res.ok) {
+                  const data = await res.json();
+                  const full = Array.isArray(data) ? data[0] : (data.data ? data.data[0] : data);
+                  if (full) setSelectedTask(full);
+                  else setSelectedTask(t);
+                } else {
+                  setSelectedTask(t);
+                }
+              } else {
+                setSelectedTask(t);
+              }
+            }}
             setPage={setPage}
             activeTab={tasksTab}
             setActiveTab={setTasksTab}
@@ -481,12 +497,18 @@ export default function GeoTask() {
               teams={teams}
               currentState={dCurrentState}
               setCurrentState={setDCurrentState}
+              sortField={dSortField}
+              setSortField={setDSortField}
+              sortOrder={dSortOrder}
+              setSortOrder={setDSortOrder}
               onClearFilters={() => {
                 setDCreatedByMe(false);
                 setDTeam("");
                 setDCurrentState("");
                 setDDateFrom(undefined);
                 setDDateTo(undefined);
+                setDSortField("");
+                setDSortOrder("");
               }}
             />
           )}
@@ -534,6 +556,10 @@ export default function GeoTask() {
               setDateTo={setFDateTo}
               showSubtasks={fShowSubtasks}
               setShowSubtasks={setFShowSubtasks}
+              sortField={fSortField}
+              setSortField={setFSortField}
+              sortOrder={fSortOrder}
+              setSortOrder={setFSortOrder}
               onNewTask={() => setShowNewTask(true)}
               onClearFilters={() => {
                 setFSearch("");
@@ -550,6 +576,8 @@ export default function GeoTask() {
                 setFDateFrom(undefined);
                 setFDateTo(undefined);
                 setFCurrentState("");
+                setFSortField("");
+                setFSortOrder("");
               }}
             />
           )}
@@ -584,16 +612,20 @@ export default function GeoTask() {
             <NotificationsPage
               dark={dark}
               notifications={notifications}
-              tasks={tasks}
+              tasks={dashboardTasks}
               unreadCount={unreadCount}
               markRead={markRead}
               markAllRead={markAllRead}
               setSelectedTask={async (t: any) => {
-                if (!t.description && t.id) {
+                if (t.id && (!t.description || t.description === "")) {
                   const res = await authFetch(`/api/tasks?id=${t.id}`);
                   if (res.ok) {
-                    const full = await res.json();
-                    setSelectedTask(full);
+                    const data = await res.json();
+                    const full = Array.isArray(data) ? data[0] : (data.data ? data.data[0] : data);
+                    if (full) setSelectedTask(full);
+                    else setSelectedTask(t);
+                  } else {
+                    setSelectedTask(t);
                   }
                 } else {
                   setSelectedTask(t);
@@ -620,7 +652,7 @@ export default function GeoTask() {
           contracts={contracts}
           citiesNeighborhoods={citiesNeighborhoods}
           contractCitiesNeighborhoods={contractCitiesNeighborhoods}
-          tasks={tasks}
+          tasks={tasksHubTasks}
           setSelectedTask={setSelectedTask}
           sectors={dbSectors}
           taskTypes={visibleTaskTypes}

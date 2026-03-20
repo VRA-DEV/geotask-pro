@@ -75,7 +75,17 @@ async function notifyManagers(
   try {
     const managers = await prisma.user.findMany({
       where: {
-        Role: { name: { in: ["Gestor", "Gerente", "Coordenador de Setores", "Coordenador de Polo", "Admin"] } },
+        Role: {
+          name: {
+            in: [
+              "Gestor",
+              "Gerente",
+              "Coordenador de Setores",
+              "Coordenador de Polo",
+              "Admin",
+            ],
+          },
+        },
       },
       select: { id: true },
     });
@@ -119,35 +129,57 @@ export async function GET(request: NextRequest) {
       ? Math.min(200, Math.max(1, Number(url.searchParams.get("limit"))))
       : 0;
     const status = url.searchParams.get("status");
+    const taskId = url.searchParams.get("id") ? Number(url.searchParams.get("id")) : undefined;
     const sectorId = Number(url.searchParams.get("sector_id")) || undefined;
     const responsibleId =
       Number(url.searchParams.get("responsible_id")) || undefined;
     const teamIdFilter = Number(url.searchParams.get("team_id")) || undefined;
     const createdByMe = url.searchParams.get("created_by_me");
-    const createdById = Number(url.searchParams.get("created_by_id")) || undefined;
+    const createdById =
+      Number(url.searchParams.get("created_by_id")) || undefined;
     const summary = url.searchParams.get("summary") === "true";
     const search = url.searchParams.get("search");
+    const orderByField = url.searchParams.get("orderBy") || "created_at";
+    const orderDirection = url.searchParams.get("order") || "desc";
+
+    // Valid fields for ordering
+    const validOrderBy = [
+      "created_at",
+      "updated_at",
+      "status_updated_at",
+      "deadline",
+      "title",
+    ];
+    const actualOrderBy = validOrderBy.includes(orderByField)
+      ? orderByField
+      : "created_at";
+    const actualOrder = orderDirection === "asc" ? "asc" : "desc";
 
     // Build optional where clause
     const where: Prisma.TaskWhereInput = {
+      ...(taskId ? { id: taskId } : {}),
       ...(status ? { status } : {}),
       ...(sectorId ? { sector_id: sectorId } : {}),
       ...(responsibleId ? { responsible_id: responsibleId } : {}),
-      ...(teamIdFilter ? {
-        OR: [
-          { team_id: teamIdFilter },
-          { responsible: { team_id: teamIdFilter } }
-        ]
-      } : {}),
-      ...((createdByMe === "true" && createdById)
+      ...(teamIdFilter
+        ? {
+            OR: [
+              { team_id: teamIdFilter },
+              { responsible: { team_id: teamIdFilter } },
+            ],
+          }
+        : {}),
+      ...(createdByMe === "true" && createdById
         ? { created_by_id: createdById }
         : {}),
-      ...(search ? {
-        OR: [
-          { title: { contains: search, mode: 'insensitive' } },
-          { parent: { title: { contains: search, mode: 'insensitive' } } }
-        ]
-      } : {}),
+      ...(search
+        ? {
+            OR: [
+              { title: { contains: search, mode: "insensitive" } },
+              { parent: { title: { contains: search, mode: "insensitive" } } },
+            ],
+          }
+        : {}),
     };
 
     if (summary) {
@@ -170,23 +202,31 @@ export async function GET(request: NextRequest) {
           city: { select: { name: true } },
           contract: { select: { name: true } },
         },
-        orderBy: { created_at: "desc" },
+        orderBy: { [actualOrderBy]: actualOrder },
       });
 
-      const total = limit > 0 ? await prisma.task.count({ where }) : tasks.length;
-      const result = tasks.map(t => ({
+      const total =
+        limit > 0 ? await prisma.task.count({ where }) : tasks.length;
+      const result = tasks.map((t) => ({
         ...t,
         sector: t.Sector,
         city: t.city?.name || "",
         contract: t.contract?.name || "",
-        created: t.created_at ? new Date(t.created_at).toLocaleDateString("pt-BR") : null,
+        created: t.created_at
+          ? new Date(t.created_at).toLocaleDateString("pt-BR")
+          : null,
         deadline: t.deadline ? t.deadline.toISOString() : null,
       }));
 
       if (limit > 0) {
         return NextResponse.json({
           data: result,
-          pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+          pagination: {
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit),
+          },
         });
       }
       return NextResponse.json(result);
@@ -242,7 +282,7 @@ export async function GET(request: NextRequest) {
         },
         parent: { select: { title: true } },
       },
-      orderBy: { created_at: "desc" },
+      orderBy: { [actualOrderBy]: actualOrder },
     });
 
     const result = tasks.map((t) => ({
@@ -296,9 +336,7 @@ export async function GET(request: NextRequest) {
             month: "2-digit",
           })
         : null,
-      deadline: t.deadline
-        ? t.deadline.toISOString()
-        : null,
+      deadline: t.deadline ? t.deadline.toISOString() : null,
       time:
         t.children && t.children.length > 0
           ? Math.round(
@@ -544,7 +582,15 @@ export async function POST(req: Request) {
           where: {
             sector_id: child.sector_id,
             Role: {
-              name: { in: ["Gestor", "Gerente", "Coordenador de Setores", "Coordenador de Polo", "Admin"] },
+              name: {
+                in: [
+                  "Gestor",
+                  "Gerente",
+                  "Coordenador de Setores",
+                  "Coordenador de Polo",
+                  "Admin",
+                ],
+              },
             },
           },
           select: { id: true },
@@ -615,19 +661,43 @@ async function logHistory(
   let nv = newValue;
 
   if (field === "sector_id") {
-    if (ov) { const s = await prisma.sector.findUnique({where:{id:Number(ov)}}); if (s) ov = s.name; }
-    if (nv) { const s = await prisma.sector.findUnique({where:{id:Number(nv)}}); if (s) nv = s.name; }
+    if (ov) {
+      const s = await prisma.sector.findUnique({ where: { id: Number(ov) } });
+      if (s) ov = s.name;
+    }
+    if (nv) {
+      const s = await prisma.sector.findUnique({ where: { id: Number(nv) } });
+      if (s) nv = s.name;
+    }
   } else if (field === "responsible_id") {
-    if (ov) { const u = await prisma.user.findUnique({where:{id:Number(ov)}}); if (u) ov = u.name; }
-    if (nv) { const u = await prisma.user.findUnique({where:{id:Number(nv)}}); if (u) nv = u.name; }
+    if (ov) {
+      const u = await prisma.user.findUnique({ where: { id: Number(ov) } });
+      if (u) ov = u.name;
+    }
+    if (nv) {
+      const u = await prisma.user.findUnique({ where: { id: Number(nv) } });
+      if (u) nv = u.name;
+    }
   } else if (field === "contract_id") {
-    if (ov) { const c = await prisma.contract.findUnique({where:{id:Number(ov)}}); if (c) ov = c.name; }
-    if (nv) { const c = await prisma.contract.findUnique({where:{id:Number(nv)}}); if (c) nv = c.name; }
+    if (ov) {
+      const c = await prisma.contract.findUnique({ where: { id: Number(ov) } });
+      if (c) ov = c.name;
+    }
+    if (nv) {
+      const c = await prisma.contract.findUnique({ where: { id: Number(nv) } });
+      if (c) nv = c.name;
+    }
   } else if (field === "city_id") {
-    if (ov) { const c = await prisma.city.findUnique({where:{id:Number(ov)}}); if (c) ov = c.name; }
-    if (nv) { const c = await prisma.city.findUnique({where:{id:Number(nv)}}); if (c) nv = c.name; }
+    if (ov) {
+      const c = await prisma.city.findUnique({ where: { id: Number(ov) } });
+      if (c) ov = c.name;
+    }
+    if (nv) {
+      const c = await prisma.city.findUnique({ where: { id: Number(nv) } });
+      if (c) nv = c.name;
+    }
   }
-  
+
   const formatValue = (v: any) => {
     if (v instanceof Date) {
       if (isNaN(v.getTime())) return "";
@@ -664,9 +734,9 @@ export async function PATCH(req: Request) {
     if (!id)
       return NextResponse.json({ error: "ID é obrigatório" }, { status: 400 });
 
-    const task = await prisma.task.findUnique({ 
+    const task = await prisma.task.findUnique({
       where: { id: Number(id) },
-      include: { coworkers: true }
+      include: { coworkers: true },
     });
     if (!task)
       return NextResponse.json(
@@ -677,7 +747,13 @@ export async function PATCH(req: Request) {
     const updateData: any = { updated_at: new Date() };
 
     // Ensure IDs are numbers
-    ["sector_id", "responsible_id", "city_id", "contract_id", "team_id"].forEach((key) => {
+    [
+      "sector_id",
+      "responsible_id",
+      "city_id",
+      "contract_id",
+      "team_id",
+    ].forEach((key) => {
       if (data[key] !== undefined && data[key] !== null) {
         data[key] = Number(data[key]);
       }
@@ -685,16 +761,21 @@ export async function PATCH(req: Request) {
 
     if (action === "update_status") {
       const { status } = data;
-      updateData.status = status;
-      if (status === "Em Andamento") {
-        updateData.started_at = new Date();
-        updateData.paused_at = null;
-      } else {
-        if (task.status === "Em Andamento" && task.started_at) {
-          const elapsed = Math.floor(
-            (new Date().getTime() - new Date(task.started_at).getTime()) / 1000,
-          );
-          updateData.time_spent = (task.time_spent || 0) + elapsed;
+      if (status) {
+        updateData.status = status;
+        updateData.status_updated_at = new Date();
+
+        if (status === "Em Andamento" && !task.started_at) {
+          updateData.started_at = new Date();
+          updateData.paused_at = null;
+        } else {
+          if (task.status === "Em Andamento" && task.started_at) {
+            const elapsed = Math.floor(
+              (new Date().getTime() - new Date(task.started_at).getTime()) /
+                1000,
+            );
+            updateData.time_spent = (task.time_spent || 0) + elapsed;
+          }
         }
         if (status === "Pausado") updateData.paused_at = new Date();
         else if (status === "Concluído") updateData.completed_at = new Date();
@@ -740,9 +821,9 @@ export async function PATCH(req: Request) {
       if (task.parent_id) {
         const parent = await prisma.task.findUnique({
           where: { id: task.parent_id },
-          include: { 
+          include: {
             children: true,
-            subtasks: true // Legacy checklist items
+            subtasks: true, // Legacy checklist items
           },
         });
 
@@ -754,8 +835,10 @@ export async function PATCH(req: Request) {
 
           // 1. Start/Resume: Parent moves to "Em Andamento" if any child task is "Em Andamento"
           // OR if any checklist item is done but not all (not a perfect check for "in progress" but better than nothing)
-          const anyChildInProgress = childrenStatus.some(s => s === "Em Andamento");
-          
+          const anyChildInProgress = childrenStatus.some(
+            (s) => s === "Em Andamento",
+          );
+
           if (
             (status === "Em Andamento" || anyChildInProgress) &&
             (parent.status === "A Fazer" || parent.status === "Pausado")
@@ -771,10 +854,16 @@ export async function PATCH(req: Request) {
           }
 
           // 2. Finish: Parent moves to "Concluído" if ALL children (tasks AND checklist) are done
-          if (status === "Concluído" || status === "A Fazer" || status === "Pausado") {
+          if (
+            status === "Concluído" ||
+            status === "A Fazer" ||
+            status === "Pausado"
+          ) {
             const allTasksDone = childrenStatus.every((s) => s === "Concluído");
-            const allChecklistDone = checklistItemsDone.every(d => d === true);
-            
+            const allChecklistDone = checklistItemsDone.every(
+              (d) => d === true,
+            );
+
             if (allTasksDone && allChecklistDone) {
               if (parent.status !== "Concluído") {
                 await prisma.task.update({
@@ -800,12 +889,16 @@ export async function PATCH(req: Request) {
               activeChildren.length > 0 &&
               activeChildren.every((s) => s === "Pausado");
 
-            // Also check if any checklist items were being worked on? 
+            // Also check if any checklist items were being worked on?
             // Checklist doesn't have "paused" state, so we just check child tasks.
             if (allPaused && parent.status === "Em Andamento") {
               await prisma.task.update({
                 where: { id: parent.id },
-                data: { status: "Pausado", paused_at: new Date() },
+                data: {
+                  status: "Pausado",
+                  paused_at: new Date(),
+                  status_updated_at: new Date(),
+                },
               });
             }
           }
@@ -831,7 +924,17 @@ export async function PATCH(req: Request) {
           const gestores = await prisma.user.findMany({
             where: {
               sector_id: task.sector_id,
-              Role: { name: { in: ["Gestor", "Gerente", "Coordenador de Setores", "Coordenador de Polo", "Admin"] } },
+              Role: {
+                name: {
+                  in: [
+                    "Gestor",
+                    "Gerente",
+                    "Coordenador de Setores",
+                    "Coordenador de Polo",
+                    "Admin",
+                  ],
+                },
+              },
             },
             select: { id: true },
           });
@@ -852,24 +955,24 @@ export async function PATCH(req: Request) {
         if (task.parent_id) {
           const siblingsTasks = await prisma.task.findMany({
             where: { parent_id: task.parent_id, id: { not: task.id } },
-            select: { responsible_id: true }
+            select: { responsible_id: true },
           });
           const legacySubtasks = await prisma.subtask.findMany({
             where: { task_id: task.parent_id },
-            select: { responsible_id: true }
+            select: { responsible_id: true },
           });
-          
+
           const notifiedSet = new Set<number>();
           if (task.created_by_id) notifiedSet.add(task.created_by_id);
           if (userId) notifiedSet.add(userId);
 
           const siblingUsers = new Set<number>();
-          siblingsTasks.forEach(s => {
+          siblingsTasks.forEach((s) => {
             if (s.responsible_id && !notifiedSet.has(s.responsible_id)) {
               siblingUsers.add(s.responsible_id);
             }
           });
-          legacySubtasks.forEach(s => {
+          legacySubtasks.forEach((s) => {
             if (s.responsible_id && !notifiedSet.has(s.responsible_id)) {
               siblingUsers.add(s.responsible_id);
             }
@@ -877,11 +980,11 @@ export async function PATCH(req: Request) {
 
           for (const uid of siblingUsers) {
             await notifyUser(
-               uid,
-               "task_completed",
-               `Subtarefa Finalizada`,
-               `A subtarefa "${task.title}" vinculada à tarefa principal foi concluída.`,
-               task.parent_id
+              uid,
+              "task_completed",
+              `Subtarefa Finalizada`,
+              `A subtarefa "${task.title}" vinculada à tarefa principal foi concluída.`,
+              task.parent_id,
             );
           }
         }
@@ -909,7 +1012,10 @@ export async function PATCH(req: Request) {
         const oldD = task.deadline ? new Date(task.deadline) : null;
         if (d?.getTime() !== oldD?.getTime()) {
           return NextResponse.json(
-            { error: "Apenas o criador da tarefa pode editar o prazo de entrega." },
+            {
+              error:
+                "Apenas o criador da tarefa pode editar o prazo de entrega.",
+            },
             { status: 403 },
           );
         }
@@ -917,8 +1023,11 @@ export async function PATCH(req: Request) {
 
       // Check if trying to reassign (only if value actually changed)
       let isReassigning = false;
-      
-      if (data.responsible_id !== undefined && data.responsible_id !== task.responsible_id) {
+
+      if (
+        data.responsible_id !== undefined &&
+        data.responsible_id !== task.responsible_id
+      ) {
         isReassigning = true;
       }
       if (data.sector_id !== undefined && data.sector_id !== task.sector_id) {
@@ -928,7 +1037,9 @@ export async function PATCH(req: Request) {
         isReassigning = true;
       }
       if (data.coworkers !== undefined) {
-        const currentCoworkers = (task.coworkers || []).map((c: any) => c.user_id).sort();
+        const currentCoworkers = (task.coworkers || [])
+          .map((c: any) => c.user_id)
+          .sort();
         const newCoworkers = data.coworkers.map(Number).sort();
         if (JSON.stringify(currentCoworkers) !== JSON.stringify(newCoworkers)) {
           isReassigning = true;
@@ -937,7 +1048,10 @@ export async function PATCH(req: Request) {
 
       if (isReassigning && !isCreator && !isLeadership) {
         return NextResponse.json(
-          { error: "Apenas o criador da tarefa, ou perfis de liderança, podem reatribuir esta tarefa." },
+          {
+            error:
+              "Apenas o criador da tarefa, ou perfis de liderança, podem reatribuir esta tarefa.",
+          },
           { status: 403 },
         );
       }
@@ -1116,7 +1230,13 @@ export async function PATCH(req: Request) {
         const d = data.completed_at ? new Date(data.completed_at) : null;
         const oldD = task.completed_at ? new Date(task.completed_at) : null;
         if (d?.getTime() !== oldD?.getTime()) {
-          await logHistory(task.id, userId, "completed_at", task.completed_at, d);
+          await logHistory(
+            task.id,
+            userId,
+            "completed_at",
+            task.completed_at,
+            d,
+          );
           updateData.completed_at = d;
         }
       }
@@ -1124,24 +1244,33 @@ export async function PATCH(req: Request) {
       if (data.coworkers !== undefined) {
         updateData.coworkers = {
           deleteMany: {}, // Clear old assignments
-          create: data.coworkers.map((uid: number) => ({ user_id: Number(uid) })),
+          create: data.coworkers.map((uid: number) => ({
+            user_id: Number(uid),
+          })),
         };
-        const currentCoworkers = (task.coworkers || []).map((c: any) => c.user_id);
-        const newCoworkers = data.coworkers.map(Number).filter((uid: number) => !currentCoworkers.includes(uid));
+        const currentCoworkers = (task.coworkers || []).map(
+          (c: any) => c.user_id,
+        );
+        const newCoworkers = data.coworkers
+          .map(Number)
+          .filter((uid: number) => !currentCoworkers.includes(uid));
 
         let updaterName = "Alguém";
         if (userId) {
-          const updater = await prisma.user.findUnique({ where: { id: userId } });
+          const updater = await prisma.user.findUnique({
+            where: { id: userId },
+          });
           if (updater) updaterName = updater.name;
         }
-        
-        const currentResponsibleId = updateData.responsible_id !== undefined 
-          ? updateData.responsible_id 
-          : task.responsible_id;
+
+        const currentResponsibleId =
+          updateData.responsible_id !== undefined
+            ? updateData.responsible_id
+            : task.responsible_id;
 
         const ds = new Date().toLocaleDateString();
         const ts = new Date().toLocaleTimeString().slice(0, 5);
-        
+
         for (const uid of newCoworkers) {
           // Notify only if NOT the main responsible (already notified in that block)
           // and NOT the person making the change
@@ -1283,7 +1412,10 @@ export async function PATCH(req: Request) {
       // Manage retroactive pauses — receives array of {started_at, ended_at}
       const { pauses } = data;
       if (!Array.isArray(pauses)) {
-        return NextResponse.json({ error: "pauses deve ser um array" }, { status: 400 });
+        return NextResponse.json(
+          { error: "pauses deve ser um array" },
+          { status: 400 },
+        );
       }
 
       // Delete existing pauses and recreate
@@ -1307,7 +1439,8 @@ export async function PATCH(req: Request) {
         let totalPauseMs = 0;
         for (const p of pauses) {
           if (p.started_at && p.ended_at) {
-            totalPauseMs += new Date(p.ended_at).getTime() - new Date(p.started_at).getTime();
+            totalPauseMs +=
+              new Date(p.ended_at).getTime() - new Date(p.started_at).getTime();
           }
         }
         const effectiveMs = Math.max(0, endTime - startTime - totalPauseMs);
@@ -1318,14 +1451,31 @@ export async function PATCH(req: Request) {
       }
 
       // Log history
-      await logHistory(task.id, userId, "Pausas", "editado", `${pauses.length} pausa(s)`);
+      await logHistory(
+        task.id,
+        userId,
+        "Pausas",
+        "editado",
+        `${pauses.length} pausa(s)`,
+      );
 
       // Activity log
       const pauseUpdater = userId
-        ? (await prisma.user.findUnique({ where: { id: userId }, select: { name: true } }))?.name || "Usuário"
+        ? (
+            await prisma.user.findUnique({
+              where: { id: userId },
+              select: { name: true },
+            })
+          )?.name || "Usuário"
         : "Sistema";
-      logActivity(userId, pauseUpdater, "task_pauses_updated", "task", task.id,
-        `Pausas atualizadas: ${pauses.length} período(s) — "${task.title}"`);
+      logActivity(
+        userId,
+        pauseUpdater,
+        "task_pauses_updated",
+        "task",
+        task.id,
+        `Pausas atualizadas: ${pauses.length} período(s) — "${task.title}"`,
+      );
 
       return NextResponse.json({ message: "Pausas atualizadas com sucesso" });
     } else if (action === "toggle_subtask") {
@@ -1345,11 +1495,15 @@ export async function PATCH(req: Request) {
         const remainingChildTasks = await prisma.task.count({
           where: {
             parent_id: task.id,
-            status: { not: "Concluído" }
-          }
+            status: { not: "Concluído" },
+          },
         });
 
-        if (remainingChecklist === 0 && remainingChildTasks === 0 && task.status !== "Concluído") {
+        if (
+          remainingChecklist === 0 &&
+          remainingChildTasks === 0 &&
+          task.status !== "Concluído"
+        ) {
           await prisma.task.update({
             where: { id: task.id },
             data: { status: "Concluído", completed_at: new Date() },
@@ -1358,10 +1512,10 @@ export async function PATCH(req: Request) {
           // If we completed a subtask, the parent is now in progress
           await prisma.task.update({
             where: { id: task.id },
-            data: { 
-              status: "Em Andamento", 
+            data: {
+              status: "Em Andamento",
               started_at: task.started_at || new Date(),
-              paused_at: null 
+              paused_at: null,
             },
           });
         }
@@ -1384,23 +1538,35 @@ export async function PATCH(req: Request) {
       });
       const roleName = userRequesting?.Role?.name || "";
       if (!["Admin", "Gerente"].includes(roleName)) {
-        return NextResponse.json({ error: "Apenas Admin ou Gerente pode resetar uma tarefa." }, { status: 403 });
+        return NextResponse.json(
+          { error: "Apenas Admin ou Gerente pode resetar uma tarefa." },
+          { status: 403 },
+        );
       }
 
       // Password Validation
       if (!userRequesting) {
-        return NextResponse.json({ error: "Usuário não encontrado." }, { status: 404 });
+        return NextResponse.json(
+          { error: "Usuário não encontrado." },
+          { status: 404 },
+        );
       }
       const bcrypt = require("bcryptjs");
       let passwordValid = false;
       if (userRequesting.password_hash.startsWith("$2")) {
-        passwordValid = await bcrypt.compare(password, userRequesting.password_hash);
+        passwordValid = await bcrypt.compare(
+          password,
+          userRequesting.password_hash,
+        );
       } else {
         passwordValid = userRequesting.password_hash === password;
       }
 
       if (!passwordValid) {
-        return NextResponse.json({ error: "Senha incorreta." }, { status: 401 });
+        return NextResponse.json(
+          { error: "Senha incorreta." },
+          { status: 401 },
+        );
       }
 
       // Action: Reset task
@@ -1412,16 +1578,22 @@ export async function PATCH(req: Request) {
           completed_at: null,
           paused_at: null,
           time_spent: 0,
-        }
+        },
       });
 
       // Clear pauses
       await prisma.taskPause.deleteMany({
-        where: { task_id: Number(id) }
+        where: { task_id: Number(id) },
       });
 
       // Log History
-      await logHistory(task.id, userId, "status", task.status, "A Fazer (Reset)");
+      await logHistory(
+        task.id,
+        userId,
+        "status",
+        task.status,
+        "A Fazer (Reset)",
+      );
 
       // Activity Log
       logActivity(

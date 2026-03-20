@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 
 interface TooltipProps {
   content: string | undefined | null;
+  subtasks?: { id: number; title: string; done?: boolean; status?: string }[];
   children: React.ReactNode;
 }
 
@@ -12,7 +13,7 @@ interface TooltipProps {
  * A themed tooltip component that follows GeoTask-Pro design principles.
  * Uses React Portals and fixed positioning to prevent clipping by overflow-hidden/auto parents.
  */
-export function Tooltip({ content, children }: TooltipProps) {
+export function Tooltip({ content, subtasks, children }: TooltipProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [portalNode, setPortalNode] = useState<HTMLElement | null>(null);
   const [coords, setCoords] = useState({ top: 0, left: 0, side: "top", align: "center" });
@@ -78,7 +79,7 @@ export function Tooltip({ content, children }: TooltipProps) {
     }
   }, [isVisible]);
 
-  if (!content) return <>{children}</>;
+  if (!content && (!subtasks || subtasks.length === 0)) return <>{children}</>;
 
   return (
     <div 
@@ -104,8 +105,29 @@ export function Tooltip({ content, children }: TooltipProps) {
             Descrição da Tarefa:
           </div>
           <div className="text-[11px] text-slate-600 dark:text-(--t-text) leading-relaxed">
-            {content}
+            {content || <i className="text-slate-400">Sem descrição</i>}
           </div>
+
+          {subtasks && subtasks.length > 0 && (
+            <div className="mt-3 pt-2 border-t border-slate-100 dark:border-white/5">
+              <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1">
+                Subtarefas ({subtasks.length}):
+              </div>
+              <div className="flex flex-col gap-1 max-h-40 overflow-y-auto pr-1 custom-scrollbar">
+                {subtasks.map((st) => {
+                  const isDone = st.done || st.status === "Concluído";
+                  return (
+                    <div key={st.id} className="flex items-start gap-1.5 text-[10px] leading-tight">
+                      <div className={`mt-0.5 w-1.5 h-1.5 rounded-full shrink-0 ${isDone ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`} />
+                      <span className={isDone ? 'text-slate-400 line-through' : 'text-slate-600 dark:text-gray-300'}>
+                        {st.title}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           
           {/* Arrow */}
           <div className={`absolute border-[6px] border-transparent 

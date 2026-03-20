@@ -449,8 +449,9 @@ export function TaskFilters({
                 val={sortField || ""}
                 onChange={setSortField}
                 opts={[
-                  { value: "title", label: "Título" },
+                  { value: "status_updated_at", label: "Atualização (status)" },
                   { value: "deadline", label: "Data de Entrega" },
+                  { value: "title", label: "Título" },
                 ]}
                 placeholder="Padrão"
               />

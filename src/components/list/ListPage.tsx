@@ -15,6 +15,7 @@ import type {
 import { ChevronDown, ChevronRight, Eye, FileText, Plus, Users, Calendar } from "lucide-react";
 import { useEffect, useState } from "react";
 import { DateRange } from "react-day-picker";
+import { Tooltip } from "../shared/Tooltip";
 
 const ExportButtons = ({
   filtered,
@@ -200,8 +201,19 @@ export default function ListPage({
     return true;
   }).sort((a, b) => {
     if (!sortField) return 0;
-    const aVal = sortField === "deadline" ? (a.deadline ? new Date(a.deadline).getTime() : (sortOrder === "desc" ? -Infinity : Infinity)) : a.title.toLowerCase();
-    const bVal = sortField === "deadline" ? (b.deadline ? new Date(b.deadline).getTime() : (sortOrder === "desc" ? -Infinity : Infinity)) : b.title.toLowerCase();
+    let aVal: any, bVal: any;
+    
+    if (sortField === "deadline") {
+      aVal = a.deadline ? new Date(a.deadline).getTime() : (sortOrder === "desc" ? -Infinity : Infinity);
+      bVal = b.deadline ? new Date(b.deadline).getTime() : (sortOrder === "desc" ? -Infinity : Infinity);
+    } else if (sortField === "status_updated_at") {
+      aVal = a.status_updated_at ? new Date(a.status_updated_at).getTime() : (sortOrder === "desc" ? -Infinity : Infinity);
+      bVal = b.status_updated_at ? new Date(b.status_updated_at).getTime() : (sortOrder === "desc" ? -Infinity : Infinity);
+    } else {
+      aVal = (a[sortField as keyof Task] || "").toString().toLowerCase();
+      bVal = (b[sortField as keyof Task] || "").toString().toLowerCase();
+    }
+
     if (aVal < bVal) return sortOrder === "desc" ? 1 : -1;
     if (aVal > bVal) return sortOrder === "desc" ? -1 : 1;
     return 0;
@@ -292,9 +304,11 @@ export default function ListPage({
             )}
             {isSubtask && <div className="text-slate-300 dark:text-gray-600 mr-1 shrink-0">↳</div>}
             
-            <div className="truncate text-[13px] font-semibold text-slate-900 dark:text-gray-50" title={t.title}>
-              {t.title}
-            </div>
+            <Tooltip content={t.description} subtasks={t.subtasks}>
+              <div className="truncate text-[13px] font-semibold text-slate-900 dark:text-gray-50 cursor-help" title={t.title}>
+                {t.title}
+              </div>
+            </Tooltip>
           </div>
 
           <div className="text-[12px] truncate text-slate-600 dark:text-gray-300 pr-2">

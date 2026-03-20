@@ -62,6 +62,10 @@ interface TasksHubProps {
   setDateTo: (v: DateRange | undefined) => void;
   onNewTask: () => void;
   onClearFilters: () => void;
+  sortField?: string;
+  setSortField?: (v: string) => void;
+  sortOrder?: string;
+  setSortOrder?: (v: string) => void;
   canCreate?: boolean;
   showSubtasks?: boolean;
   setShowSubtasks?: (v: boolean) => void;
@@ -112,6 +116,10 @@ export default function TasksHub({
   setDateTo,
   onNewTask,
   onClearFilters,
+  sortField,
+  setSortField,
+  sortOrder,
+  setSortOrder,
   canCreate,
   showSubtasks,
   setShowSubtasks,
@@ -157,9 +165,11 @@ export default function TasksHub({
             canViewAllSectors={canViewAllSectors}
             showSubtasks={showSubtasks}
             setShowSubtasks={setShowSubtasks}
-            createdByMe={createdByMe}
-            setCreatedByMe={setCreatedByMe}
             setTeam={setTeam}
+            sortField={sortField}
+            setSortField={setSortField}
+            sortOrder={sortOrder}
+            setSortOrder={setSortOrder}
           />
         </div>
       </div>

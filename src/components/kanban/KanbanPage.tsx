@@ -586,7 +586,7 @@ export default function KanbanPage({
                     : String(t.responsible || "") || "";
                   const respInitials = respName ? respName.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase() : '?';
                   return (
-                    <Tooltip content={t.description} key={t.id}>
+                    <Tooltip content={t.description} subtasks={t.subtasks} key={t.id}>
                       <div
                         onClick={() => onSelect(t)}
                         className="bg-white dark:bg-(--t-card) rounded-xl p-3 card-hover cursor-pointer animate-fade-in-up border-l-4 shadow-sm h-full"

@@ -61,7 +61,8 @@ model Task {
   created_by_id   Int?
   team_id         Int?
   created_at      DateTime         @default(now())
-  updated_at      DateTime?        @updatedAt
+  updated_at        DateTime?        @updatedAt
+  status_updated_at DateTime?
   started_at      DateTime?
   paused_at       DateTime?
   completed_at    DateTime?

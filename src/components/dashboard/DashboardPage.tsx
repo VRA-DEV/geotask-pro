@@ -17,7 +17,7 @@ import {
   Pie,
   PieChart,
   ResponsiveContainer,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   XAxis,
   YAxis,
 } from "recharts";
@@ -27,6 +27,7 @@ import AIReportModal from "@/components/AIReportModal";
 import { TaskFilters } from "@/components/shared/TaskFilters";
 import { authFetch } from "@/lib/authFetch";
 import { PRIO_COLOR, PRIORITIES, STATUS_COLOR } from "@/lib/constants";
+import { Tooltip } from "../shared/Tooltip";
 import { exportToExcel, getKpiData, type ExportKPIs } from "@/lib/exportUtils";
 import { getTaskState, parseDate, parseDateStr } from "@/lib/helpers";
 import type {
@@ -119,6 +120,10 @@ interface DashboardPageProps {
   teams?: { id: number; name: string }[];
   currentState?: string;
   setCurrentState?: (v: string) => void;
+  sortField?: string;
+  setSortField?: (v: string) => void;
+  sortOrder?: string;
+  setSortOrder?: (v: string) => void;
   onClearFilters?: () => void;
 }
 
@@ -140,6 +145,10 @@ export default function DashboardPage({
   teams,
   currentState,
   setCurrentState,
+  sortField,
+  setSortField,
+  sortOrder,
+  setSortOrder,
   onClearFilters,
 }: DashboardPageProps) {
   const [fSearch, setFSearch] = useState("");
@@ -504,6 +513,10 @@ export default function DashboardPage({
         setCreatedByMe={setCreatedByMe}
         team={team}
         setTeam={setTeam}
+        sortField={sortField}
+        setSortField={setSortField}
+        sortOrder={sortOrder}
+        setSortOrder={setSortOrder}
         teams={teams}
       />
 
@@ -612,7 +625,7 @@ export default function DashboardPage({
                   <Cell key={i} fill={STATUS_COLOR[d.name]} />
                 ))}
               </Pie>
-              <Tooltip
+              <RechartsTooltip
                 contentStyle={{
                   background: "var(--color-white, #fff)",
                   border: "1px solid var(--color-slate-200, #e2e8f0)",
@@ -809,7 +822,7 @@ export default function DashboardPage({
               axisLine={false}
               tickLine={false}
             />
-            <Tooltip
+            <RechartsTooltip
               contentStyle={{
                 background: "var(--color-white, #fff)",
                 border: "1px solid var(--color-slate-200, #e2e8f0)",
@@ -873,9 +886,11 @@ export default function DashboardPage({
                   <div className="text-[10px] font-bold uppercase text-slate-500 dark:text-gray-400">
                      {t.type} &middot; {typeof t.sector === 'object' ? t.sector?.name : t.sector}
                   </div>
-                  <div className="text-[14px] font-bold text-slate-900 dark:text-gray-50 leading-snug">
-                    {t.title}
-                  </div>
+                  <Tooltip content={t.description} subtasks={t.subtasks}>
+                    <div className="text-[14px] font-bold text-slate-900 dark:text-gray-50 leading-snug cursor-help">
+                      {t.title}
+                    </div>
+                  </Tooltip>
                 </div>
                 <span className="text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap" style={{ background: PRIO_COLOR[t.priority as string] + "22", color: PRIO_COLOR[t.priority as string] }}>
                   {t.priority}
@@ -955,9 +970,11 @@ export default function DashboardPage({
               }}
             >
               <div className="min-w-0">
-                <div className="text-[13px] font-semibold text-slate-900 dark:text-gray-50 overflow-hidden text-ellipsis whitespace-nowrap">
-                  {t.title}
-                </div>
+                <Tooltip content={t.description} subtasks={t.subtasks}>
+                  <div className="text-[13px] font-semibold text-slate-900 dark:text-gray-50 overflow-hidden text-ellipsis whitespace-nowrap cursor-help">
+                    {t.title}
+                  </div>
+                </Tooltip>
                 <div className="text-[10px] text-slate-500 dark:text-gray-400 mt-px">
                   {t.type} &middot;{" "}
                   {t.sector && typeof t.sector === "object"

@@ -121,6 +121,7 @@ export interface Task {
   created_by_id?: number | null;
   created_at?: string;
   updated_at?: string | null;
+  status_updated_at?: string | null;
   started_at?: string | null;
   paused_at?: string | null;
   completed_at?: string | null;

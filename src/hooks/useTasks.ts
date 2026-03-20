@@ -18,6 +18,9 @@ interface UseTasksOptions {
   createdById?: number;
   /** Server-side filter for search */
   search?: string;
+  /** Server-side sorting */
+  sortField?: string;
+  sortOrder?: string;
 }
 
 function buildUrl(opts: UseTasksOptions = {}): string {
@@ -35,6 +38,8 @@ function buildUrl(opts: UseTasksOptions = {}): string {
     params.set("created_by_id", String(opts.createdById));
   }
   if (opts.search) params.set("search", opts.search);
+  if (opts.sortField) params.set("orderBy", opts.sortField);
+  if (opts.sortOrder) params.set("order", opts.sortOrder);
   const qs = params.toString();
   return qs ? `/api/tasks?${qs}` : "/api/tasks";
 }

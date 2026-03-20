@@ -46,7 +46,12 @@
       "Bash(findstr \"543\")",
       "Bash(gh repo:*)",
       "Bash(where gh:*)",
-      "Bash(find C:UsersviniciusaraujoDocumentsGDriveprojectsGeoTask-Progeotask-proprisma -name *.prisma)"
+      "Bash(find C:UsersviniciusaraujoDocumentsGDriveprojectsGeoTask-Progeotask-proprisma -name *.prisma)",
+      "Bash(find /c/Users/viniciusaraujo/Documents/GDrive/projects/Geoboard/geogis-contratos/api/src -name *.ts -type f)",
+      "Bash(find /c/Users/viniciusaraujo/Documents/GDrive/projects/Geoboard/geogis-contratos/web/src -name *.ts -o -name *.tsx)",
+      "Bash(mkdir -p \"C:\\\\Users\\\\viniciusaraujo\\\\Documents\\\\GDrive\\\\projects\\\\GeoTask-Pro\\\\geotask-pro\\\\geotask-pro-v2\\\\src\\\\app\\\\api\\\\lots\\\\[id]\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\viniciusaraujo\\\\Documents\\\\GDrive\\\\projects\\\\GeoTask-Pro\\\\geotask-pro\\\\geotask-pro-v2\\\\src\\\\app\\\\api\\\\lots\\\\[id]\\\\compliance\")",
+      "Bash(ls \"C:\\\\Users\\\\viniciusaraujo\\\\Documents\\\\GDrive\\\\projects\\\\GeoTask-Pro\\\\geotask-pro\\\\geotask-pro-v2\\\\src\\\\components\\\\ui\"\" 2>/dev/null || echo \"UI dir not found \")"
     ]
   }
 }
