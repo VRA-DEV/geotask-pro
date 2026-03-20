@@ -27,16 +27,6 @@ describe("verifyPassword", () => {
     const valid = await verifyPassword("wrong", hash);
     expect(valid).toBe(false);
   });
-
-  it("should verify legacy plain text password", async () => {
-    const valid = await verifyPassword("plaintext", "plaintext");
-    expect(valid).toBe(true);
-  });
-
-  it("should reject wrong legacy plain text password", async () => {
-    const valid = await verifyPassword("wrong", "plaintext");
-    expect(valid).toBe(false);
-  });
 });
 
 describe("sanitizeUser", () => {
@@ -57,11 +47,7 @@ describe("sanitizeUser", () => {
   });
 
   it("should return null for null input", () => {
-    expect(sanitizeUser(null)).toBeNull();
-  });
-
-  it("should return null for undefined input", () => {
-    expect(sanitizeUser(undefined)).toBeNull();
+    expect(sanitizeUser(null as any)).toBeNull();
   });
 
   it("should preserve all other fields", () => {
@@ -89,7 +75,8 @@ describe("sanitizeUser", () => {
 });
 
 describe("DEFAULT_PASSWORD", () => {
-  it("should be defined", () => {
-    expect(DEFAULT_PASSWORD).toBe("Mudar@123");
+  it("should be defined and not empty", () => {
+    expect(DEFAULT_PASSWORD).toBeTruthy();
+    expect(typeof DEFAULT_PASSWORD).toBe("string");
   });
 });

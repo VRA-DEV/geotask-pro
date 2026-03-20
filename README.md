@@ -41,28 +41,28 @@ O GeoTask Pro e uma aplicacao web full-stack para gestao de tarefas com foco em 
 - **Gestao de Equipes** — Times/Polos com membros vinculados
 - **Multi-setor** — Coordenadores podem gerenciar multiplos setores
 - **Anexos** — Upload de imagens e PDFs vinculados a tarefas
-- **Relatorios** — Geracao de relatorios com analise de dados
+- **Relatorios** — Geracao de relatorios com analise de dados por ia
 
 ---
 
 ## Stack Tecnologica
 
-| Camada | Tecnologia | Versao |
-|--------|-----------|--------|
-| **Framework** | Next.js (App Router) | 16.1.6 |
-| **Frontend** | React | 19.0.0 |
-| **Linguagem** | TypeScript | 5.x |
-| **Estilizacao** | Tailwind CSS | 4.2.1 |
-| **ORM** | Prisma | 5.22.0 |
-| **Banco de Dados** | PostgreSQL | 15+ |
-| **State Management** | Zustand | 5.0.11 |
-| **Data Fetching** | SWR | 2.4.0 |
-| **Validacao** | Zod | 3.23.8 |
-| **Autenticacao** | bcryptjs | 3.0.3 |
-| **Icones** | Lucide React | 0.574.0 |
-| **Graficos** | Recharts | 3.7.0 |
-| **Exportacao** | ExcelJS, jsPDF | 4.4.0 / 4.2.0 |
-| **Testes** | Vitest | 4.0.18 |
+| Camada               | Tecnologia           | Versao        |
+| -------------------- | -------------------- | ------------- |
+| **Framework**        | Next.js (App Router) | 16.1.6        |
+| **Frontend**         | React                | 19.0.0        |
+| **Linguagem**        | TypeScript           | 5.x           |
+| **Estilizacao**      | Tailwind CSS         | 4.2.1         |
+| **ORM**              | Prisma               | 5.22.0        |
+| **Banco de Dados**   | PostgreSQL           | 15+           |
+| **State Management** | Zustand              | 5.0.11        |
+| **Data Fetching**    | SWR                  | 2.4.0         |
+| **Validacao**        | Zod                  | 3.23.8        |
+| **Autenticacao**     | bcryptjs             | 3.0.3         |
+| **Icones**           | Lucide React         | 0.574.0       |
+| **Graficos**         | Recharts             | 3.7.0         |
+| **Exportacao**       | ExcelJS, jsPDF       | 4.4.0 / 4.2.0 |
+| **Testes**           | Vitest               | 4.0.18        |
 
 ---
 
@@ -192,17 +192,17 @@ XAI_API_KEY="sua-api-key-xai"
 
 ## Scripts Disponiveis
 
-| Script | Comando | Descricao |
-|--------|---------|-----------|
-| Dev | `npm run dev` | Servidor de desenvolvimento com hot reload |
-| Build | `npm run build` | Build de producao |
-| Start | `npm start` | Inicia servidor de producao |
-| Lint | `npm run lint` | Verificacao de codigo com ESLint |
-| Test | `npm test` | Executa testes unitarios com Vitest |
-| Test Watch | `npm run test:watch` | Testes em modo watch |
-| Prisma Studio | `npx prisma studio` | Interface visual do banco de dados |
-| Migration | `npx prisma migrate dev` | Cria e aplica nova migration |
-| Seed | `npx tsx prisma/seed_roles_v2.ts` | Popula roles, teams e sectors |
+| Script        | Comando                           | Descricao                                  |
+| ------------- | --------------------------------- | ------------------------------------------ |
+| Dev           | `npm run dev`                     | Servidor de desenvolvimento com hot reload |
+| Build         | `npm run build`                   | Build de producao                          |
+| Start         | `npm start`                       | Inicia servidor de producao                |
+| Lint          | `npm run lint`                    | Verificacao de codigo com ESLint           |
+| Test          | `npm test`                        | Executa testes unitarios com Vitest        |
+| Test Watch    | `npm run test:watch`              | Testes em modo watch                       |
+| Prisma Studio | `npx prisma studio`               | Interface visual do banco de dados         |
+| Migration     | `npx prisma migrate dev`          | Cria e aplica nova migration               |
+| Seed          | `npx tsx prisma/seed_roles_v2.ts` | Popula roles, teams e sectors              |
 
 ---
 
@@ -210,30 +210,30 @@ XAI_API_KEY="sua-api-key-xai"
 
 ### Modelos Principais
 
-| Modelo | Descricao |
-|--------|-----------|
-| `User` | Usuarios com cargo, setor e equipe |
-| `Task` | Tarefas com status, prioridade, prazo e localizacao |
-| `Subtask` | Subtarefas vinculadas a uma tarefa |
-| `Comment` | Comentarios em tarefas com suporte a mencoes |
-| `Role` | Cargos com permissoes JSON granulares |
-| `Sector` | Setores/departamentos |
-| `Team` | Equipes/Polos |
-| `Contract` | Contratos de servico |
-| `City` | Cidades |
-| `Neighborhood` | Bairros (vinculados a cidade e contrato) |
-| `Template` | Modelos de tarefas reutilizaveis |
-| `TemplateTask` | Tarefas dentro de templates |
-| `TemplateSubtask` | Subtarefas dentro de tarefas de template |
-| `TaskHistory` | Historico de alteracoes (auditoria) |
-| `Notification` | Notificacoes do sistema |
-| `Mention` | Mencoes em comentarios |
-| `ActivityLog` | Log de auditoria global |
-| `TaskUser` | Colaboradores em tarefas (N:N) |
-| `UserSector` | Usuarios com multiplos setores (N:N) |
-| `TaskAttachment` | Anexos (imagens/PDFs) |
-| `TaskPause` | Registros de pausas com calculo de tempo |
-| `TaskType` | Tipos de tarefa por setor |
+| Modelo            | Descricao                                           |
+| ----------------- | --------------------------------------------------- |
+| `User`            | Usuarios com cargo, setor e equipe                  |
+| `Task`            | Tarefas com status, prioridade, prazo e localizacao |
+| `Subtask`         | Subtarefas vinculadas a uma tarefa                  |
+| `Comment`         | Comentarios em tarefas com suporte a mencoes        |
+| `Role`            | Cargos com permissoes JSON granulares               |
+| `Sector`          | Setores/departamentos                               |
+| `Team`            | Equipes/Polos                                       |
+| `Contract`        | Contratos de servico                                |
+| `City`            | Cidades                                             |
+| `Neighborhood`    | Bairros (vinculados a cidade e contrato)            |
+| `Template`        | Modelos de tarefas reutilizaveis                    |
+| `TemplateTask`    | Tarefas dentro de templates                         |
+| `TemplateSubtask` | Subtarefas dentro de tarefas de template            |
+| `TaskHistory`     | Historico de alteracoes (auditoria)                 |
+| `Notification`    | Notificacoes do sistema                             |
+| `Mention`         | Mencoes em comentarios                              |
+| `ActivityLog`     | Log de auditoria global                             |
+| `TaskUser`        | Colaboradores em tarefas (N:N)                      |
+| `UserSector`      | Usuarios com multiplos setores (N:N)                |
+| `TaskAttachment`  | Anexos (imagens/PDFs)                               |
+| `TaskPause`       | Registros de pausas com calculo de tempo            |
+| `TaskType`        | Tipos de tarefa por setor                           |
 
 ### Diagrama de Relacoes
 
@@ -338,61 +338,61 @@ geotask-pro/
 
 ### Autenticacao
 
-| Metodo | Rota | Descricao |
-|--------|------|-----------|
-| POST | `/api/auth/login` | Login com email e senha |
-| POST | `/api/auth/me` | Validacao de sessao |
-| POST | `/api/auth/change-password` | Alterar senha |
+| Metodo | Rota                        | Descricao               |
+| ------ | --------------------------- | ----------------------- |
+| POST   | `/api/auth/login`           | Login com email e senha |
+| POST   | `/api/auth/me`              | Validacao de sessao     |
+| POST   | `/api/auth/change-password` | Alterar senha           |
 
 ### Tarefas
 
-| Metodo | Rota | Descricao |
-|--------|------|-----------|
-| GET | `/api/tasks` | Listar tarefas (com filtros e paginacao) |
-| POST | `/api/tasks` | Criar tarefa |
-| PATCH | `/api/tasks` | Atualizar tarefa |
-| DELETE | `/api/tasks` | Excluir tarefa |
-| GET | `/api/tasks/[id]/attachments` | Listar anexos |
-| POST | `/api/tasks/[id]/attachments` | Upload de anexo |
-| DELETE | `/api/tasks/[id]/attachments` | Remover anexo |
-| GET | `/api/tasks/history` | Historico de alteracoes |
+| Metodo | Rota                          | Descricao                                |
+| ------ | ----------------------------- | ---------------------------------------- |
+| GET    | `/api/tasks`                  | Listar tarefas (com filtros e paginacao) |
+| POST   | `/api/tasks`                  | Criar tarefa                             |
+| PATCH  | `/api/tasks`                  | Atualizar tarefa                         |
+| DELETE | `/api/tasks`                  | Excluir tarefa                           |
+| GET    | `/api/tasks/[id]/attachments` | Listar anexos                            |
+| POST   | `/api/tasks/[id]/attachments` | Upload de anexo                          |
+| DELETE | `/api/tasks/[id]/attachments` | Remover anexo                            |
+| GET    | `/api/tasks/history`          | Historico de alteracoes                  |
 
 ### Usuarios
 
-| Metodo | Rota | Descricao |
-|--------|------|-----------|
-| GET | `/api/users` | Listar usuarios |
-| POST | `/api/users` | Criar usuario |
-| PATCH | `/api/users` | Atualizar usuario |
-| POST | `/api/users/import` | Importar usuarios via Excel |
+| Metodo | Rota                | Descricao                   |
+| ------ | ------------------- | --------------------------- |
+| GET    | `/api/users`        | Listar usuarios             |
+| POST   | `/api/users`        | Criar usuario               |
+| PATCH  | `/api/users`        | Atualizar usuario           |
+| POST   | `/api/users/import` | Importar usuarios via Excel |
 
 ### Administracao
 
-| Metodo | Rota | Descricao |
-|--------|------|-----------|
-| GET/POST/PUT | `/api/roles` | Cargos e permissoes |
-| GET/POST/PUT | `/api/sectors` | Setores |
-| GET/POST/PUT | `/api/teams` | Times/Polos |
-| GET/POST | `/api/user-sectors` | Vinculos multi-setor |
-| GET/POST/PUT | `/api/contracts` | Contratos |
-| GET/POST/PUT | `/api/cities` | Cidades |
-| GET/POST/PUT | `/api/neighborhoods` | Bairros |
-| GET/POST/PUT | `/api/task-types` | Tipos de tarefa |
-| GET/POST/DELETE | `/api/templates` | Templates |
+| Metodo          | Rota                 | Descricao            |
+| --------------- | -------------------- | -------------------- |
+| GET/POST/PUT    | `/api/roles`         | Cargos e permissoes  |
+| GET/POST/PUT    | `/api/sectors`       | Setores              |
+| GET/POST/PUT    | `/api/teams`         | Times/Polos          |
+| GET/POST        | `/api/user-sectors`  | Vinculos multi-setor |
+| GET/POST/PUT    | `/api/contracts`     | Contratos            |
+| GET/POST/PUT    | `/api/cities`        | Cidades              |
+| GET/POST/PUT    | `/api/neighborhoods` | Bairros              |
+| GET/POST/PUT    | `/api/task-types`    | Tipos de tarefa      |
+| GET/POST/DELETE | `/api/templates`     | Templates            |
 
 ### Outros
 
-| Metodo | Rota | Descricao |
-|--------|------|-----------|
-| GET/POST | `/api/comments` | Comentarios e mencoes |
-| GET/PATCH | `/api/notifications` | Notificacoes |
-| GET | `/api/activity-log` | Log de atividades |
-| GET | `/api/dashboard/stats` | Estatisticas do dashboard |
-| GET | `/api/lookups` | Dados para dropdowns |
-| GET | `/api/events` | Eventos do cronograma |
-| POST | `/api/ai/analyze` | Relatorios com IA |
-| GET | `/api/reports/weekly` | Relatorio semanal |
-| GET | `/api/cron/late-tasks` | Job de tarefas atrasadas |
+| Metodo    | Rota                   | Descricao                 |
+| --------- | ---------------------- | ------------------------- |
+| GET/POST  | `/api/comments`        | Comentarios e mencoes     |
+| GET/PATCH | `/api/notifications`   | Notificacoes              |
+| GET       | `/api/activity-log`    | Log de atividades         |
+| GET       | `/api/dashboard/stats` | Estatisticas do dashboard |
+| GET       | `/api/lookups`         | Dados para dropdowns      |
+| GET       | `/api/events`          | Eventos do cronograma     |
+| POST      | `/api/ai/analyze`      | Relatorios com IA         |
+| GET       | `/api/reports/weekly`  | Relatorio semanal         |
+| GET       | `/api/cron/late-tasks` | Job de tarefas atrasadas  |
 
 ---
 
@@ -402,16 +402,16 @@ RBAC (Role-Based Access Control) com permissoes JSON armazenadas no campo `permi
 
 ### Cargos e Niveis de Acesso
 
-| Cargo | Visualizacao | Criar | Editar | Atribuir | Pausas |
-|-------|-------------|-------|--------|----------|--------|
-| **Admin** | Todos os setores | Sim | Sim | Qualquer um | Sim |
-| **Socio** | Todos os setores | Nao | Nao | Nao | Nao |
-| **Diretor** | Todos os setores | Sim | Nao | Qualquer um | Nao |
-| **Gerente** | Todos os setores | Sim | Sim | Qualquer um | Sim |
-| **Coord. de Polo** | Proprio time | Sim | Nao | Proprio time | Nao |
-| **Coord. de Setores** | Setores vinculados | Sim | Sim | Setores vinculados | Nao |
-| **Gestor** | Proprio setor | Sim | Nao | Proprio setor | Nao |
-| **Liderado** | Apenas atribuidas | Nao | Nao | Nao | Nao |
+| Cargo                 | Visualizacao       | Criar | Editar | Atribuir           | Pausas |
+| --------------------- | ------------------ | ----- | ------ | ------------------ | ------ |
+| **Admin**             | Todos os setores   | Sim   | Sim    | Qualquer um        | Sim    |
+| **Socio**             | Todos os setores   | Nao   | Nao    | Nao                | Nao    |
+| **Diretor**           | Todos os setores   | Sim   | Nao    | Qualquer um        | Nao    |
+| **Gerente**           | Todos os setores   | Sim   | Sim    | Qualquer um        | Sim    |
+| **Coord. de Polo**    | Proprio time       | Sim   | Nao    | Proprio time       | Nao    |
+| **Coord. de Setores** | Setores vinculados | Sim   | Sim    | Setores vinculados | Nao    |
+| **Gestor**            | Proprio setor      | Sim   | Nao    | Proprio setor      | Nao    |
+| **Liderado**          | Apenas atribuidas  | Nao   | Nao    | Nao                | Nao    |
 
 ### Categorias de Permissao
 
@@ -425,13 +425,13 @@ RBAC (Role-Based Access Control) com permissoes JSON armazenadas no campo `permi
 
 ### Visualizacoes
 
-| Pagina | Descricao |
-|--------|-----------|
-| **Kanban** | Quadro com colunas por status. Drag-and-drop para mover tarefas. |
-| **Dashboard** | Graficos: tarefas por status, setor, prioridade. Taxa de conclusao. Ranking de responsaveis. |
-| **Cronograma** | Timeline de tarefas por data de prazo com filtros por setor/responsavel/contrato. |
-| **Mind Map** | Arvore hierarquica de tarefas pai/filho. |
-| **Lista** | Tabela completa com filtros avancados e exportacao Excel/PDF. |
+| Pagina         | Descricao                                                                                    |
+| -------------- | -------------------------------------------------------------------------------------------- |
+| **Kanban**     | Quadro com colunas por status. Drag-and-drop para mover tarefas.                             |
+| **Dashboard**  | Graficos: tarefas por status, setor, prioridade. Taxa de conclusao. Ranking de responsaveis. |
+| **Cronograma** | Timeline de tarefas por data de prazo com filtros por setor/responsavel/contrato.            |
+| **Mind Map**   | Arvore hierarquica de tarefas pai/filho.                                                     |
+| **Lista**      | Tabela completa com filtros avancados e exportacao Excel/PDF.                                |
 
 ### Filtros Avancados
 
@@ -468,13 +468,13 @@ npm run test:watch
 
 Testes em `src/lib/__tests__/`:
 
-| Arquivo | Cobertura |
-|---------|-----------|
-| `authService.test.ts` | Autenticacao e hashing |
-| `task.test.ts` | Validacao de tarefas (Zod) |
-| `user.test.ts` | Validacao de usuarios (Zod) |
-| `comment.test.ts` | Validacao de comentarios (Zod) |
-| `helpers.test.ts` | Funcoes utilitarias |
+| Arquivo               | Cobertura                      |
+| --------------------- | ------------------------------ |
+| `authService.test.ts` | Autenticacao e hashing         |
+| `task.test.ts`        | Validacao de tarefas (Zod)     |
+| `user.test.ts`        | Validacao de usuarios (Zod)    |
+| `comment.test.ts`     | Validacao de comentarios (Zod) |
+| `helpers.test.ts`     | Funcoes utilitarias            |
 
 ---
 
@@ -539,16 +539,16 @@ git push origin feature/nome-da-feature
 
 ### Convencao de commits
 
-| Prefixo | Uso |
-|---------|-----|
-| `feat:` | Nova funcionalidade |
-| `fix:` | Correcao de bug |
+| Prefixo     | Uso                                      |
+| ----------- | ---------------------------------------- |
+| `feat:`     | Nova funcionalidade                      |
+| `fix:`      | Correcao de bug                          |
 | `refactor:` | Refatoracao sem mudanca de comportamento |
-| `docs:` | Documentacao |
-| `test:` | Testes |
-| `chore:` | Tarefas de manutencao |
-| `style:` | Formatacao, sem mudanca de logica |
-| `perf:` | Melhoria de performance |
+| `docs:`     | Documentacao                             |
+| `test:`     | Testes                                   |
+| `chore:`    | Tarefas de manutencao                    |
+| `style:`    | Formatacao, sem mudanca de logica        |
+| `perf:`     | Melhoria de performance                  |
 
 ### Regras
 

@@ -11,27 +11,7 @@ export async function verifyPassword(
   plain: string,
   hash: string,
 ): Promise<boolean> {
-  // Support legacy plain text passwords
-  if (hash.startsWith("$2")) {
-    return bcrypt.compare(plain, hash);
-  }
-  // Legacy: direct comparison
-  return hash === plain;
-}
-
-export async function migratePasswordIfNeeded(
-  userId: number,
-  plainPassword: string,
-  currentHash: string,
-): Promise<void> {
-  // If still plain text, upgrade to bcrypt
-  if (!currentHash.startsWith("$2")) {
-    const newHash = await hashPassword(plainPassword);
-    await prisma.user.update({
-      where: { id: userId },
-      data: { password_hash: newHash },
-    });
-  }
+  return bcrypt.compare(plain, hash);
 }
 
 export async function findUserByEmail(email: string) {
@@ -51,10 +31,10 @@ export async function findUserById(id: number) {
 /**
  * Sanitize user object for API response — strips password_hash
  */
-export function sanitizeUser(user: any) {
+export function sanitizeUser(user: Record<string, unknown>) {
   if (!user) return null;
   const { password_hash, ...safe } = user;
   return safe;
 }
 
-export const DEFAULT_PASSWORD = "Mudar@123";
+export const DEFAULT_PASSWORD = process.env.DEFAULT_USER_PASSWORD || "Mudar@123";

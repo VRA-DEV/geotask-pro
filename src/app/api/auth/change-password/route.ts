@@ -1,5 +1,7 @@
+import { getAuthUser } from "@/lib/auth";
 import { logActivity } from "@/lib/activityLog";
 import prisma from "@/lib/prisma";
+import { getPermissions } from "@/lib/permissions";
 import { changePasswordSchema } from "@/lib/validators/auth";
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
@@ -17,24 +19,47 @@ export async function POST(req: Request) {
 
     const { userId, currentPassword, newPassword } = parsed.data;
 
-    const user = await prisma.user.findUnique({
+    const targetUser = await prisma.user.findUnique({
       where: { id: userId },
     });
-    if (!user) {
+    if (!targetUser) {
       return NextResponse.json(
         { error: "Usuário não encontrado" },
         { status: 404 },
       );
     }
 
-    // If currentPassword is provided, validate it (user changing own password)
-    if (currentPassword !== undefined && currentPassword !== null) {
-      let valid = false;
-      if (user.password_hash.startsWith("$2")) {
-        valid = await bcrypt.compare(currentPassword, user.password_hash);
-      } else {
-        valid = user.password_hash === currentPassword;
+    // Determine who is making this request
+    const authUser = await getAuthUser(req);
+
+    // If changing someone else's password, require admin/manage_users permission
+    const isOwnPassword = authUser && authUser.id === userId;
+    const isMustChange = targetUser.must_change_password;
+
+    if (!isOwnPassword && !isMustChange) {
+      // Someone else is changing this user's password — require admin permissions
+      if (!authUser) {
+        return NextResponse.json(
+          { error: "Autenticação necessária" },
+          { status: 401 },
+        );
       }
+      const perms = getPermissions({ role: authUser.role } as any);
+      if (!perms.settings.manage_users) {
+        return NextResponse.json(
+          { error: "Sem permissão para alterar senha de outro usuário" },
+          { status: 403 },
+        );
+      }
+    } else if (isOwnPassword && !isMustChange) {
+      // User changing own password — must provide current password
+      if (!currentPassword) {
+        return NextResponse.json(
+          { error: "Senha atual é obrigatória" },
+          { status: 400 },
+        );
+      }
+      const valid = await bcrypt.compare(currentPassword, targetUser.password_hash);
       if (!valid) {
         return NextResponse.json(
           { error: "Senha atual incorreta" },
@@ -42,6 +67,7 @@ export async function POST(req: Request) {
         );
       }
     }
+    // If must_change_password is true, allow without current password (first login)
 
     const hash = await bcrypt.hash(newPassword, 10);
 
@@ -54,12 +80,12 @@ export async function POST(req: Request) {
     });
 
     logActivity(
-      userId,
-      user.name,
+      authUser?.id ?? userId,
+      authUser?.name ?? targetUser.name,
       "password_changed",
       "user",
       userId,
-      "Alterou a senha",
+      isOwnPassword ? "Alterou a própria senha" : `Alterou a senha de ${targetUser.name}`,
     );
 
     return NextResponse.json({ message: "Senha alterada com sucesso" });

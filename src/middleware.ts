@@ -1,35 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * Middleware de autenticação.
+ * Middleware de autenticacao.
  *
- * Rotas públicas: /login, /api/auth/login, /api/setup, assets estáticos.
- * Todas as outras rotas verificam se existe sessão via cookie ou header.
+ * Rotas publicas: /login, /api/auth/login, /api/setup, assets estaticos.
+ * Rotas de API protegidas requerem o header X-User-Id.
  *
- * Nota: A autenticação atual usa localStorage no cliente.
- * Este middleware protege as rotas API verificando o header X-User-Id
- * que o frontend deve enviar. Numa próxima iteração, migrar para
- * cookies HTTP-only com JWT.
+ * Nota: A autenticacao atual usa localStorage no cliente.
+ * O frontend envia X-User-Id em cada request. O middleware valida
+ * presenca e formato. A validacao completa (usuario existe e esta ativo)
+ * e feita por `requireAuth()` em cada route handler.
  */
 
-const PUBLIC_PATHS = [
+const PUBLIC_PATHS = new Set([
   "/login",
   "/api/auth/login",
   "/api/setup",
-  "/api/cron/late-tasks",
-];
+]);
 
-const PUBLIC_PREFIXES = [
-  "/_next",
-  "/favicon",
-  "/logo",
-  "/icon",
-];
+const PUBLIC_API_PATHS = new Set([
+  "/api/auth/login",
+  "/api/auth/me",
+  "/api/auth/change-password",
+  "/api/setup",
+]);
+
+const PUBLIC_PREFIXES = ["/_next", "/favicon", "/logo", "/icon"];
 
 function isPublicPath(pathname: string): boolean {
-  if (PUBLIC_PATHS.includes(pathname)) return true;
+  if (PUBLIC_PATHS.has(pathname)) return true;
   if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return true;
-  // Static files
   if (pathname.match(/\.(png|jpg|jpeg|svg|ico|css|js|woff2?)$/)) return true;
   return false;
 }
@@ -37,36 +37,40 @@ function isPublicPath(pathname: string): boolean {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Allow public paths
   if (isPublicPath(pathname)) {
     return NextResponse.next();
   }
 
-  // For API routes, check for user identification header
+  // Protected API routes — require X-User-Id header
   if (pathname.startsWith("/api/")) {
-    // /api/auth/me is used for session validation, allow it
-    if (pathname === "/api/auth/me" || pathname === "/api/auth/change-password") {
+    // Allow public API paths
+    if (PUBLIC_API_PATHS.has(pathname)) {
       return NextResponse.next();
     }
 
-    // For other API routes, we could check a header/cookie here.
-    // For now, allow all API calls since auth is handled per-route.
-    // TODO: Implement JWT-based auth with HTTP-only cookies
+    // Cron routes use their own secret-based auth
+    if (pathname.startsWith("/api/cron/")) {
+      return NextResponse.next();
+    }
+
+    // Require X-User-Id header
+    const userId = request.headers.get("X-User-Id");
+    if (!userId || isNaN(Number(userId))) {
+      return NextResponse.json(
+        { error: "Autenticação necessária" },
+        { status: 401 },
+      );
+    }
+
     return NextResponse.next();
   }
 
-  // For page routes (non-API), the client-side handles auth redirect
+  // Page routes — client-side handles auth redirect
   return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization)
-     * - favicon.ico
-     */
     "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 };

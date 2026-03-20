@@ -41,21 +41,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Support both bcrypt hashes and legacy plain text passwords
-    let passwordValid = false;
-    if (user.password_hash.startsWith("$2")) {
-      passwordValid = await bcrypt.compare(password, user.password_hash);
-    } else {
-      // Legacy plain text — validate and upgrade to bcrypt
-      passwordValid = user.password_hash === password;
-      if (passwordValid) {
-        const hash = await bcrypt.hash(password, 10);
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { password_hash: hash },
-        });
-      }
-    }
+    const passwordValid = await bcrypt.compare(password, user.password_hash);
 
     if (!passwordValid) {
       return NextResponse.json(

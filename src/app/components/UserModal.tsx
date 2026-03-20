@@ -359,9 +359,7 @@ export function UserModal({
                 color: T.sub,
               }}
             >
-              🔑 Senha padrão:{" "}
-              <strong style={{ color: T.text }}>Geogis2026</strong>
-              <br />O usuário será solicitado a alterar no primeiro acesso.
+              O usuário será solicitado a alterar a senha no primeiro acesso.
             </div>
           )}
 
@@ -401,8 +399,8 @@ export function UserModal({
                   Resetar senha para o padrão
                 </div>
                 <div style={{ fontSize: 11, color: T.sub }}>
-                  Senha voltará para <strong>Geogis2026</strong> e o usuário
-                  deverá alterá-la.
+                  Senha será redefinida e o usuário deverá alterá-la
+                  no próximo acesso.
                 </div>
               </div>
             </div>

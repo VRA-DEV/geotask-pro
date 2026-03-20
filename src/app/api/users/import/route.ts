@@ -2,7 +2,7 @@ import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 
-const DEFAULT_PASSWORD = "Geogis2026";
+const DEFAULT_PASSWORD = process.env.DEFAULT_USER_PASSWORD || "Mudar@123";
 
 export async function POST(req: Request) {
   try {

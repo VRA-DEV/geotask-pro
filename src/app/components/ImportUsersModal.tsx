@@ -146,7 +146,7 @@ export const ImportUsersModal: React.FC<ImportUsersModalProps> = ({
                     </table>
                   </div>
                   <p className="text-[10px] text-slate-500 italic">
-                    * O sistema criará cargos e setores automaticamente se não existirem. A senha padrão será "Geogis2026".
+                    * O sistema criará cargos e setores automaticamente se não existirem. O usuário deverá alterar a senha no primeiro acesso.
                   </p>
                 </div>
               )}

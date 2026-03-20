@@ -99,12 +99,12 @@ describe("getTaskState", () => {
     expect(getTaskState({ status: "A Fazer" })).toBeNull();
   });
 
-  it("should return null for completed on-time tasks", () => {
+  it("should return 'Entregue no Prazo' for completed on-time tasks", () => {
     const result = getTaskState({
       deadline: "2099-12-31",
       status: "Concluído",
       completed_at: "2025-01-01",
     });
-    expect(result).toBeNull();
+    expect(result).toEqual({ label: "Entregue no Prazo", color: "#059669" });
   });
 });

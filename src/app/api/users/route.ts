@@ -3,7 +3,7 @@ import { createUserSchema, updateUserSchema } from "@/lib/validators/user";
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
 
-const DEFAULT_PASSWORD = "Geogis2026";
+const DEFAULT_PASSWORD = process.env.DEFAULT_USER_PASSWORD || "Mudar@123";
 
 // GET /api/users
 export async function GET() {

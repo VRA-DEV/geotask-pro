@@ -1,2 +1,0 @@
-npx prisma migrate deploy
-npx ts-node prisma/seed_safe_production.ts
