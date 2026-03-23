@@ -84,7 +84,7 @@ export function FormTextarea({
         outline: "none",
         resize: "vertical",
         boxSizing: "border-box",
-        fontFamily: "system-ui",
+        fontFamily: "inherit",
       }}
     />
   );

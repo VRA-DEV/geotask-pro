@@ -286,7 +286,7 @@ export default function NewTaskModal({
   );
 
   useEffect(() => {
-    if (dateVal) {
+    if (dateVal && !isNaN(dateVal.getTime())) {
       // set form.deadline as ISO string to match DB expectation
       setForm((f) => ({ ...f, deadline: dateVal.toISOString() }));
     } else {
@@ -468,10 +468,6 @@ export default function NewTaskModal({
               selectedTemplate
                 ? "border border-primary text-primary"
                 : "border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400"
-            } ${
-              templates.length === 0
-                ? "Nenhum template cadastrado — crie em Templates"
-                : "Nenhum (formulário em branco)"
             }`}
           >
             <option value="">
