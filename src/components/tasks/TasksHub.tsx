@@ -165,6 +165,8 @@ export default function TasksHub({
             canViewAllSectors={canViewAllSectors}
             showSubtasks={showSubtasks}
             setShowSubtasks={setShowSubtasks}
+            createdByMe={createdByMe}
+            setCreatedByMe={setCreatedByMe}
             setTeam={setTeam}
             sortField={sortField}
             setSortField={setSortField}
