@@ -51,7 +51,24 @@
       "Bash(find /c/Users/viniciusaraujo/Documents/GDrive/projects/Geoboard/geogis-contratos/web/src -name *.ts -o -name *.tsx)",
       "Bash(mkdir -p \"C:\\\\Users\\\\viniciusaraujo\\\\Documents\\\\GDrive\\\\projects\\\\GeoTask-Pro\\\\geotask-pro\\\\geotask-pro-v2\\\\src\\\\app\\\\api\\\\lots\\\\[id]\")",
       "Bash(mkdir -p \"C:\\\\Users\\\\viniciusaraujo\\\\Documents\\\\GDrive\\\\projects\\\\GeoTask-Pro\\\\geotask-pro\\\\geotask-pro-v2\\\\src\\\\app\\\\api\\\\lots\\\\[id]\\\\compliance\")",
-      "Bash(ls \"C:\\\\Users\\\\viniciusaraujo\\\\Documents\\\\GDrive\\\\projects\\\\GeoTask-Pro\\\\geotask-pro\\\\geotask-pro-v2\\\\src\\\\components\\\\ui\"\" 2>/dev/null || echo \"UI dir not found \")"
+      "Bash(ls \"C:\\\\Users\\\\viniciusaraujo\\\\Documents\\\\GDrive\\\\projects\\\\GeoTask-Pro\\\\geotask-pro\\\\geotask-pro-v2\\\\src\\\\components\\\\ui\"\" 2>/dev/null || echo \"UI dir not found \")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\(''''dependencies'''',{}\\), indent=2\\)\\)\")",
+      "Bash(for d:*)",
+      "Bash(do echo:*)",
+      "Read(//c/Users/viniciusaraujo/Documents/GDrive/projects/GeoTask-Pro/geotask-pro/geotask-pro-v2/src/components/**)",
+      "Bash(done)",
+      "Bash(cat src/app/\\\\\\(dashboard\\\\\\)/configuracoes/page.tsx)",
+      "Bash(npm run:*)",
+      "Bash(taskkill /F /IM node.exe)",
+      "Bash(findstr :3000)",
+      "Bash(taskkill /F /PID 4152)",
+      "Bash(TASKKILL //F //PID 4152)",
+      "Bash(node -e \"const bcrypt=require\\(''bcryptjs''\\);bcrypt.hash\\(''Geotask@2024'',12\\).then\\(h=>{console.log\\(''New hash:'',h\\);bcrypt.compare\\(''Geotask@2024'',h\\).then\\(r=>console.log\\(''Verify:'',r\\)\\)}\\)\")",
+      "Bash(node fix_passwords.js)",
+      "Bash(curl -s -X POST http://localhost:3000/api/auth/login -H \"Content-Type: application/json\" -d '{\"\"\"\"email\"\"\"\":\"\"\"\"admin@geotask.com\"\"\"\",\"\"\"\"password\"\"\"\":\"\"\"\"Geotask@2024\"\"\"\"}')",
+      "Bash(findstr \":3000 \")",
+      "Bash(where npx.cmd)",
+      "Bash(where npx:*)"
     ]
   }
 }

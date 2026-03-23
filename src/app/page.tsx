@@ -331,7 +331,7 @@ export default function GeoTask() {
     const uSectorId = user?.sector?.id || user?.sector_id;
 
     // Roles that see ALL tasks
-    const fullAccessRoles = ["Admin", "Gerente", "Socio", "Diretor"];
+    const fullAccessRoles = ["Admin", "Gerente", "Socio", "Diretor", "GM"];
     if (fullAccessRoles.includes(roleName)) return tasksToFilter;
 
     let filtered = tasksToFilter.filter((t: any) => {

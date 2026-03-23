@@ -1018,6 +1018,7 @@ export default function TaskDetailModal({
                 ))}
               </div>
 
+              {user.role?.name !== "GM" && (
               <div className="bg-slate-100 dark:bg-gray-900 p-3 rounded-[10px] border border-slate-200 dark:border-gray-700">
                 <div className="text-xs font-bold text-primary mb-2">
                   Nova Subtarefa
@@ -1111,6 +1112,7 @@ export default function TaskDetailModal({
                   </div>
                 </div>
               </div>
+              )}
             </div>
           )}
 
@@ -1145,6 +1147,7 @@ export default function TaskDetailModal({
                 )}
               </div>
 
+              {user.role?.name !== "GM" && (
               <div className="relative flex gap-2 items-end">
                 <textarea
                   value={commentText}
@@ -1184,6 +1187,7 @@ export default function TaskDetailModal({
                   </div>
                 )}
               </div>
+              )}
             </div>
           )}
 
@@ -1194,6 +1198,7 @@ export default function TaskDetailModal({
                 <div className="text-[11px] font-bold text-slate-500 dark:text-gray-400 uppercase">
                   Anexos ({attachments.length})
                 </div>
+                {user.role?.name !== "GM" && (
                 <label className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white rounded-lg text-[12px] font-semibold cursor-pointer hover:opacity-90 transition-opacity">
                   <Upload size={13} />
                   {uploadingFile ? "Enviando..." : "Enviar Arquivo"}
@@ -1206,6 +1211,7 @@ export default function TaskDetailModal({
                     disabled={uploadingFile}
                   />
                 </label>
+                )}
               </div>
 
               {loadingAttachments && (

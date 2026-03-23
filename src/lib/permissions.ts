@@ -39,6 +39,7 @@ export interface AppPermissions {
 // Display name mapping: Admin appears as "Gestor" in the UI
 export const ROLE_DISPLAY_NAMES: Record<string, string> = {
   Admin: "Gestor",
+  GM: "GM",
 };
 
 export const getRoleDisplayName = (roleName: string): string =>
@@ -86,6 +87,7 @@ export const getPermissions = (user?: User | null): AppPermissions => {
   const isCoordSetores = roleName === "Coordenador de Setores";
   const isGestor = roleName === "Gestor";
   const isLiderado = roleName === "Liderado";
+  const isGM = roleName === "GM";
 
   const p = { ...defaultPerms };
 
@@ -96,15 +98,15 @@ export const getPermissions = (user?: User | null): AppPermissions => {
   p.pages.list = true;
   p.pages.dashboard = !isLiderado;
   p.pages.templates = !isLiderado && !isSocio;
-  p.pages.activity_log = isAdmin || isGerente;
+  p.pages.activity_log = isAdmin || isGerente || isGM;
   p.pages.settings = isAdmin || isGerente || isCoordSetores || isGestor;
-  p.pages.view_all_templates = isAdmin || isGerente || isCoordPolo || isCoordSetores || isDiretor;
+  p.pages.view_all_templates = isAdmin || isGerente || isCoordPolo || isCoordSetores || isDiretor || isGM;
 
   // Tasks
   p.tasks.create = isAdmin || isGerente || isDiretor || isCoordPolo || isCoordSetores || isGestor;
   p.tasks.edit_all = isAdmin || isGerente || isCoordSetores;
   p.tasks.edit_retroactive_dates = isAdmin || isGerente;
-  p.tasks.view_all_sectors = isAdmin || isSocio || isDiretor || isGerente;
+  p.tasks.view_all_sectors = isAdmin || isSocio || isDiretor || isGerente || isGM;
   p.tasks.view_own_team = isCoordPolo;
   p.tasks.view_own_sector = isCoordSetores || isGestor;
   p.tasks.view_created_by_me = !isLiderado && !isSocio;
