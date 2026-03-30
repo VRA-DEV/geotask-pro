@@ -770,11 +770,22 @@ export async function PATCH(req: Request) {
           updateData.paused_at = null;
         } else {
           if (task.status === "Em Andamento" && task.started_at) {
-            const elapsed = Math.floor(
-              (new Date().getTime() - new Date(task.started_at).getTime()) /
-                1000,
-            );
-            updateData.time_spent = (task.time_spent || 0) + elapsed;
+            // Calculate effective time excluding pauses
+            const nowMs = new Date().getTime();
+            const startMs = new Date(task.started_at).getTime();
+            const existingPauses = await prisma.taskPause.findMany({
+              where: { task_id: Number(id) },
+            });
+            let totalPauseMs = 0;
+            for (const p of existingPauses) {
+              const pStart = new Date(p.started_at).getTime();
+              const pEnd = p.ended_at
+                ? new Date(p.ended_at).getTime()
+                : nowMs;
+              totalPauseMs += pEnd - pStart;
+            }
+            const effectiveMs = Math.max(0, nowMs - startMs - totalPauseMs);
+            updateData.time_spent = Math.floor(effectiveMs / 1000);
           }
         }
         if (status === "Pausado") updateData.paused_at = new Date();
@@ -1106,17 +1117,28 @@ export async function PATCH(req: Request) {
           }
         }
 
-        // Recalculate time_spent if both are valid dates
+        // Recalculate time_spent if both are valid dates, subtracting pauses
         if (
           newStarted &&
           newCompleted &&
           !isNaN(newStarted.getTime()) &&
           !isNaN(newCompleted.getTime())
         ) {
-          const diffMs = newCompleted.getTime() - newStarted.getTime();
+          const existingPauses = await prisma.taskPause.findMany({
+            where: { task_id: Number(id) },
+          });
+          let totalPauseMs = 0;
+          for (const p of existingPauses) {
+            if (p.started_at && p.ended_at) {
+              totalPauseMs +=
+                new Date(p.ended_at).getTime() -
+                new Date(p.started_at).getTime();
+            }
+          }
+          const diffMs =
+            newCompleted.getTime() - newStarted.getTime() - totalPauseMs;
           if (diffMs > 0) {
-            const newTimeSpent = Math.floor(diffMs / 1000); // in seconds
-            updateData.time_spent = newTimeSpent;
+            updateData.time_spent = Math.floor(diffMs / 1000);
           }
         }
       }
@@ -1410,7 +1432,8 @@ export async function PATCH(req: Request) {
       );
     } else if (action === "manage_pauses") {
       // Manage retroactive pauses — receives array of {started_at, ended_at}
-      const { pauses } = data;
+      // Also optionally accepts started_at / completed_at to update dates in same request
+      const { pauses, started_at: reqStarted, completed_at: reqCompleted } = data;
       if (!Array.isArray(pauses)) {
         return NextResponse.json(
           { error: "pauses deve ser um array" },
@@ -1430,12 +1453,34 @@ export async function PATCH(req: Request) {
         });
       }
 
+      // If started_at / completed_at were sent, update them too
+      const taskUpdate: any = {};
+      let effectiveStarted = task.started_at;
+      let effectiveCompleted = task.completed_at;
+
+      if (reqStarted !== undefined) {
+        const s = reqStarted ? new Date(reqStarted) : null;
+        if (s?.getTime() !== task.started_at?.getTime()) {
+          await logHistory(task.id, userId, "started_at", task.started_at, s);
+          taskUpdate.started_at = s;
+          effectiveStarted = s;
+        }
+      }
+      if (reqCompleted !== undefined) {
+        const c = reqCompleted ? new Date(reqCompleted) : null;
+        if (c?.getTime() !== task.completed_at?.getTime()) {
+          await logHistory(task.id, userId, "completed_at", task.completed_at, c);
+          taskUpdate.completed_at = c;
+          effectiveCompleted = c;
+        }
+      }
+
       // Recalculate time_spent excluding pauses
-      if (task.started_at) {
-        const endTime = task.completed_at
-          ? new Date(task.completed_at).getTime()
+      if (effectiveStarted) {
+        const endTime = effectiveCompleted
+          ? new Date(effectiveCompleted).getTime()
           : new Date().getTime();
-        const startTime = new Date(task.started_at).getTime();
+        const startTime = new Date(effectiveStarted).getTime();
         let totalPauseMs = 0;
         for (const p of pauses) {
           if (p.started_at && p.ended_at) {
@@ -1444,9 +1489,13 @@ export async function PATCH(req: Request) {
           }
         }
         const effectiveMs = Math.max(0, endTime - startTime - totalPauseMs);
+        taskUpdate.time_spent = Math.floor(effectiveMs / 1000);
+      }
+
+      if (Object.keys(taskUpdate).length > 0) {
         await prisma.task.update({
           where: { id: Number(id) },
-          data: { time_spent: Math.floor(effectiveMs / 1000) },
+          data: taskUpdate,
         });
       }
 

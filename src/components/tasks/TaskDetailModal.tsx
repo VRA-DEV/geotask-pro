@@ -506,8 +506,8 @@ export default function TaskDetailModal({
   const handleSaveTiming = async () => {
     setSavingTiming(true);
     try {
-      // 1. Update pauses
-      const resP = await authFetch("/api/tasks", {
+      // Send pauses + dates in a single request to avoid race conditions
+      const res = await authFetch("/api/tasks", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -515,22 +515,12 @@ export default function TaskDetailModal({
           action: "manage_pauses",
           user_id: user?.id,
           pauses: editTiming.pauses.filter((p) => p.started_at),
-        }),
-      });
-
-      // 2. Update start/complete dates
-      const resD = await authFetch("/api/tasks", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: t.id,
-          action: "update_fields",
           started_at: editTiming.started_at || null,
           completed_at: editTiming.completed_at || null,
         }),
       });
 
-      if (resP.ok && resD.ok) {
+      if (res.ok) {
         setShowTimingModal(false);
         if (onUpdate) await onUpdate(t.id, "refresh", {});
       } else {
