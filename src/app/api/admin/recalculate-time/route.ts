@@ -25,116 +25,89 @@ export async function GET(req: Request) {
       select: {
         id: true,
         title: true,
-        started_at: true,
+        status: true,
+        created_at: true,
         completed_at: true,
         time_spent: true,
-        status: true,
       },
       orderBy: { id: "asc" },
     });
 
-    const allPauses = await prisma.taskPause.findMany({
-      orderBy: { started_at: "asc" },
-    });
-
-    // Index pauses by task_id
-    const pausesByTask = new Map<number, typeof allPauses>();
-    for (const p of allPauses) {
-      const list = pausesByTask.get(p.task_id) || [];
-      list.push(p);
-      pausesByTask.set(p.task_id, list);
-    }
-
     const now = new Date();
-    const results: {
-      id: number;
-      title: string;
-      oldTime: number;
-      newTime: number;
-      pauseCount: number;
-      changed: boolean;
-    }[] = [];
+    const results: any[] = [];
     let updatedCount = 0;
 
     for (const task of tasks) {
-      if (!task.started_at) {
-        if ((task.time_spent || 0) !== 0) {
-          await prisma.task.update({
-            where: { id: task.id },
-            data: { time_spent: 0 },
-          });
-          results.push({
-            id: task.id,
-            title: task.title,
-            oldTime: task.time_spent || 0,
-            newTime: 0,
-            pauseCount: 0,
-            changed: true,
-          });
-          updatedCount++;
+      // Fetch status history for this task
+      const history = await prisma.taskHistory.findMany({
+        where: {
+          task_id: task.id,
+          field: "status",
+        },
+        orderBy: { created_at: "asc" },
+      });
+
+      let totalElapsedMs = 0;
+      let lastInProgressStart: Date | null = null;
+
+      // Logic: 
+      // 1. If history transitions TO "Em Andamento", start counting.
+      // 2. If history transitions FROM "Em Andamento", stop counting and add interval.
+      // 3. If there's no history but task was created "Em Andamento" (rare but possible),
+      //    or if the first record is leaving "Em Andamento", assume it started at created_at.
+
+      history.forEach((entry, index) => {
+        const entryTime = new Date(entry.created_at);
+
+        if (entry.new_value === "Em Andamento") {
+          lastInProgressStart = entryTime;
+        } else if (entry.old_value === "Em Andamento" && lastInProgressStart) {
+          totalElapsedMs += entryTime.getTime() - lastInProgressStart.getTime();
+          lastInProgressStart = null;
+        } else if (entry.old_value === "Em Andamento" && !lastInProgressStart && index === 0) {
+          // Task was started before the first history record (likely at creation)
+          totalElapsedMs += entryTime.getTime() - new Date(task.created_at).getTime();
         }
-        continue;
+      });
+
+      // Handle current status if it's still In Progress
+      if (task.status === "Em Andamento") {
+        const startTime = lastInProgressStart || new Date(task.created_at);
+        totalElapsedMs += now.getTime() - startTime.getTime();
+      } else if (task.status === "Concluído" && lastInProgressStart) {
+        // If it was concluded but we have a dangling start (shouldn't happen with correct logs)
+        const endTime = task.completed_at ? new Date(task.completed_at) : now;
+        totalElapsedMs += endTime.getTime() - lastInProgressStart.getTime();
       }
 
-      const startMs = new Date(task.started_at).getTime();
-      const endMs = task.completed_at
-        ? new Date(task.completed_at).getTime()
-        : now.getTime();
-
-      const pauses = pausesByTask.get(task.id) || [];
-      let totalPauseMs = 0;
-      for (const p of pauses) {
-        const pStart = new Date(p.started_at).getTime();
-        const pEnd = p.ended_at
-          ? new Date(p.ended_at).getTime()
-          : now.getTime();
-        const clampedStart = Math.max(pStart, startMs);
-        const clampedEnd = Math.min(pEnd, endMs);
-        if (clampedEnd > clampedStart) {
-          totalPauseMs += clampedEnd - clampedStart;
-        }
-      }
-
-      const effectiveMs = Math.max(0, endMs - startMs - totalPauseMs);
-      const newTimeSpent = Math.floor(effectiveMs / 1000);
+      const newTimeSpent = Math.floor(totalElapsedMs / 1000);
       const oldTimeSpent = task.time_spent || 0;
 
-      if (newTimeSpent !== oldTimeSpent) {
+      // Only update if difference is significant (more than 1 minute) or if correcting a huge error
+      if (Math.abs(newTimeSpent - oldTimeSpent) > 60 || (oldTimeSpent > 3600*10 && newTimeSpent < 3600*5)) {
         await prisma.task.update({
           where: { id: task.id },
           data: { time_spent: newTimeSpent },
         });
         updatedCount++;
+        
+        results.push({
+          id: task.id,
+          title: task.title,
+          oldSeconds: oldTimeSpent,
+          newSeconds: newTimeSpent,
+          oldFormatted: fmtSec(oldTimeSpent),
+          newFormatted: fmtSec(newTimeSpent),
+          diff: fmtSec(Math.abs(oldTimeSpent - newTimeSpent)),
+        });
       }
-
-      results.push({
-        id: task.id,
-        title: task.title,
-        oldTime: oldTimeSpent,
-        newTime: newTimeSpent,
-        pauseCount: pauses.length,
-        changed: newTimeSpent !== oldTimeSpent,
-      });
     }
 
-    const changed = results.filter((r) => r.changed);
-
     return NextResponse.json({
-      message: `Recálculo concluído. ${updatedCount} tarefas atualizadas de ${tasks.length} total.`,
-      totalTasks: tasks.length,
-      totalPauses: allPauses.length,
+      message: `Recálculo via histórico concluído. ${updatedCount} tarefas corrigidas.`,
       updated: updatedCount,
-      unchanged: tasks.length - updatedCount,
-      changes: changed.map((r) => ({
-        id: r.id,
-        title: r.title,
-        oldSeconds: r.oldTime,
-        newSeconds: r.newTime,
-        oldFormatted: fmtSec(r.oldTime),
-        newFormatted: fmtSec(r.newTime),
-        diffFormatted: fmtSec(Math.abs(r.oldTime - r.newTime)),
-        pauseCount: r.pauseCount,
-      })),
+      totalTasks: tasks.length,
+      changes: results,
     });
   } catch (error: any) {
     console.error("Erro no recálculo:", error);
