@@ -44,8 +44,8 @@ export function middleware(request: NextRequest) {
       return NextResponse.next();
     }
 
-    // Cron routes use their own secret-based auth
-    if (pathname.startsWith("/api/cron/")) {
+    // Cron and Admin tasks use their own secret-based auth
+    if (pathname.startsWith("/api/cron/") || pathname === "/api/admin/recalculate-time") {
       return NextResponse.next();
     }
 
