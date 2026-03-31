@@ -8,173 +8,77 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-model User {
-  id                   Int              @id @default(autoincrement())
-  name                 String
-  email                String           @unique
-  password_hash        String           @default("mock")
-  role_id              Int
-  sector_id            Int
-  team_id              Int?
-  avatar               String?
-  active               Boolean          @default(true)
-  must_change_password Boolean          @default(true)
-  created_at           DateTime         @default(now())
-  comments             Comment[]
-  mentions_created     Mention[]        @relation("MentionedBy")
-  mentions_received    Mention[]        @relation("MentionedUser")
-  notifications        Notification[]
-  subtasks             Subtask[]
-  tasks_created        Task[]           @relation("CreatedBy")
-  tasks_responsible    Task[]           @relation("Responsible")
-  task_history         TaskHistory[]
-  templates            Template[]
-  template_subtasks    TemplateSubtask[]
-  activity_logs        ActivityLog[]
-  coworkers            TaskUser[]
-  attachments          TaskAttachment[]
-  user_sectors         UserSector[]
-  Role                 Role             @relation(fields: [role_id], references: [id])
-  Sector               Sector           @relation(fields: [sector_id], references: [id])
-  Team                 Team?            @relation(fields: [team_id], references: [id])
+model ActivityLog {
+  id         Int      @id @default(autoincrement())
+  user_id    Int?
+  user_name  String
+  action     String
+  entity     String?
+  entity_id  Int?
+  details    String?
+  ip_address String?
+  created_at DateTime @default(now())
+  User       User?    @relation(fields: [user_id], references: [id])
 
-  @@index([team_id])
+  @@index([action])
+  @@index([created_at])
+  @@index([user_id])
 }
 
-model Task {
-  id              Int              @id @default(autoincrement())
-  title           String
-  description     String?
-  type            String?
-  status          String           @default("A Fazer")
-  priority        String?
-  sector_id       Int?
-  responsible_id  Int?
-  contract_id     Int?
-  city_id         Int?
-  neighborhood_id Int?
-  nucleus         String?
-  quadra          String?
-  lote            String?
-  deadline        DateTime?
-  link            String?
-  created_by_id   Int?
-  team_id         Int?
-  created_at      DateTime         @default(now())
-  updated_at        DateTime?        @updatedAt
-  status_updated_at DateTime?
-  started_at      DateTime?
-  paused_at       DateTime?
-  completed_at    DateTime?
-  time_spent      Int              @default(0)
-  parent_id       Int?
-  comments        Comment[]
-  mentions        Mention[]
-  notifications   Notification[]
-  subtasks        Subtask[]
-  attachments     TaskAttachment[]
-  city            City?            @relation(fields: [city_id], references: [id])
-  contract        Contract?        @relation(fields: [contract_id], references: [id])
-  created_by      User?            @relation("CreatedBy", fields: [created_by_id], references: [id])
-  neighborhood    Neighborhood?    @relation(fields: [neighborhood_id], references: [id])
-  parent          Task?            @relation("TaskSubtasks", fields: [parent_id], references: [id])
-  children        Task[]           @relation("TaskSubtasks")
-  responsible     User?            @relation("Responsible", fields: [responsible_id], references: [id])
-  Sector          Sector?          @relation(fields: [sector_id], references: [id])
-  Team            Team?            @relation(fields: [team_id], references: [id])
-  history         TaskHistory[]
-  pauses          TaskPause[]
-  coworkers       TaskUser[]
-
-  @@index([responsible_id])
-  @@index([sector_id])
-  @@index([status])
-  @@index([parent_id])
-  @@index([created_by_id])
-  @@index([team_id])
-}
-
-model Subtask {
-  id             Int       @id @default(autoincrement())
-  title          String
-  done           Boolean   @default(false)
-  sector_id      Int?
-  task_id        Int
-  responsible_id Int?
-  done_at        DateTime?
-  responsible    User?     @relation(fields: [responsible_id], references: [id])
-  Sector         Sector?   @relation(fields: [sector_id], references: [id])
-  task           Task      @relation(fields: [task_id], references: [id], onDelete: Cascade)
-}
-
-model Template {
-  id            Int            @id @default(autoincrement())
-  name          String
-  sector_id     Int
-  created_by_id Int?
-  created_at    DateTime       @default(now())
-  created_by    User?          @relation(fields: [created_by_id], references: [id])
-  Sector        Sector         @relation(fields: [sector_id], references: [id])
-  tasks         TemplateTask[]
-}
-
-model TemplateTask {
-  id          Int               @id @default(autoincrement())
-  title       String
-  order_index Int               @default(0)
-  template_id Int
-  subtasks    TemplateSubtask[]
-  template    Template          @relation(fields: [template_id], references: [id], onDelete: Cascade)
-}
-
-model TemplateSubtask {
-  id               Int          @id @default(autoincrement())
-  title            String
-  order_index      Int          @default(0)
-  template_task_id Int
-  sector_id        Int?
-  responsible_id   Int?
-  template_task    TemplateTask @relation(fields: [template_task_id], references: [id], onDelete: Cascade)
-  Sector           Sector?      @relation(fields: [sector_id], references: [id])
-  responsible      User?        @relation(fields: [responsible_id], references: [id])
+model City {
+  id           Int            @id @default(autoincrement())
+  name         String         @unique
+  Neighborhood Neighborhood[]
+  Task         Task[]
 }
 
 model Comment {
-  id            Int            @id @default(autoincrement())
-  content       String
-  created_at    DateTime       @default(now())
-  task_id       Int
-  user_id       Int?
-  task          Task           @relation(fields: [task_id], references: [id], onDelete: Cascade)
-  user          User?          @relation(fields: [user_id], references: [id])
-  mentions      Mention[]
-  notifications Notification[]
+  id           Int            @id @default(autoincrement())
+  content      String
+  created_at   DateTime       @default(now())
+  task_id      Int
+  user_id      Int?
+  Task         Task           @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  User         User?          @relation(fields: [user_id], references: [id])
+  Mention      Mention[]
+  Notification Notification[]
 
   @@index([task_id])
 }
 
-model TaskPause {
-  id         Int       @id @default(autoincrement())
-  task_id    Int
-  started_at DateTime  @default(now())
-  ended_at   DateTime?
-  task       Task      @relation(fields: [task_id], references: [id], onDelete: Cascade)
+model Contract {
+  id           Int            @id @default(autoincrement())
+  name         String         @unique
+  Neighborhood Neighborhood[]
+  Task         Task[]
 }
 
 model Mention {
-  id                  Int      @id @default(autoincrement())
-  mention_type        String
-  mentioned_sector_id Int?
-  created_at          DateTime @default(now())
-  comment_id          Int
-  task_id             Int
-  mentioned_user_id   Int?
-  mentioned_by_id     Int?
-  comment             Comment  @relation(fields: [comment_id], references: [id], onDelete: Cascade)
-  mentioned_by        User?    @relation("MentionedBy", fields: [mentioned_by_id], references: [id])
-  Sector              Sector?  @relation(fields: [mentioned_sector_id], references: [id])
-  mentioned_user      User?    @relation("MentionedUser", fields: [mentioned_user_id], references: [id])
-  task                Task     @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  id                                   Int      @id @default(autoincrement())
+  mention_type                         String
+  created_at                           DateTime @default(now())
+  comment_id                           Int
+  task_id                              Int
+  mentioned_user_id                    Int?
+  mentioned_by_id                      Int?
+  mentioned_sector_id                  Int?
+  Comment                              Comment  @relation(fields: [comment_id], references: [id], onDelete: Cascade)
+  User_Mention_mentioned_by_idToUser   User?    @relation("Mention_mentioned_by_idToUser", fields: [mentioned_by_id], references: [id])
+  Sector                               Sector?  @relation(fields: [mentioned_sector_id], references: [id])
+  User_Mention_mentioned_user_idToUser User?    @relation("Mention_mentioned_user_idToUser", fields: [mentioned_user_id], references: [id])
+  Task                                 Task     @relation(fields: [task_id], references: [id], onDelete: Cascade)
+}
+
+model Neighborhood {
+  id          Int       @id @default(autoincrement())
+  name        String
+  city_id     Int
+  contract_id Int?
+  City        City      @relation(fields: [city_id], references: [id], onDelete: Cascade)
+  Contract    Contract? @relation(fields: [contract_id], references: [id])
+  Task        Task[]
+
+  @@unique([city_id, name])
 }
 
 model Notification {
@@ -187,52 +91,12 @@ model Notification {
   user_id    Int
   task_id    Int?
   comment_id Int?
-  comment    Comment? @relation(fields: [comment_id], references: [id])
-  task       Task?    @relation(fields: [task_id], references: [id])
-  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  Comment    Comment? @relation(fields: [comment_id], references: [id])
+  Task       Task?    @relation(fields: [task_id], references: [id])
+  User       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
+  @@index([task_id])
   @@index([user_id, read])
-  @@index([task_id])
-}
-
-model Contract {
-  id            Int            @id @default(autoincrement())
-  name          String         @unique
-  tasks         Task[]
-  neighborhoods Neighborhood[]
-}
-
-model City {
-  id            Int            @id @default(autoincrement())
-  name          String         @unique
-  neighborhoods Neighborhood[]
-  tasks         Task[]
-}
-
-model Neighborhood {
-  id          Int       @id @default(autoincrement())
-  name        String
-  city_id     Int
-  contract_id Int?
-  city        City      @relation(fields: [city_id], references: [id], onDelete: Cascade)
-  contract    Contract? @relation(fields: [contract_id], references: [id], onDelete: SetNull)
-  tasks       Task[]
-
-  @@unique([city_id, name])
-}
-
-model TaskHistory {
-  id         Int      @id @default(autoincrement())
-  task_id    Int
-  user_id    Int?
-  field      String
-  old_value  String?
-  new_value  String?
-  created_at DateTime @default(now())
-  task       Task     @relation(fields: [task_id], references: [id], onDelete: Cascade)
-  user       User?    @relation(fields: [user_id], references: [id])
-
-  @@index([task_id])
 }
 
 model Role {
@@ -240,87 +104,89 @@ model Role {
   name        String   @unique
   permissions Json?
   created_at  DateTime @default(now())
-  updated_at  DateTime @default(now()) @updatedAt
+  updated_at  DateTime @default(now())
   User        User[]
 }
 
 model Sector {
-  id                Int               @id @default(autoincrement())
-  name              String            @unique
-  created_at        DateTime          @default(now())
-  updated_at        DateTime          @default(now()) @updatedAt
-  Mention           Mention[]
-  Subtask           Subtask[]
-  Task              Task[]
-  template_subtasks TemplateSubtask[]
-  Template          Template[]
-  User              User[]
-  TaskType          TaskType[]
-  user_sectors      UserSector[]
+  id              Int               @id @default(autoincrement())
+  name            String            @unique
+  created_at      DateTime          @default(now())
+  updated_at      DateTime          @default(now())
+  Mention         Mention[]
+  Subtask         Subtask[]
+  Task            Task[]
+  TaskType        TaskType[]
+  Template        Template[]
+  TemplateSubtask TemplateSubtask[]
+  User            User[]
+  UserSector      UserSector[]
 }
 
-model TaskType {
-  id         Int      @id @default(autoincrement())
-  name       String   @unique
-  sector_id  Int?
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now()) @updatedAt
-  Sector     Sector?  @relation(fields: [sector_id], references: [id], onDelete: SetNull)
+model Subtask {
+  id             Int       @id @default(autoincrement())
+  title          String
+  done           Boolean   @default(false)
+  task_id        Int
+  responsible_id Int?
+  done_at        DateTime?
+  sector_id      Int?
+  User           User?     @relation(fields: [responsible_id], references: [id])
+  Sector         Sector?   @relation(fields: [sector_id], references: [id])
+  Task           Task      @relation(fields: [task_id], references: [id], onDelete: Cascade)
+}
 
+model Task {
+  id                             Int              @id @default(autoincrement())
+  title                          String
+  description                    String?
+  type                           String?
+  status                         String           @default("A Fazer")
+  priority                       String?
+  responsible_id                 Int?
+  contract_id                    Int?
+  city_id                        Int?
+  neighborhood_id                Int?
+  nucleus                        String?
+  quadra                         String?
+  lote                           String?
+  deadline                       DateTime?
+  link                           String?
+  created_by_id                  Int?
+  created_at                     DateTime         @default(now())
+  updated_at                     DateTime?
+  started_at                     DateTime?
+  paused_at                      DateTime?
+  completed_at                   DateTime?
+  time_spent                     Int              @default(0)
+  parent_id                      Int?
+  sector_id                      Int?
+  team_id                        Int?
+  status_updated_at              DateTime?
+  Comment                        Comment[]
+  Mention                        Mention[]
+  Notification                   Notification[]
+  Subtask                        Subtask[]
+  City                           City?            @relation(fields: [city_id], references: [id])
+  Contract                       Contract?        @relation(fields: [contract_id], references: [id])
+  User_Task_created_by_idToUser  User?            @relation("Task_created_by_idToUser", fields: [created_by_id], references: [id])
+  Neighborhood                   Neighborhood?    @relation(fields: [neighborhood_id], references: [id])
+  Task                           Task?            @relation("TaskToTask", fields: [parent_id], references: [id])
+  other_Task                     Task[]           @relation("TaskToTask")
+  User_Task_responsible_idToUser User?            @relation("Task_responsible_idToUser", fields: [responsible_id], references: [id])
+  Sector                         Sector?          @relation(fields: [sector_id], references: [id])
+  Team                           Team?            @relation(fields: [team_id], references: [id])
+  TaskAttachment                 TaskAttachment[]
+  TaskHistory                    TaskHistory[]
+  TaskPause                      TaskPause[]
+  TaskUser                       TaskUser[]
+
+  @@index([created_by_id])
+  @@index([parent_id])
+  @@index([responsible_id])
   @@index([sector_id])
-}
-
-model ActivityLog {
-  id         Int      @id @default(autoincrement())
-  user_id    Int?
-  user_name  String
-  action     String
-  entity     String?
-  entity_id  Int?
-  details    String?
-  ip_address String?
-  created_at DateTime @default(now())
-  user       User?    @relation(fields: [user_id], references: [id])
-
-  @@index([user_id])
-  @@index([action])
-  @@index([created_at])
-}
-
-model TaskUser {
-  id         Int      @id @default(autoincrement())
-  task_id    Int
-  user_id    Int
-  created_at DateTime @default(now())
-
-  task       Task     @relation(fields: [task_id], references: [id], onDelete: Cascade)
-  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-
-  @@unique([task_id, user_id])
-  @@index([task_id])
-  @@index([user_id])
-}
-
-model Team {
-  id         Int      @id @default(autoincrement())
-  name       String   @unique
-  created_at DateTime @default(now())
-  updated_at DateTime @default(now()) @updatedAt
-  users      User[]
-  tasks      Task[]
-}
-
-model UserSector {
-  id         Int      @id @default(autoincrement())
-  user_id    Int
-  sector_id  Int
-  created_at DateTime @default(now())
-  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  sector     Sector   @relation(fields: [sector_id], references: [id], onDelete: Cascade)
-
-  @@unique([user_id, sector_id])
-  @@index([user_id])
-  @@index([sector_id])
+  @@index([status])
+  @@index([team_id])
 }
 
 model TaskAttachment {
@@ -333,8 +199,141 @@ model TaskAttachment {
   url            String
   uploaded_by_id Int?
   created_at     DateTime @default(now())
-  task           Task     @relation(fields: [task_id], references: [id], onDelete: Cascade)
-  uploaded_by    User?    @relation(fields: [uploaded_by_id], references: [id])
+  Task           Task     @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  User           User?    @relation(fields: [uploaded_by_id], references: [id])
 
   @@index([task_id])
+}
+
+model TaskHistory {
+  id         Int      @id @default(autoincrement())
+  task_id    Int
+  user_id    Int?
+  field      String
+  old_value  String?
+  new_value  String?
+  created_at DateTime @default(now())
+  Task       Task     @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  User       User?    @relation(fields: [user_id], references: [id])
+
+  @@index([task_id])
+}
+
+model TaskPause {
+  id         Int       @id @default(autoincrement())
+  task_id    Int
+  started_at DateTime  @default(now())
+  ended_at   DateTime?
+  Task       Task      @relation(fields: [task_id], references: [id], onDelete: Cascade)
+}
+
+model TaskType {
+  id         Int      @id @default(autoincrement())
+  name       String   @unique
+  sector_id  Int?
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+  Sector     Sector?  @relation(fields: [sector_id], references: [id])
+
+  @@index([sector_id])
+}
+
+model TaskUser {
+  id         Int      @id @default(autoincrement())
+  task_id    Int
+  user_id    Int
+  created_at DateTime @default(now())
+  Task       Task     @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  User       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([task_id, user_id])
+  @@index([task_id])
+  @@index([user_id])
+}
+
+model Team {
+  id         Int      @id @default(autoincrement())
+  name       String   @unique
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+  Task       Task[]
+  User       User[]
+}
+
+model Template {
+  id            Int            @id @default(autoincrement())
+  name          String
+  created_by_id Int?
+  created_at    DateTime       @default(now())
+  sector_id     Int
+  User          User?          @relation(fields: [created_by_id], references: [id])
+  Sector        Sector         @relation(fields: [sector_id], references: [id])
+  TemplateTask  TemplateTask[]
+}
+
+model TemplateSubtask {
+  id               Int          @id @default(autoincrement())
+  title            String
+  order_index      Int          @default(0)
+  template_task_id Int
+  responsible_id   Int?
+  sector_id        Int?
+  User             User?        @relation(fields: [responsible_id], references: [id])
+  Sector           Sector?      @relation(fields: [sector_id], references: [id])
+  TemplateTask     TemplateTask @relation(fields: [template_task_id], references: [id], onDelete: Cascade)
+}
+
+model TemplateTask {
+  id              Int               @id @default(autoincrement())
+  title           String
+  order_index     Int               @default(0)
+  template_id     Int
+  TemplateSubtask TemplateSubtask[]
+  Template        Template          @relation(fields: [template_id], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id                                      Int               @id @default(autoincrement())
+  name                                    String
+  email                                   String            @unique
+  password_hash                           String            @default("mock")
+  avatar                                  String?
+  created_at                              DateTime          @default(now())
+  active                                  Boolean           @default(true)
+  must_change_password                    Boolean           @default(true)
+  role_id                                 Int
+  sector_id                               Int
+  team_id                                 Int?
+  ActivityLog                             ActivityLog[]
+  Comment                                 Comment[]
+  Mention_Mention_mentioned_by_idToUser   Mention[]         @relation("Mention_mentioned_by_idToUser")
+  Mention_Mention_mentioned_user_idToUser Mention[]         @relation("Mention_mentioned_user_idToUser")
+  Notification                            Notification[]
+  Subtask                                 Subtask[]
+  Task_Task_created_by_idToUser           Task[]            @relation("Task_created_by_idToUser")
+  Task_Task_responsible_idToUser          Task[]            @relation("Task_responsible_idToUser")
+  TaskAttachment                          TaskAttachment[]
+  TaskHistory                             TaskHistory[]
+  TaskUser                                TaskUser[]
+  Template                                Template[]
+  TemplateSubtask                         TemplateSubtask[]
+  Role                                    Role              @relation(fields: [role_id], references: [id])
+  Sector                                  Sector            @relation(fields: [sector_id], references: [id])
+  Team                                    Team?             @relation(fields: [team_id], references: [id])
+  UserSector                              UserSector[]
+
+  @@index([team_id])
+}
+
+model UserSector {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  sector_id  Int
+  created_at DateTime @default(now())
+  Sector     Sector   @relation(fields: [sector_id], references: [id], onDelete: Cascade)
+  User       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, sector_id])
+  @@index([sector_id])
+  @@index([user_id])
 }

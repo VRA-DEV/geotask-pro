@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { writeFile, mkdir, unlink } from "fs/promises";
 import path from "path";
-
-const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads", "tasks");
+import { uploadFile, deleteFile } from "@/lib/storage";
 
 export async function GET(
   _req: NextRequest,
@@ -56,16 +54,11 @@ export async function POST(
     return NextResponse.json({ error: "Arquivo excede 10MB" }, { status: 400 });
   }
 
-  const taskDir = path.join(UPLOAD_DIR, String(taskId));
-  await mkdir(taskDir, { recursive: true });
-
   const ext = path.extname(file.name) || ".bin";
   const filename = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`;
-  const filePath = path.join(taskDir, filename);
   const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(filePath, buffer);
 
-  const url = `/uploads/tasks/${taskId}/${filename}`;
+  const { url } = await uploadFile(buffer, taskId, filename, file.type);
 
   const attachment = await prisma.taskAttachment.create({
     data: {
@@ -129,12 +122,11 @@ export async function DELETE(
     return NextResponse.json({ error: "Anexo não encontrado" }, { status: 404 });
   }
 
-  // Delete file from disk
+  // Delete file from storage (local, Supabase, or S3)
   try {
-    const filePath = path.join(process.cwd(), "public", attachment.url);
-    await unlink(filePath);
+    await deleteFile(attachment.url);
   } catch {
-    // File may not exist on disk, continue with DB cleanup
+    // File may not exist in storage, continue with DB cleanup
   }
 
   await prisma.taskAttachment.delete({ where: { id: Number(attachmentId) } });

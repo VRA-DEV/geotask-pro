@@ -591,9 +591,20 @@ export default function TaskDetailModal({
                    </span>
                  )}
             </div>
-            <h2 className="m-0 text-2xl font-bold tracking-tight text-slate-900 dark:text-gray-50 leading-tight pr-8">
-              {t.title}
-            </h2>
+            {canEdit("title") ? (
+              <input
+                value={form.title}
+                onChange={(e) =>
+                  setForm({ ...form, title: e.target.value })
+                }
+                className="w-full m-0 p-1 -ml-1 text-2xl font-bold tracking-tight text-slate-900 dark:text-gray-50 leading-tight pr-8 bg-transparent border-none outline-none focus:ring-2 focus:ring-primary/20 rounded-lg hover:bg-slate-100/50 dark:hover:bg-gray-800/50 transition-all"
+                placeholder="Título da tarefa"
+              />
+            ) : (
+              <h2 className="m-0 text-2xl font-bold tracking-tight text-slate-900 dark:text-gray-50 leading-tight pr-8">
+                {form.title}
+              </h2>
+            )}
             <div className="flex items-center gap-3 mt-2 text-slate-500 dark:text-gray-400 text-[12px]">
                 <span className="flex items-center gap-1"><Clock size={13} /> {t.created || "---"}</span>
                 {t.deadline && <span className="flex items-center gap-1 font-semibold text-primary"><Calendar size={13} /> {t.deadline}</span>}

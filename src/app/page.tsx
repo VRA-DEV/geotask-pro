@@ -561,6 +561,7 @@ export default function GeoTask() {
               sortOrder={fSortOrder}
               setSortOrder={setFSortOrder}
               onNewTask={() => setShowNewTask(true)}
+              onUpdate={handleUpdateTask}
               onClearFilters={() => {
                 setFSearch("");
                 setFSector([]);

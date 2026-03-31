@@ -68,7 +68,8 @@
       "Bash(curl -s -X POST http://localhost:3000/api/auth/login -H \"Content-Type: application/json\" -d '{\"\"\"\"email\"\"\"\":\"\"\"\"admin@geotask.com\"\"\"\",\"\"\"\"password\"\"\"\":\"\"\"\"Geotask@2024\"\"\"\"}')",
       "Bash(findstr \":3000 \")",
       "Bash(where npx.cmd)",
-      "Bash(where npx:*)"
+      "Bash(where npx:*)",
+      "Bash(node scripts/generate-doc.cjs)"
     ]
   }
 }

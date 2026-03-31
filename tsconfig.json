@@ -39,6 +39,7 @@
   ],
   "exclude": [
     "node_modules",
-    "geotask-pro-v2"
+    "geotask-pro-v2",
+    "bonini_erp"
   ]
 }

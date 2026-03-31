@@ -24,6 +24,7 @@ interface TasksHubProps {
   tasks: Task[];
   user: User;
   onSelect: (t: Task) => void;
+  onUpdate?: (id: number, action: string, data?: any) => Promise<void>;
   users: User[];
   contracts: string[];
   sectors: Sector[];
@@ -80,6 +81,7 @@ export default function TasksHub({
   tasks,
   user,
   onSelect: onSelectTask,
+  onUpdate,
   users,
   contracts,
   sectors,
@@ -185,6 +187,7 @@ export default function TasksHub({
               tasks={tasks}
               user={user}
               onSelect={onSelectTask}
+              onUpdate={onUpdate}
               canCreate={true}
               onNew={onNewTask}
               users={users}
@@ -211,7 +214,6 @@ export default function TasksHub({
               setType={setType}
               setContract={setContract}
               setCity={setCity}
-              setNeighbor={setNeighbor}
               setDateFrom={setDateFrom}
               setDateTo={setDateTo}
             />

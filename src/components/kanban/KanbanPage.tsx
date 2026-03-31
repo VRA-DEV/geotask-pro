@@ -28,6 +28,24 @@ import { DateRange } from "react-day-picker";
 import { TaskFilters } from "../shared/TaskFilters";
 import { PageHeader } from "../shared/PageHeader";
 import { Tooltip } from "../shared/Tooltip";
+import {
+  DndContext,
+  DragEndEvent,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  DragOverlay,
+  useDroppable,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { createPortal } from "react-dom";
 
 // ── KanbanTask: extends shared Task with runtime alias ──
 interface KanbanTask extends Task {
@@ -66,6 +84,7 @@ interface KanbanPageProps {
   tasks: KanbanTask[];
   user: UserType | null;
   onSelect: (task: KanbanTask) => void;
+  onUpdate?: (id: number, action: string, data?: any) => Promise<void>;
   canCreate: boolean;
   onNew: () => void;
   users: UserType[];
@@ -280,6 +299,73 @@ function DateRangePicker({ date, setDate, label, T }: DateRangePickerProps) {
   );
 }
 
+function KanbanColumn({
+  col,
+  colIdx,
+  colTasks,
+  onSelect,
+  tasks,
+  handleSetSearch,
+}: {
+  col: string;
+  colIdx: number;
+  colTasks: KanbanTask[];
+  onSelect: (t: KanbanTask) => void;
+  tasks: KanbanTask[];
+  handleSetSearch: (v: string) => void;
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: col,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`shrink-0 w-[272px] animate-fade-in-up transition-all duration-200 rounded-2xl ${isOver ? "bg-primary/5 ring-2 ring-primary/20 scale-[1.01]" : ""}`}
+      style={{ animationDelay: `${colIdx * 0.08}s` }}
+    >
+      <div className="flex items-center gap-2 mb-2.5 px-1">
+        <div
+          className={`w-2.5 h-2.5 rounded-full ${isOver ? "animate-pulse scale-125" : ""}`}
+          style={{ background: STATUS_COLOR[col] }}
+        />
+        <span className="text-[13px] font-semibold text-slate-900 dark:text-gray-50 font-display">
+          {col}
+        </span>
+        <span className="ml-auto text-[11px] px-2 py-px rounded-[20px] bg-slate-200 dark:bg-(--t-tag) text-gray-700 dark:text-gray-300 font-semibold font-kpi">
+          {colTasks.length}
+        </span>
+      </div>
+      <SortableContext
+        id={col}
+        items={colTasks.map((t) => t.id)}
+        strategy={verticalListSortingStrategy}
+      >
+        <div
+          className={`bg-slate-50 dark:bg-(--t-col) rounded-xl p-2 min-h-[200px] flex flex-col gap-2 transition-colors duration-200 ${isOver ? "bg-primary/10 dark:bg-primary/5" : ""}`}
+        >
+          {colTasks.map((t: KanbanTask, cardIdx: number) => (
+            <KanbanCard
+              key={t.id}
+              t={t}
+              colIdx={colIdx}
+              cardIdx={cardIdx}
+              onSelect={onSelect}
+              tasks={tasks}
+              handleSetSearch={handleSetSearch}
+            />
+          ))}
+          {colTasks.length === 0 && (
+            <div className="text-center py-[30px] text-xs text-slate-400 dark:text-gray-50">
+              Sem tarefas
+            </div>
+          )}
+        </div>
+      </SortableContext>
+    </div>
+  );
+}
+
 const ExportButtons = ({
   filtered,
   kpi,
@@ -297,12 +383,220 @@ const ExportButtons = ({
   </div>
 );
 
+interface KanbanCardProps {
+  t: KanbanTask;
+  colIdx: number;
+  cardIdx: number;
+  onSelect: (t: KanbanTask) => void;
+  tasks: KanbanTask[];
+  handleSetSearch: (v: string) => void;
+  isOverlay?: boolean;
+}
+
+function KanbanCard({
+  t,
+  colIdx,
+  cardIdx,
+  onSelect,
+  tasks,
+  handleSetSearch,
+  isOverlay = false,
+}: KanbanCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: t.id,
+    data: {
+      type: "Task",
+      task: t,
+    },
+  });
+
+  const taskState = getTaskState(t);
+  const stateColor = taskState?.color || "#cbd5e1";
+  const prog = t.subtasks?.length
+    ? (t.subtasks.filter((s: Subtask) => s.done).length / t.subtasks.length) *
+      100
+    : 0;
+  const respName =
+    t.responsible && typeof t.responsible === "object"
+      ? (t.responsible as any).name
+      : String(t.responsible || "") || "";
+  const respInitials = respName
+    ? respName
+        .split(" ")
+        .map((w: string) => w[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()
+    : "?";
+
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    transition,
+    opacity: isDragging ? 0.3 : 1,
+    borderLeftColor: stateColor,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      onClick={() => !isDragging && onSelect(t)}
+      className={`bg-white dark:bg-(--t-card) rounded-xl p-3 card-hover cursor-pointer border-l-4 shadow-sm h-full ${isDragging ? "z-50 ring-2 ring-primary" : ""} ${isOverlay ? "rotate-3 shadow-xl" : ""}`}
+    >
+      <Tooltip content={t.description} subtasks={t.subtasks} key={t.id}>
+        <div>
+          {t.parent_id && (
+            <div
+              className="text-[10px] text-primary/70 dark:text-primary-light font-medium mb-2 flex items-center gap-1 hover:text-primary transition-colors group/parent"
+              onClick={(e) => {
+                e.stopPropagation();
+                const pTitle =
+                  t.parent?.title ||
+                  tasks.find((p: KanbanTask) => p.id === t.parent_id)?.title;
+                if (pTitle) handleSetSearch(pTitle);
+              }}
+            >
+              <span className="text-xs">↳</span>
+              <span>
+                Tarefa Principal:{" "}
+                <b className="underline decoration-primary/20 group-hover/parent:decoration-primary/50 underline-offset-2">
+                  {t.parent?.title ||
+                    tasks.find((p: KanbanTask) => p.id === t.parent_id)?.title ||
+                    "..."}
+                </b>
+              </span>
+            </div>
+          )}
+          <div className="flex justify-between mb-[7px]">
+            <span className="text-[10px] px-[7px] py-0.5 rounded-md bg-slate-100 dark:bg-(--t-tag) text-gray-600 dark:text-gray-300 font-semibold flex items-center gap-1">
+              {t.type}
+              {taskState && (
+                <span
+                  className="w-1.5 h-1.5 rounded-full"
+                  style={{
+                    background: taskState.color,
+                  }}
+                />
+              )}
+            </span>
+            <span
+              className="text-[10px] px-[7px] py-0.5 rounded-md font-bold"
+              style={{
+                background: PRIO_COLOR[t.priority || ""] + "18",
+                color: PRIO_COLOR[t.priority || ""],
+              }}
+            >
+              {t.priority}
+            </span>
+          </div>
+          <div className="text-[13px] font-semibold text-slate-900 dark:text-(--t-text) mb-[7px] leading-[1.3]">
+            {t.title}
+          </div>
+          {taskState && (
+            <div className="mb-[7px]">
+              <span
+                className="text-[9px] font-bold px-1.5 py-0.5 rounded"
+                style={{
+                  background: taskState.color + "18",
+                  color: taskState.color,
+                }}
+              >
+                {taskState.label}
+              </span>
+            </div>
+          )}
+          <div className="flex flex-col gap-[3px] mb-[7px]">
+            <span className="text-[11px] text-slate-500 dark:text-gray-400 flex items-center gap-1">
+              <Building2 size={9} />
+              {sectorDisplay(t.sector)}
+            </span>
+            <span className="text-[11px] text-slate-500 dark:text-gray-400 flex items-center gap-1.5">
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-linear-to-br from-primary to-primary-hover text-[7px] font-bold text-white shrink-0">
+                {respInitials}
+              </span>
+              {respName || "Não atribuído"}
+            </span>
+            <span className="text-[11px] text-slate-500 dark:text-gray-400 flex items-center gap-1">
+              <MapPin size={9} />
+              {t.contract && typeof t.contract === "object"
+                ? (t.contract as any).name
+                : t.contract}
+            </span>
+            {t.city && (
+              <span className="text-[11px] text-slate-500 dark:text-gray-400 flex items-center gap-1 pl-[13px]">
+                {typeof t.city === "object" ? (t.city as any).name : t.city}
+                {t.nucleus ? ` · ${t.nucleus}` : ""}
+              </span>
+            )}
+            {(t.quadra || t.lote) && (
+              <span className="text-[10px] text-slate-400 dark:text-gray-500 pl-[13px]">
+                {t.quadra ? `Q: ${t.quadra} ` : ""}
+                {t.lote ? `L: ${t.lote}` : ""}
+              </span>
+            )}
+          </div>
+          {t.deadline && (
+            <div className="text-[10px] text-slate-500 dark:text-gray-400 flex items-center gap-[3px] mb-1.5">
+              <Calendar size={9} />
+              Prazo:{" "}
+              <b className="text-slate-800 dark:text-(--t-text)">
+                {(() => {
+                  const d = new Date(t.deadline);
+                  return !isNaN(d.getTime())
+                    ? d.toLocaleDateString("pt-BR", { timeZone: "UTC" })
+                    : t.deadline;
+                })()}
+              </b>
+            </div>
+          )}
+          {(t.subtasks?.length ?? 0) > 0 && (
+            <div>
+              <div className="flex justify-between text-[10px] text-slate-500 dark:text-gray-400 mb-[3px]">
+                <span>Subtarefas</span>
+                <span className="font-kpi">
+                  {t.subtasks!.filter((s: Subtask) => s.done).length}/
+                  {t.subtasks!.length}
+                </span>
+              </div>
+              <div className="h-[3px] bg-slate-200 dark:bg-(--t-border) rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${prog}%`,
+                    background: "linear-gradient(90deg, #98af3b, #7a9e2e)",
+                  }}
+                />
+              </div>
+            </div>
+          )}
+          {(t.time ?? 0) > 0 && (
+            <div className="text-[10px] text-slate-500 dark:text-gray-400 flex items-center gap-[3px] mt-1.5">
+              <Clock size={9} />
+              <span className="font-kpi">{fmtTime(t.time ?? 0)}</span>
+            </div>
+          )}
+        </div>
+      </Tooltip>
+    </div>
+  );
+}
+
 // ── KANBAN ─────────────────────────────────────────────────────
 export default function KanbanPage({
   T,
   tasks,
   user,
   onSelect,
+  onUpdate,
   canCreate,
   onNew,
   users = [],
@@ -365,6 +659,21 @@ export default function KanbanPage({
   const [sortField, setSortField] = useState<string>("");
   const [sortOrder, setSortOrder] = useState<string>("asc");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [activeId, setActiveId] = useState<number | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 250,
+        tolerance: 5,
+      },
+    }),
+  );
 
   const cityNeighborhoods = fCity ? citiesNeighborhoods[fCity] || [] : [];
 
@@ -430,26 +739,6 @@ export default function KanbanPage({
     return 0;
   });
 
-  const totalActiveFilters = [
-    fSector.length > 0,
-    fContract,
-    fCity,
-    fNeighbor,
-    fPriority,
-    fType,
-    fDateFrom?.from || fDateFrom?.to,
-    fDateTo?.from || fDateTo?.to,
-    fCurrentState,
-  ].filter(Boolean).length;
-
-  const activeAdvancedFilters = [
-    fPriority,
-    fType,
-    fNeighbor,
-    fDateFrom?.from || fDateFrom?.to,
-    fDateTo?.from || fDateTo?.to,
-  ].filter(Boolean).length;
-
   const clearAll = () => {
     if (externalFilters) return;
     setInternalSearch("");
@@ -467,276 +756,159 @@ export default function KanbanPage({
     setSortOrder("asc");
   };
 
-  // mini select helper for filters bar
+  const handleDragStart = (event: any) => {
+    setActiveId(event.active.id);
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    setActiveId(null);
+    const { active, over } = event;
+    if (!over) return;
+
+    const taskId = active.id as number;
+    const overId = String(over.id);
+
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+
+    // Determine destination column
+    let destCol = "";
+    if (cols.includes(overId)) {
+      destCol = overId;
+    } else {
+      const overTask = tasks.find((t) => t.id === Number(overId));
+      if (overTask) destCol = overTask.status;
+    }
+
+    if (destCol && destCol !== task.status) {
+      if ((task.subtasks?.length ?? 0) > 0) {
+        alert(
+          "O status desta tarefa é gerenciado automaticamente através das suas subtarefas.",
+        );
+        return;
+      }
+      if (onUpdate) {
+        await onUpdate(taskId, "update_status", { status: destCol });
+      }
+    }
+  };
+
+  const activeTask = activeId ? tasks.find((t) => t.id === activeId) : null;
 
   return (
-    <div>
-      {/* Header */}
-      <PageHeader
-        title="Quadro de Tarefas"
-        subtitle={`${filtered.length} de ${tasks.length} tarefas`}
-        actionButtons={
-          <>
-            <ExportButtons
-              filtered={filtered}
-              kpi={getKpiData(filtered, users)}
-              users={users}
-            />
-            {canCreate && (
-              <button
-                id="kanban-nova-tarefa-btn"
-                onClick={onNew}
-                className="flex items-center h-9 gap-2 px-4 text-white border-none rounded-lg text-[13px] font-bold cursor-pointer btn-primary active:scale-95 shadow-sm"
-              >
-                <Plus size={16} />
-                NOVA TAREFA
-              </button>
-            )}
-          </>
-        }
-      />
-
-      {!externalFilters && (
-        <TaskFilters
-          T={T}
-          search={search}
-          setSearch={externalFilters ? () => {} : setInternalSearch}
-          sector={fSector}
-          setSector={externalFilters ? () => {} : setInternalSector}
-          priority={fPriority}
-          setPriority={externalFilters ? () => {} : setInternalPriority}
-          type={fType}
-          setType={externalFilters ? () => {} : setInternalType}
-          responsible={fResponsible}
-          setResponsible={externalFilters ? () => {} : setInternalResponsible}
-          contract={fContract}
-          setContract={externalFilters ? () => {} : setInternalContract}
-          city={fCity}
-          setCity={externalFilters ? () => {} : setInternalCity}
-          neighbor={fNeighbor}
-          setNeighbor={externalFilters && setNeighborProp ? setNeighborProp : setInternalNeighbor}
-          dateFrom={fDateFrom}
-          setDateFrom={externalFilters && setDateFromProp ? setDateFromProp : setInternalDateFrom}
-          dateTo={fDateTo}
-          setDateTo={externalFilters && setDateToProp ? setDateToProp : setInternalDateTo}
-          showSubtasks={showSubtasks}
-          setShowSubtasks={setInternalShowSubtasks}
-          sortField={sortField}
-          setSortField={setSortField}
-          sortOrder={sortOrder}
-          setSortOrder={setSortOrder}
-          contracts={contracts}
-          taskTypes={taskTypes}
-          sectors={sectors}
-          citiesNeighborhoods={citiesNeighborhoods}
-          onClear={clearAll}
-          totalTasks={tasks.length}
-          filteredTasks={filtered.length}
-          createdByMe={createdByMe}
-          setCreatedByMe={setCreatedByMe}
-          team={team}
-          setTeam={setTeam}
-          teams={teams}
-          currentState={fCurrentState}
-          setCurrentState={setCurrentState}
-          users={users}
-          canViewAllSectors={canViewAllSectors}
-          displayedTasks={filtered}
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
+      <div>
+        {/* Header */}
+        <PageHeader
+          title="Quadro de Tarefas"
+          subtitle={`${filtered.length} de ${tasks.length} tarefas`}
+          actionButtons={
+            <>
+              <ExportButtons
+                filtered={filtered}
+                kpi={getKpiData(filtered, users)}
+                users={users}
+              />
+              {canCreate && (
+                <button
+                  id="kanban-nova-tarefa-btn"
+                  onClick={onNew}
+                  className="flex items-center h-9 gap-2 px-4 text-white border-none rounded-lg text-[13px] font-bold cursor-pointer btn-primary active:scale-95 shadow-sm"
+                >
+                  <Plus size={16} />
+                  NOVA TAREFA
+                </button>
+              )}
+            </>
+          }
         />
-      )}
 
-      {/* Colunas */}
-      <div className="flex gap-3.5 overflow-x-auto pb-2">
-        {cols.map((col, colIdx) => {
-          const colTasks = filtered.filter((t: KanbanTask) => t.status === col);
-          const getPriorityBorder = (priority: string | null | undefined) => {
-            switch (priority?.toLowerCase()) {
-              case 'urgente': return 'priority-border-urgente';
-              case 'alta': return 'priority-border-alta';
-              case 'média': case 'media': return 'priority-border-media';
-              case 'baixa': return 'priority-border-baixa';
-              default: return '';
-            }
-          };
-          return (
-            <div key={col} className="shrink-0 w-[272px] animate-fade-in-up" style={{ animationDelay: `${colIdx * 0.08}s` }}>
-              <div className="flex items-center gap-2 mb-2.5">
-                <div
-                  className="w-2.5 h-2.5 rounded-full"
-                  style={{ background: STATUS_COLOR[col] }}
-                />
-                <span className="text-[13px] font-semibold text-slate-900 dark:text-gray-50 font-display">
-                  {col}
-                </span>
-                <span className="ml-auto text-[11px] px-2 py-px rounded-[20px] bg-slate-200 dark:bg-(--t-tag) text-gray-700 dark:text-gray-300 font-semibold font-kpi">
-                  {colTasks.length}
-                </span>
-              </div>
-              <div className="bg-slate-50 dark:bg-[var(--t-col)] rounded-xl p-2 min-h-[200px] flex flex-col gap-2">
-                {colTasks.map((t: KanbanTask, cardIdx: number) => {
-                  const taskState = getTaskState(t);
-                  const stateColor = taskState?.color || "#cbd5e1";
-                  const prog = t.subtasks?.length
-                    ? (t.subtasks.filter((s: Subtask) => s.done).length /
-                        t.subtasks.length) *
-                      100
-                    : 0;
-                  const respName = t.responsible && typeof t.responsible === "object"
-                    ? (t.responsible as any).name
-                    : String(t.responsible || "") || "";
-                  const respInitials = respName ? respName.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase() : '?';
-                  return (
-                    <Tooltip content={t.description} subtasks={t.subtasks} key={t.id}>
-                      <div
-                        onClick={() => onSelect(t)}
-                        className="bg-white dark:bg-(--t-card) rounded-xl p-3 card-hover cursor-pointer animate-fade-in-up border-l-4 shadow-sm h-full"
-                      style={{ 
-                        animationDelay: `${(colIdx * 0.08) + (cardIdx * 0.04)}s`,
-                        borderLeftColor: stateColor,
-                      }}
-                    >
-                      {t.parent_id && (
-                        <div 
-                          className="text-[10px] text-primary/70 dark:text-primary-light font-medium mb-2 flex items-center gap-1 hover:text-primary transition-colors group/parent"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const pTitle = t.parent?.title || tasks.find((p: KanbanTask) => p.id === t.parent_id)?.title;
-                            if (pTitle) handleSetSearch(pTitle);
-                          }}
-                        >
-                          <span className="text-xs">↳</span>
-                          <span>
-                            Tarefa Principal:{" "}
-                            <b className="underline decoration-primary/20 group-hover/parent:decoration-primary/50 underline-offset-2">
-                              {t.parent?.title ||
-                                tasks.find(
-                                  (p: KanbanTask) => p.id === t.parent_id,
-                                )?.title ||
-                                "..."}
-                            </b>
-                          </span>
-                        </div>
-                      )}
-                      <div className="flex justify-between mb-[7px]">
-                        <span className="text-[10px] px-[7px] py-0.5 rounded-md bg-slate-100 dark:bg-(--t-tag) text-gray-600 dark:text-gray-300 font-semibold flex items-center gap-1">
-                          {t.type}
-                          {taskState && (
-                            <span
-                              className="w-1.5 h-1.5 rounded-full"
-                              style={{
-                                background: taskState.color,
-                              }}
-                            />
-                          )}
-                        </span>
-                        <span
-                          className="text-[10px] px-[7px] py-0.5 rounded-md font-bold"
-                          style={{
-                            background: PRIO_COLOR[t.priority || ""] + "18",
-                            color: PRIO_COLOR[t.priority || ""],
-                          }}
-                        >
-                          {t.priority}
-                        </span>
-                      </div>
-                      <div className="text-[13px] font-semibold text-slate-900 dark:text-(--t-text) mb-[7px] leading-[1.3]">
-                        {t.title}
-                      </div>
-                      {taskState && (
-                        <div className="mb-[7px]">
-                          <span
-                            className="text-[9px] font-bold px-1.5 py-0.5 rounded"
-                            style={{
-                              background: taskState.color + "18",
-                              color: taskState.color,
-                            }}
-                          >
-                            {taskState.label}
-                          </span>
-                        </div>
-                      )}
-                      <div className="flex flex-col gap-[3px] mb-[7px]">
-                        <span className="text-[11px] text-slate-500 dark:text-gray-400 flex items-center gap-1">
-                          <Building2 size={9} />
-                          {sectorDisplay(t.sector)}
-                        </span>
-                        <span className="text-[11px] text-slate-500 dark:text-gray-400 flex items-center gap-1.5">
-                          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-linear-to-br from-primary to-primary-hover text-[7px] font-bold text-white shrink-0">
-                            {respInitials}
-                          </span>
-                          {respName || "Não atribuído"}
-                        </span>
-                        <span className="text-[11px] text-slate-500 dark:text-gray-400 flex items-center gap-1">
-                          <MapPin size={9} />
-                          {t.contract && typeof t.contract === "object"
-                            ? (t.contract as any).name
-                            : t.contract}
-                        </span>
-                        {t.city && (
-                          <span className="text-[11px] text-slate-500 dark:text-gray-400 flex items-center gap-1 pl-[13px]">
-                            {typeof t.city === "object" ? (t.city as any).name : t.city}
-                            {t.nucleus ? ` · ${t.nucleus}` : ""}
-                          </span>
-                        )}
-                        {(t.quadra || t.lote) && (
-                          <span className="text-[10px] text-slate-400 dark:text-gray-500 pl-[13px]">
-                            {t.quadra ? `Q: ${t.quadra} ` : ""}
-                            {t.lote ? `L: ${t.lote}` : ""}
-                          </span>
-                        )}
-                      </div>
-                      {t.deadline && (
-                        <div className="text-[10px] text-slate-500 dark:text-gray-400 flex items-center gap-[3px] mb-1.5">
-                          <Calendar size={9} />
-                          Prazo:{" "}
-                          <b className="text-slate-800 dark:text-(--t-text)">
-                            {(() => {
-                              const d = new Date(t.deadline);
-                              return !isNaN(d.getTime()) ? d.toLocaleDateString("pt-BR", { timeZone: "UTC" }) : t.deadline;
-                            })()}
-                          </b>
-                        </div>
-                      )}
-                      {(t.subtasks?.length ?? 0) > 0 && (
-                        <div>
-                          <div className="flex justify-between text-[10px] text-slate-500 dark:text-gray-400 mb-[3px]">
-                            <span>Subtarefas</span>
-                            <span className="font-kpi">
-                              {
-                                t.subtasks!.filter((s: Subtask) => s.done)
-                                  .length
-                              }
-                              /{t.subtasks!.length}
-                            </span>
-                          </div>
-                          <div className="h-[3px] bg-slate-200 dark:bg-[var(--t-border)] rounded-full overflow-hidden">
-                            <div
-                              className="h-full rounded-full transition-all duration-500"
-                              style={{ width: `${prog}%`, background: 'linear-gradient(90deg, #98af3b, #7a9e2e)' }}
-                            />
-                          </div>
-                        </div>
-                      )}
-                      {(t.time ?? 0) > 0 && (
-                        <div className="text-[10px] text-slate-500 dark:text-gray-400 flex items-center gap-[3px] mt-1.5">
-                          <Clock size={9} />
-                          <span className="font-kpi">{fmtTime(t.time ?? 0)}</span>
-                        </div>
-                      )}
-                    </div>
-                  </Tooltip>
-                  );
-                })}
-                {colTasks.length === 0 && (
-                  <div className="text-center py-[30px] text-xs text-slate-400 dark:text-gray-500">
-                    Sem tarefas
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+        {!externalFilters && (
+          <TaskFilters
+            T={T}
+            search={search}
+            setSearch={externalFilters ? () => {} : setInternalSearch}
+            sector={fSector}
+            setSector={externalFilters ? () => {} : setInternalSector}
+            priority={fPriority}
+            setPriority={externalFilters ? () => {} : setInternalPriority}
+            type={fType}
+            setType={externalFilters ? () => {} : setInternalType}
+            responsible={fResponsible}
+            setResponsible={externalFilters ? () => {} : setInternalResponsible}
+            contract={fContract}
+            setContract={externalFilters ? () => {} : setInternalContract}
+            city={fCity}
+            setCity={externalFilters ? () => {} : setInternalCity}
+            neighbor={fNeighbor}
+            setNeighbor={externalFilters && setNeighborProp ? setNeighborProp : setInternalNeighbor}
+            dateFrom={fDateFrom}
+            setDateFrom={externalFilters && setDateFromProp ? setDateFromProp : setInternalDateFrom}
+            dateTo={fDateTo}
+            setDateTo={externalFilters && setDateToProp ? setDateToProp : setInternalDateTo}
+            showSubtasks={showSubtasks}
+            setShowSubtasks={setInternalShowSubtasks}
+            sortField={sortField}
+            setSortField={setSortField}
+            sortOrder={sortOrder}
+            setSortOrder={setSortOrder}
+            contracts={contracts}
+            taskTypes={taskTypes}
+            sectors={sectors}
+            citiesNeighborhoods={citiesNeighborhoods}
+            onClear={clearAll}
+            totalTasks={tasks.length}
+            filteredTasks={filtered.length}
+            createdByMe={createdByMe}
+            setCreatedByMe={setCreatedByMe}
+            team={team}
+            setTeam={setTeam}
+            teams={teams}
+            currentState={fCurrentState}
+            setCurrentState={setCurrentState}
+            users={users}
+            canViewAllSectors={canViewAllSectors}
+            displayedTasks={filtered}
+          />
+        )}
+
+        {/* Colunas */}
+        <div className="flex gap-3.5 overflow-x-auto pb-2">
+          {cols.map((col, colIdx) => (
+            <KanbanColumn
+              key={col}
+              col={col}
+              colIdx={colIdx}
+              colTasks={filtered.filter((t: KanbanTask) => t.status === col)}
+              onSelect={onSelect}
+              tasks={tasks}
+              handleSetSearch={handleSetSearch}
+            />
+          ))}
+        </div>
+
+        {createPortal(
+          <DragOverlay>
+            {activeTask ? (
+              <KanbanCard
+                t={activeTask}
+                colIdx={0}
+                cardIdx={0}
+                onSelect={() => {}}
+                tasks={[]}
+                handleSetSearch={() => {}}
+                isOverlay
+              />
+            ) : null}
+          </DragOverlay>,
+          document.body,
+        )}
       </div>
-    </div>
+    </DndContext>
   );
 }

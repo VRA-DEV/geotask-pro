@@ -77,7 +77,7 @@ export async function GET(req: Request) {
       } else if (task.status === "Concluído" && lastInProgressStart) {
         // If it was concluded but we have a dangling start (shouldn't happen with correct logs)
         const endTime = task.completed_at ? new Date(task.completed_at) : now;
-        totalElapsedMs += endTime.getTime() - lastInProgressStart.getTime();
+        totalElapsedMs += endTime.getTime() - (lastInProgressStart as Date).getTime();
       }
 
       const newTimeSpent = Math.floor(totalElapsedMs / 1000);

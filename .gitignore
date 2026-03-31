@@ -56,8 +56,9 @@ next-env.d.ts
 # Claude Code
 .claude/
 
-# GeoTask Pro v2 (separate project/repo)
+# Projetos separados (não fazem parte deste repo)
 /geotask-pro-v2/
+/bonini_erp/
 
 # uploads (user content, not source code)
 /public/uploads/
@@ -70,3 +71,5 @@ data/
 # documents (keep in separate storage, not in repo)
 *.docx
 *.xlsx
+# Allow documentation in docs/ folder
+!docs/*.docx
