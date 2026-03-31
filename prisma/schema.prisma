@@ -26,10 +26,10 @@ model ActivityLog {
 }
 
 model City {
-  id           Int            @id @default(autoincrement())
-  name         String         @unique
-  Neighborhood Neighborhood[]
-  Task         Task[]
+  id            Int            @id @default(autoincrement())
+  name          String         @unique
+  neighborhoods Neighborhood[]
+  tasks         Task[]
 }
 
 model Comment {
@@ -47,10 +47,10 @@ model Comment {
 }
 
 model Contract {
-  id           Int            @id @default(autoincrement())
-  name         String         @unique
-  Neighborhood Neighborhood[]
-  Task         Task[]
+  id            Int            @id @default(autoincrement())
+  name          String         @unique
+  neighborhoods Neighborhood[]
+  tasks         Task[]
 }
 
 model Mention {
@@ -74,9 +74,9 @@ model Neighborhood {
   name        String
   city_id     Int
   contract_id Int?
-  City        City      @relation(fields: [city_id], references: [id], onDelete: Cascade)
-  Contract    Contract? @relation(fields: [contract_id], references: [id])
-  Task        Task[]
+  city        City      @relation(fields: [city_id], references: [id], onDelete: Cascade)
+  contract    Contract? @relation(fields: [contract_id], references: [id])
+  tasks       Task[]
 
   @@unique([city_id, name])
 }
@@ -105,7 +105,7 @@ model Role {
   permissions Json?
   created_at  DateTime @default(now())
   updated_at  DateTime @default(now())
-  User        User[]
+  users       User[]
 }
 
 model Sector {
@@ -113,14 +113,14 @@ model Sector {
   name            String            @unique
   created_at      DateTime          @default(now())
   updated_at      DateTime          @default(now())
-  Mention         Mention[]
-  Subtask         Subtask[]
-  Task            Task[]
-  TaskType        TaskType[]
-  Template        Template[]
-  TemplateSubtask TemplateSubtask[]
-  User            User[]
-  UserSector      UserSector[]
+  mentions        Mention[]
+  subtasks        Subtask[]
+  tasks           Task[]
+  taskTypes       TaskType[]
+  templates       Template[]
+  templateSubtasks TemplateSubtask[]
+  users           User[]
+  userSectors     UserSector[]
 }
 
 model Subtask {
@@ -131,9 +131,9 @@ model Subtask {
   responsible_id Int?
   done_at        DateTime?
   sector_id      Int?
-  User           User?     @relation(fields: [responsible_id], references: [id])
+  responsible    User?     @relation(fields: [responsible_id], references: [id])
   Sector         Sector?   @relation(fields: [sector_id], references: [id])
-  Task           Task      @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  task           Task      @relation(fields: [task_id], references: [id], onDelete: Cascade)
 }
 
 model Task {
@@ -163,23 +163,23 @@ model Task {
   sector_id                      Int?
   team_id                        Int?
   status_updated_at              DateTime?
-  Comment                        Comment[]
-  Mention                        Mention[]
-  Notification                   Notification[]
-  Subtask                        Subtask[]
-  City                           City?            @relation(fields: [city_id], references: [id])
-  Contract                       Contract?        @relation(fields: [contract_id], references: [id])
-  User_Task_created_by_idToUser  User?            @relation("Task_created_by_idToUser", fields: [created_by_id], references: [id])
-  Neighborhood                   Neighborhood?    @relation(fields: [neighborhood_id], references: [id])
-  Task                           Task?            @relation("TaskToTask", fields: [parent_id], references: [id])
-  other_Task                     Task[]           @relation("TaskToTask")
-  User_Task_responsible_idToUser User?            @relation("Task_responsible_idToUser", fields: [responsible_id], references: [id])
+  comments                       Comment[]
+  mentions                       Mention[]
+  notifications                  Notification[]
+  subtasks                       Subtask[]
+  city                           City?            @relation(fields: [city_id], references: [id])
+  contract                       Contract?        @relation(fields: [contract_id], references: [id])
+  created_by                     User?            @relation("Task_created_by_idToUser", fields: [created_by_id], references: [id])
+  neighborhood                   Neighborhood?    @relation(fields: [neighborhood_id], references: [id])
+  parent                         Task?            @relation("TaskToTask", fields: [parent_id], references: [id])
+  children                       Task[]           @relation("TaskToTask")
+  responsible                    User?            @relation("Task_responsible_idToUser", fields: [responsible_id], references: [id])
   Sector                         Sector?          @relation(fields: [sector_id], references: [id])
-  Team                           Team?            @relation(fields: [team_id], references: [id])
-  TaskAttachment                 TaskAttachment[]
-  TaskHistory                    TaskHistory[]
-  TaskPause                      TaskPause[]
-  TaskUser                       TaskUser[]
+  team                           Team?            @relation(fields: [team_id], references: [id])
+  attachments                    TaskAttachment[]
+  history                        TaskHistory[]
+  pauses                         TaskPause[]
+  taskUsers                      TaskUser[]
 
   @@index([created_by_id])
   @@index([parent_id])
@@ -199,8 +199,8 @@ model TaskAttachment {
   url            String
   uploaded_by_id Int?
   created_at     DateTime @default(now())
-  Task           Task     @relation(fields: [task_id], references: [id], onDelete: Cascade)
-  User           User?    @relation(fields: [uploaded_by_id], references: [id])
+  task           Task     @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  user           User?    @relation(fields: [uploaded_by_id], references: [id])
 
   @@index([task_id])
 }
@@ -213,8 +213,8 @@ model TaskHistory {
   old_value  String?
   new_value  String?
   created_at DateTime @default(now())
-  Task       Task     @relation(fields: [task_id], references: [id], onDelete: Cascade)
-  User       User?    @relation(fields: [user_id], references: [id])
+  task       Task     @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  user       User?    @relation(fields: [user_id], references: [id])
 
   @@index([task_id])
 }
@@ -224,7 +224,7 @@ model TaskPause {
   task_id    Int
   started_at DateTime  @default(now())
   ended_at   DateTime?
-  Task       Task      @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  task       Task      @relation(fields: [task_id], references: [id], onDelete: Cascade)
 }
 
 model TaskType {
@@ -233,7 +233,7 @@ model TaskType {
   sector_id  Int?
   created_at DateTime @default(now())
   updated_at DateTime @default(now())
-  Sector     Sector?  @relation(fields: [sector_id], references: [id])
+  sector     Sector?  @relation(fields: [sector_id], references: [id])
 
   @@index([sector_id])
 }
@@ -243,8 +243,8 @@ model TaskUser {
   task_id    Int
   user_id    Int
   created_at DateTime @default(now())
-  Task       Task     @relation(fields: [task_id], references: [id], onDelete: Cascade)
-  User       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  task       Task     @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@unique([task_id, user_id])
   @@index([task_id])
@@ -256,8 +256,8 @@ model Team {
   name       String   @unique
   created_at DateTime @default(now())
   updated_at DateTime @default(now())
-  Task       Task[]
-  User       User[]
+  tasks      Task[]
+  users      User[]
 }
 
 model Template {
@@ -266,9 +266,9 @@ model Template {
   created_by_id Int?
   created_at    DateTime       @default(now())
   sector_id     Int
-  User          User?          @relation(fields: [created_by_id], references: [id])
-  Sector        Sector         @relation(fields: [sector_id], references: [id])
-  TemplateTask  TemplateTask[]
+  user           User?          @relation(fields: [created_by_id], references: [id])
+  sector         Sector         @relation(fields: [sector_id], references: [id])
+  templateTasks  TemplateTask[]
 }
 
 model TemplateSubtask {
@@ -278,9 +278,9 @@ model TemplateSubtask {
   template_task_id Int
   responsible_id   Int?
   sector_id        Int?
-  User             User?        @relation(fields: [responsible_id], references: [id])
-  Sector           Sector?      @relation(fields: [sector_id], references: [id])
-  TemplateTask     TemplateTask @relation(fields: [template_task_id], references: [id], onDelete: Cascade)
+  user             User?        @relation(fields: [responsible_id], references: [id])
+  sector           Sector?      @relation(fields: [sector_id], references: [id])
+  templateTask     TemplateTask @relation(fields: [template_task_id], references: [id], onDelete: Cascade)
 }
 
 model TemplateTask {
@@ -288,8 +288,8 @@ model TemplateTask {
   title           String
   order_index     Int               @default(0)
   template_id     Int
-  TemplateSubtask TemplateSubtask[]
-  Template        Template          @relation(fields: [template_id], references: [id], onDelete: Cascade)
+  templateSubtasks TemplateSubtask[]
+  template         Template          @relation(fields: [template_id], references: [id], onDelete: Cascade)
 }
 
 model User {
@@ -304,23 +304,23 @@ model User {
   role_id                                 Int
   sector_id                               Int
   team_id                                 Int?
-  ActivityLog                             ActivityLog[]
-  Comment                                 Comment[]
-  Mention_Mention_mentioned_by_idToUser   Mention[]         @relation("Mention_mentioned_by_idToUser")
-  Mention_Mention_mentioned_user_idToUser Mention[]         @relation("Mention_mentioned_user_idToUser")
-  Notification                            Notification[]
-  Subtask                                 Subtask[]
-  Task_Task_created_by_idToUser           Task[]            @relation("Task_created_by_idToUser")
-  Task_Task_responsible_idToUser          Task[]            @relation("Task_responsible_idToUser")
-  TaskAttachment                          TaskAttachment[]
-  TaskHistory                             TaskHistory[]
-  TaskUser                                TaskUser[]
-  Template                                Template[]
-  TemplateSubtask                         TemplateSubtask[]
+  activityLogs                            ActivityLog[]
+  comments                                Comment[]
+  mentionsSent                            Mention[]         @relation("Mention_mentioned_by_idToUser")
+  mentionsReceived                        Mention[]         @relation("Mention_mentioned_user_idToUser")
+  notifications                           Notification[]
+  subtasks                                Subtask[]
+  tasksCreated                            Task[]            @relation("Task_created_by_idToUser")
+  tasksResponsible                        Task[]            @relation("Task_responsible_idToUser")
+  attachments                             TaskAttachment[]
+  history                                 TaskHistory[]
+  taskUsers                               TaskUser[]
+  templates                               Template[]
+  templateSubtasks                        TemplateSubtask[]
   Role                                    Role              @relation(fields: [role_id], references: [id])
   Sector                                  Sector            @relation(fields: [sector_id], references: [id])
-  Team                                    Team?             @relation(fields: [team_id], references: [id])
-  UserSector                              UserSector[]
+  team                                    Team?             @relation(fields: [team_id], references: [id])
+  userSectors                             UserSector[]
 
   @@index([team_id])
 }
@@ -330,8 +330,8 @@ model UserSector {
   user_id    Int
   sector_id  Int
   created_at DateTime @default(now())
-  Sector     Sector   @relation(fields: [sector_id], references: [id], onDelete: Cascade)
-  User       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  sector     Sector   @relation(fields: [sector_id], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@unique([user_id, sector_id])
   @@index([sector_id])

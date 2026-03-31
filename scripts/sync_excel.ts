@@ -12,7 +12,9 @@ async function main() {
   const data = xlsx.utils.sheet_to_json(sheet);
   
   const contracts = await prisma.contract.findMany();
-  const dbCities = await prisma.city.findMany({ include: { neighborhoods: true } });
+  const dbCities = await prisma.city.findMany({ 
+    include: { neighborhoods: true } 
+  });
 
   // Normalization helper
   const norm = (str: string) => String(str || "").toLowerCase().trim();
