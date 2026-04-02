@@ -292,6 +292,8 @@ export default function GeoTask() {
           ? [optimisticTask, ...(tasksHubDataRaw as any[])] 
           : { ...tasksHubDataRaw, data: [optimisticTask, ...((tasksHubDataRaw as any)?.data || [])] },
         rollbackOnError: true,
+        populateCache: false, // Don't let the API response override the lists
+        revalidate: true,
       });
       
       mutateDashboardTasks(); // Soft refresh for dashboard

@@ -50,6 +50,7 @@ export function useTasks(opts: UseTasksOptions = {}) {
   const { data, error, isLoading, mutate } = useSWR(url, authFetcher, {
     revalidateOnFocus: false,
     dedupingInterval: 5000,
+    keepPreviousData: true, // Smooth transitions between filters
   });
 
   // Handle both paginated ({ data, pagination }) and flat array responses
@@ -72,7 +73,7 @@ export function useTasks(opts: UseTasksOptions = {}) {
     return mutate(updateFn(), {
       optimisticData,
       rollbackOnError: true,
-      populateCache: true,
+      populateCache: false, // Critical: don't let the API response (message: "...") override our list
       revalidate: true,
     });
   };
