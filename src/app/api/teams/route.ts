@@ -6,7 +6,9 @@ export async function GET() {
     orderBy: { name: "asc" },
     include: { _count: { select: { users: true, tasks: true } } },
   });
-  return NextResponse.json(teams);
+  const response = NextResponse.json(teams);
+  response.headers.set("Cache-Control", "s-maxage=600, stale-while-revalidate=1200");
+  return response;
 }
 
 export async function POST(req: NextRequest) {

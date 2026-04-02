@@ -6,7 +6,9 @@ export async function GET() {
     const contracts = await prisma.contract.findMany({
       orderBy: { name: "asc" },
     });
-    return NextResponse.json(contracts);
+    const response = NextResponse.json(contracts);
+    response.headers.set("Cache-Control", "s-maxage=1800, stale-while-revalidate=3600");
+    return response;
   } catch (error) {
     return NextResponse.json(
       { error: "Erro ao buscar contratos" },

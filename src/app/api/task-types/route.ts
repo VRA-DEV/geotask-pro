@@ -11,7 +11,9 @@ export async function GET() {
         name: "asc",
       },
     });
-    return NextResponse.json(types);
+    const response = NextResponse.json(types);
+    response.headers.set("Cache-Control", "s-maxage=3600, stale-while-revalidate=7200");
+    return response;
   } catch (error) {
     console.error("Error fetching task types:", error);
     return NextResponse.json(

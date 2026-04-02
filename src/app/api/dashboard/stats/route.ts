@@ -91,7 +91,7 @@ export async function GET(req: Request) {
         }, 0) / concluded.length / (1000 * 60)) // in minutes
       : 0;
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       total,
       byStatus,
       byPriority,
@@ -101,6 +101,8 @@ export async function GET(req: Request) {
       avgTime,
       lastUpdated: new Date().toISOString(),
     });
+    response.headers.set("Cache-Control", "s-maxage=60, stale-while-revalidate=120");
+    return response;
   } catch (error) {
     console.error("Dashboard stats error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

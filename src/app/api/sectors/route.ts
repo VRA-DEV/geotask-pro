@@ -7,7 +7,9 @@ export async function GET() {
     const sectors = await prisma.sector.findMany({
       orderBy: { name: "asc" },
     });
-    return NextResponse.json(sectors);
+    const response = NextResponse.json(sectors);
+    response.headers.set("Cache-Control", "s-maxage=3600, stale-while-revalidate=7200");
+    return response;
   } catch (error) {
     console.error("Erro ao buscar setores:", error);
     return NextResponse.json(

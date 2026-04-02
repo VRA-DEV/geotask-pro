@@ -1,8 +1,6 @@
 import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
-export const dynamic = "force-dynamic";
-
 export async function GET() {
   try {
     const [cities, contracts, sectors, roles, taskTypes] = await Promise.all([
@@ -57,14 +55,16 @@ export async function GET() {
       });
     });
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       contracts: contracts.map((c) => c.name),
       cities_neighborhoods: citiesNeighborhoods,
       contract_cities_neighborhoods: contractCitiesNeighborhoods,
-      sectors: sectors, // Returns {id, name}
-      roles: roles, // Returns {id, name}
-      task_types: taskTypes, // Returns {id, name, sector_id}
+      sectors: sectors,
+      roles: roles,
+      task_types: taskTypes,
     });
+    response.headers.set("Cache-Control", "s-maxage=3600, stale-while-revalidate=7200");
+    return response;
   } catch (error) {
     console.error("Error fetching lookups:", error);
     return NextResponse.json(

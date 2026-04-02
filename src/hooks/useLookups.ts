@@ -8,7 +8,7 @@ export function useLookups() {
     {
       revalidateOnFocus: false,
     revalidateOnReconnect: false,
-    dedupingInterval: 5000,
+    dedupingInterval: 300000,
   });
 
   if (error) console.error("useLookups error:", error);

@@ -7,7 +7,9 @@ export async function GET() {
     const roles = await prisma.role.findMany({
       orderBy: { name: "asc" },
     });
-    return NextResponse.json(roles);
+    const response = NextResponse.json(roles);
+    response.headers.set("Cache-Control", "s-maxage=3600, stale-while-revalidate=7200");
+    return response;
   } catch (error) {
     console.error("Erro ao buscar cargos:", error);
     return NextResponse.json(

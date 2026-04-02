@@ -10,7 +10,9 @@ export async function GET(req: Request) {
       include: { city: true },
       orderBy: { name: "asc" },
     });
-    return NextResponse.json(neighborhoods);
+    const response = NextResponse.json(neighborhoods);
+    response.headers.set("Cache-Control", "s-maxage=3600, stale-while-revalidate=7200");
+    return response;
   } catch (error) {
     return NextResponse.json(
       { error: "Erro ao buscar bairros" },

@@ -7,7 +7,9 @@ export async function GET() {
       include: { _count: { select: { neighborhoods: true } } },
       orderBy: { name: "asc" },
     });
-    return NextResponse.json(cities);
+    const response = NextResponse.json(cities);
+    response.headers.set("Cache-Control", "s-maxage=3600, stale-while-revalidate=7200");
+    return response;
   } catch (error) {
     return NextResponse.json(
       { error: "Erro ao buscar cidades" },
