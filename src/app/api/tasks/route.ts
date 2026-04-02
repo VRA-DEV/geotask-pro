@@ -4,7 +4,7 @@ import { type Prisma } from "@prisma/client";
 import { type NextRequest, NextResponse } from "next/server";
 import { broadcast } from "../events/route";
 
-async function resolveSectorId(s: any): Promise<number | null> {
+async function resolveSectorId(s: any, cache?: Record<string, number | null>): Promise<number | null> {
   if (!s) return null;
 
   // If it's already an ID
@@ -16,18 +16,24 @@ async function resolveSectorId(s: any): Promise<number | null> {
   if (typeof s === "object") {
     if (s.id && !isNaN(Number(s.id))) return Number(s.id);
     if (s.name) s = s.name;
+    else return null;
   }
+
+  const name = String(s).trim();
+  if (cache && name in cache) return cache[name];
 
   // Try to find by name (case-insensitive and trimmed)
   const sector = await prisma.sector.findFirst({
     where: {
-      name: { equals: String(s).trim(), mode: "insensitive" },
+      name: { equals: name, mode: "insensitive" },
     },
   });
-  return sector?.id || null;
+  const id = sector?.id || null;
+  if (cache) cache[name] = id;
+  return id;
 }
 
-async function resolveResponsibleId(r: any): Promise<number | null> {
+async function resolveResponsibleId(r: any, cache?: Record<string, number | null>): Promise<number | null> {
   if (!r) return null;
 
   // If already an ID
@@ -39,15 +45,21 @@ async function resolveResponsibleId(r: any): Promise<number | null> {
   if (typeof r === "object") {
     if (r.id && !isNaN(Number(r.id))) return Number(r.id);
     if (r.name) r = r.name;
+    else return null;
   }
+
+  const name = String(r).trim();
+  if (cache && name in cache) return cache[name];
 
   // Find by name (case-insensitive and trimmed)
   const u = await prisma.user.findFirst({
     where: {
-      name: { equals: String(r).trim(), mode: "insensitive" },
+      name: { equals: name, mode: "insensitive" },
     },
   });
-  return u?.id || null;
+  const id = u?.id || null;
+  if (cache) cache[name] = id;
+  return id;
 }
 
 async function notifyUser(
@@ -413,6 +425,11 @@ export async function GET(request: NextRequest) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
+    const cache = {
+      sectors: {} as Record<string, number | null>,
+      users: {} as Record<string, number | null>,
+    };
+
     const {
       title,
       description,
@@ -437,30 +454,32 @@ export async function POST(req: Request) {
       team_id,
     } = body;
 
-    let contractId: number | null = body.contract_id
-      ? Number(body.contract_id)
-      : null;
-    if (!contractId && contract) {
-      const c = await prisma.contract.findUnique({ where: { name: contract } });
-      if (c) contractId = c.id;
-    }
+    // Parallelize initial lookups
+    const [contractIdRes, cityIdRes, resolvedResponsibleId, resolvedSectorId] = await Promise.all([
+      (async () => {
+        if (body.contract_id) return Number(body.contract_id);
+        if (contract) {
+          const c = await prisma.contract.findUnique({ where: { name: contract }, select: { id: true } });
+          return c?.id || null;
+        }
+        return null;
+      })(),
+      (async () => {
+        if (body.city_id) return Number(body.city_id);
+        if (city) {
+          const c = await prisma.city.findUnique({ where: { name: city }, select: { id: true } });
+          return c?.id || null;
+        }
+        return null;
+      })(),
+      resolveResponsibleId(responsible_id || body.responsible, cache.users),
+      resolveSectorId(sector_id || sector, cache.sectors),
+    ]);
 
-    let cityId: number | null = body.city_id ? Number(body.city_id) : null;
-    if (!cityId && city) {
-      const c = await prisma.city.findUnique({ where: { name: city } });
-      if (c) cityId = c.id;
-    }
-
-    const resolvedResponsibleId = await resolveResponsibleId(
-      responsible_id || body.responsible,
-    );
-
-    const resolvedSectorId = await resolveSectorId(sector_id || sector);
-
-    const createdById =
-      created_by && !isNaN(Number(created_by)) ? Number(created_by) : null;
-    const parentId =
-      parent_id && !isNaN(Number(parent_id)) ? Number(parent_id) : null;
+    const contractId = contractIdRes;
+    const cityId = cityIdRes;
+    const createdById = created_by && !isNaN(Number(created_by)) ? Number(created_by) : null;
+    const parentId = parent_id && !isNaN(Number(parent_id)) ? Number(parent_id) : null;
 
     const taskData: any = {
       title,
@@ -494,11 +513,12 @@ export async function POST(req: Request) {
           (subtasks || children).map(async (st: any) => {
             const sId =
               st.sector_id || st.sector
-                ? await resolveSectorId(st.sector_id || st.sector)
+                ? await resolveSectorId(st.sector_id || st.sector, cache.sectors)
                 : resolvedSectorId;
 
             const sRid = await resolveResponsibleId(
               st.responsible_id || st.responsible,
+              cache.users
             );
 
             return {
@@ -526,102 +546,112 @@ export async function POST(req: Request) {
       include: { children: true, coworkers: true },
     });
 
-    let creatorName = "Alguém";
-    if (created_by) {
-      const u = await prisma.user.findUnique({
-        where: { id: Number(created_by) },
-      });
-      if (u) creatorName = u.name;
-    }
-    const dateStr = new Date().toLocaleDateString();
-    const timeStr = new Date().toLocaleTimeString().slice(0, 5);
-
-    // Notify responsible of the main task
-    if (resolvedResponsibleId) {
-      await notifyUser(
-        resolvedResponsibleId,
-        "task_assigned",
-        "Nova Atribuição",
-        `${creatorName} atribuiu uma tarefa a você em ${dateStr} às ${timeStr}h: "${title}"`,
-        newTask.id,
-      );
-    }
-
-    // Notify new coworkers
-    if (newTask.coworkers && newTask.coworkers.length > 0) {
-      for (const cw of newTask.coworkers) {
-        if (cw.user_id !== resolvedResponsibleId) {
-          await notifyUser(
-            cw.user_id,
-            "task_assigned",
-            "Nova Atribuição (Equipe)",
-            `${creatorName} adicionou você à equipe da tarefa "${title}" em ${dateStr} às ${timeStr}h.`,
-            newTask.id,
-          );
-        }
-      }
-    }
-
-    // Notify responsible of each subtask (if set),
-    // OR notify the Gestor(es) of the subtask's sector (if only sector is set)
-    for (const child of newTask.children || []) {
-      if (child.responsible_id) {
-        // Only notify if different from the main task responsible (avoid duplicate)
-        if (child.responsible_id !== resolvedResponsibleId) {
-          await notifyUser(
-            child.responsible_id,
-            "task_assigned",
-            "Nova Atribuição (Subtarefa)",
-            `${creatorName} atribuiu uma subtarefa a você em ${dateStr} às ${timeStr}h: "${child.title}"`,
-            child.id,
-          );
-        }
-      } else if (child.sector_id) {
-        // No responsible — notify Gestores of that sector
-        const sectorGestores = await prisma.user.findMany({
-          where: {
-            sector_id: child.sector_id,
-            Role: {
-              name: {
-                in: [
-                  "Gestor",
-                  "Gerente",
-                  "Coordenador de Setores",
-                  "Coordenador de Polo",
-                  "Admin",
-                ],
-              },
-            },
-          },
-          select: { id: true },
-        });
-        for (const g of sectorGestores) {
-          await notifyUser(
-            g.id,
-            "subtask_sector",
-            "Subtarefa sem responsável",
-            `${creatorName} criou a subtarefa "${child.title}" sem responsável atribuído no seu setor.`,
-            child.id,
-          );
-        }
-      }
-    }
-
-    logActivity(
-      createdById,
-      creatorName,
-      "task_created",
-      "task",
-      newTask.id,
-      `Criou a tarefa "${title}"`,
-    );
-
-    broadcast("TASK_CREATED", { taskId: newTask.id, creatorId: createdById });
-
-    return NextResponse.json({
+    // Send response early, then do background work
+    const response = NextResponse.json({
       message: "Tarefa criada com sucesso",
       id: newTask.id,
     });
+
+    const backgroundWork = async () => {
+      try {
+        let creatorName = "Alguém";
+        if (created_by) {
+          const u = await prisma.user.findUnique({
+            where: { id: Number(created_by) },
+            select: { name: true }
+          });
+          if (u) creatorName = u.name;
+        }
+        const dateStr = new Date().toLocaleDateString();
+        const timeStr = new Date().toLocaleTimeString().slice(0, 5);
+
+        const notifications: any[] = [];
+
+        // Notify responsible of the main task
+        if (resolvedResponsibleId) {
+          notifications.push({
+            user_id: resolvedResponsibleId,
+            type: "task_assigned",
+            title: "Nova Atribuição",
+            message: `${creatorName} atribuiu uma tarefa a você em ${dateStr} às ${timeStr}h: "${title}"`,
+            task_id: newTask.id,
+          });
+        }
+
+        // Notify new coworkers
+        if (newTask.coworkers && newTask.coworkers.length > 0) {
+          for (const cw of newTask.coworkers) {
+            if (cw.user_id !== resolvedResponsibleId) {
+              notifications.push({
+                user_id: cw.user_id,
+                type: "task_assigned",
+                title: "Nova Atribuição (Equipe)",
+                message: `${creatorName} adicionou você à equipe da tarefa "${title}" em ${dateStr} às ${timeStr}h.`,
+                task_id: newTask.id,
+              });
+            }
+          }
+        }
+
+        // Notify subtasks
+        const subtaskSectorGestoresCache: Record<number, number[]> = {};
+
+        for (const child of newTask.children || []) {
+          if (child.responsible_id) {
+            if (child.responsible_id !== resolvedResponsibleId) {
+              notifications.push({
+                user_id: child.responsible_id,
+                type: "task_assigned",
+                title: "Nova Atribuição (Subtarefa)",
+                message: `${creatorName} atribuiu uma subtarefa a você em ${dateStr} às ${timeStr}h: "${child.title}"`,
+                task_id: child.id,
+              });
+            }
+          } else if (child.sector_id) {
+            if (!subtaskSectorGestoresCache[child.sector_id]) {
+              const gestores = await prisma.user.findMany({
+                where: {
+                  sector_id: child.sector_id,
+                  Role: { name: { in: ["Gestor", "Gerente", "Coordenador de Setores", "Coordenador de Polo", "Admin"] } },
+                },
+                select: { id: true },
+              });
+              subtaskSectorGestoresCache[child.sector_id] = gestores.map(g => g.id);
+            }
+
+            for (const gId of subtaskSectorGestoresCache[child.sector_id]) {
+              notifications.push({
+                user_id: gId,
+                type: "subtask_sector",
+                title: "Subtarefa sem responsável",
+                message: `${creatorName} criou a subtarefa "${child.title}" sem responsável atribuído no seu setor.`,
+                task_id: child.id,
+              });
+            }
+          }
+        }
+
+        if (notifications.length > 0) {
+          await prisma.notification.createMany({ data: notifications });
+        }
+
+        logActivity(
+          createdById,
+          creatorName,
+          "task_created",
+          "task",
+          newTask.id,
+          `Criou a tarefa "${title}"`,
+        );
+
+        broadcast("TASK_CREATED", { taskId: newTask.id, creatorId: createdById });
+      } catch (err) {
+        console.error("Error in POST background work:", err);
+      }
+    };
+
+    backgroundWork();
+    return response;
   } catch (error: any) {
     console.error("Erro ao criar tarefa:", error);
     return NextResponse.json(
@@ -654,48 +684,61 @@ async function logHistory(
   field: string,
   oldValue: any,
   newValue: any,
+  cache?: {
+    sectors: Record<number, string>;
+    users: Record<number, string>;
+    contracts: Record<number, string>;
+    cities: Record<number, string>;
+  }
 ) {
   const maskedField = FIELD_NAMES[field] || field;
 
   let ov = oldValue;
   let nv = newValue;
 
+  const resolveName = async (
+    id: any,
+    type: "sectors" | "users" | "contracts" | "cities"
+  ) => {
+    if (!id) return null;
+    const numericId = Number(id);
+    if (isNaN(numericId)) return id;
+
+    if (cache && cache[type] && numericId in cache[type]) {
+      return cache[type][numericId];
+    }
+
+    let name = id;
+    if (type === "sectors") {
+      const s = await prisma.sector.findUnique({ where: { id: numericId }, select: { name: true } });
+      if (s) name = s.name;
+    } else if (type === "users") {
+      const u = await prisma.user.findUnique({ where: { id: numericId }, select: { name: true } });
+      if (u) name = u.name;
+    } else if (type === "contracts") {
+      const c = await prisma.contract.findUnique({ where: { id: numericId }, select: { name: true } });
+      if (c) name = c.name;
+    } else if (type === "cities") {
+      const c = await prisma.city.findUnique({ where: { id: numericId }, select: { name: true } });
+      if (c) name = c.name;
+    }
+
+    if (cache && cache[type]) cache[type][numericId] = name;
+    return name;
+  };
+
   if (field === "sector_id") {
-    if (ov) {
-      const s = await prisma.sector.findUnique({ where: { id: Number(ov) } });
-      if (s) ov = s.name;
-    }
-    if (nv) {
-      const s = await prisma.sector.findUnique({ where: { id: Number(nv) } });
-      if (s) nv = s.name;
-    }
+    ov = await resolveName(ov, "sectors");
+    nv = await resolveName(nv, "sectors");
   } else if (field === "responsible_id") {
-    if (ov) {
-      const u = await prisma.user.findUnique({ where: { id: Number(ov) } });
-      if (u) ov = u.name;
-    }
-    if (nv) {
-      const u = await prisma.user.findUnique({ where: { id: Number(nv) } });
-      if (u) nv = u.name;
-    }
+    ov = await resolveName(ov, "users");
+    nv = await resolveName(nv, "users");
   } else if (field === "contract_id") {
-    if (ov) {
-      const c = await prisma.contract.findUnique({ where: { id: Number(ov) } });
-      if (c) ov = c.name;
-    }
-    if (nv) {
-      const c = await prisma.contract.findUnique({ where: { id: Number(nv) } });
-      if (c) nv = c.name;
-    }
+    ov = await resolveName(ov, "contracts");
+    nv = await resolveName(nv, "contracts");
   } else if (field === "city_id") {
-    if (ov) {
-      const c = await prisma.city.findUnique({ where: { id: Number(ov) } });
-      if (c) ov = c.name;
-    }
-    if (nv) {
-      const c = await prisma.city.findUnique({ where: { id: Number(nv) } });
-      if (c) nv = c.name;
-    }
+    ov = await resolveName(ov, "cities");
+    nv = await resolveName(nv, "cities");
   }
 
   const formatValue = (v: any) => {
@@ -730,6 +773,17 @@ export async function PATCH(req: Request) {
     const body = await req.json();
     const { id, action, user_id, ...data } = body;
     const userId = user_id ? Number(user_id) : null;
+
+    const cache = {
+      sectors: {} as Record<number, string>,
+      users: {} as Record<number, string>,
+      contracts: {} as Record<number, string>,
+      cities: {} as Record<number, string>,
+      resolution: {
+        sectors: {} as Record<string, number | null>,
+        users: {} as Record<string, number | null>,
+      }
+    };
 
     if (!id)
       return NextResponse.json({ error: "ID é obrigatório" }, { status: 400 });
@@ -770,11 +824,11 @@ export async function PATCH(req: Request) {
           updateData.paused_at = null;
         } else {
           if (task.status === "Em Andamento" && task.started_at) {
-            // Calculate effective time excluding pauses
             const nowMs = new Date().getTime();
             const startMs = new Date(task.started_at).getTime();
             const existingPauses = await prisma.taskPause.findMany({
               where: { task_id: Number(id) },
+              select: { started_at: true, ended_at: true }
             });
             let totalPauseMs = 0;
             for (const p of existingPauses) {
@@ -792,214 +846,154 @@ export async function PATCH(req: Request) {
         else if (status === "Concluído") updateData.completed_at = new Date();
       }
 
-      await logHistory(task.id, userId, "status", task.status, status);
-      await prisma.task.update({ where: { id: Number(id) }, data: updateData });
+      // Critical path: update task + log history in parallel
+      await Promise.all([
+        prisma.task.update({ where: { id: Number(id) }, data: updateData }),
+        logHistory(task.id, userId, "status", task.status, status, cache),
+      ]);
 
-      // Activity log
-      const userName = userId
-        ? (
-            await prisma.user.findUnique({
-              where: { id: userId },
-              select: { name: true },
-            })
-          )?.name || "Usuário"
-        : "Sistema";
-      logActivity(
-        userId,
-        userName,
-        "task_status_changed",
-        "task",
-        task.id,
-        `Status: ${task.status} → ${status} — "${task.title}"`,
-      );
+      // Respond immediately
+      broadcast("TASK_UPDATED", { taskId: Number(id), userId });
+      const response = NextResponse.json({ message: "Atualizado com sucesso" });
 
-      if (status === "Pausado") {
-        await prisma.taskPause.create({
-          data: { task_id: Number(id), started_at: new Date() },
-        });
-      } else if (task.status === "Pausado") {
-        const lastPause = await prisma.taskPause.findFirst({
-          where: { task_id: Number(id), ended_at: null },
-          orderBy: { started_at: "desc" },
-        });
-        if (lastPause)
-          await prisma.taskPause.update({
-            where: { id: lastPause.id },
-            data: { ended_at: new Date() },
-          });
-      }
-
-      if (task.parent_id) {
-        const parent = await prisma.task.findUnique({
-          where: { id: task.parent_id },
-          include: {
-            children: true,
-            subtasks: true, // Legacy checklist items
-          },
-        });
-
-        if (parent) {
-          const childrenStatus = parent.children.map((c: any) =>
-            c.id === task.id ? status : c.status,
-          );
-          const checklistItemsDone = parent.subtasks.map((s: any) => s.done);
-
-          // 1. Start/Resume: Parent moves to "Em Andamento" if any child task is "Em Andamento"
-          // OR if any checklist item is done but not all (not a perfect check for "in progress" but better than nothing)
-          const anyChildInProgress = childrenStatus.some(
-            (s) => s === "Em Andamento",
-          );
-
-          if (
-            (status === "Em Andamento" || anyChildInProgress) &&
-            (parent.status === "A Fazer" || parent.status === "Pausado")
-          ) {
-            await prisma.task.update({
-              where: { id: parent.id },
-              data: {
-                status: "Em Andamento",
-                started_at: parent.started_at || new Date(),
-                paused_at: null,
-              },
+      // Background logic (explicitly non-blocking)
+      const runBackgroundWork = async () => {
+        try {
+          if (status === "Pausado") {
+            await prisma.taskPause.create({
+              data: { task_id: Number(id), started_at: new Date() },
             });
+          } else if (task.status === "Pausado") {
+            const lastPause = await prisma.taskPause.findFirst({
+              where: { task_id: Number(id), ended_at: null },
+              orderBy: { started_at: "desc" },
+              select: { id: true }
+            });
+            if (lastPause)
+              await prisma.taskPause.update({
+                where: { id: lastPause.id },
+                data: { ended_at: new Date() },
+              });
           }
 
-          // 2. Finish: Parent moves to "Concluído" if ALL children (tasks AND checklist) are done
-          if (
-            status === "Concluído" ||
-            status === "A Fazer" ||
-            status === "Pausado"
-          ) {
-            const allTasksDone = childrenStatus.every((s) => s === "Concluído");
-            const allChecklistDone = checklistItemsDone.every(
-              (d) => d === true,
-            );
+          const userName = userId
+            ? (await prisma.user.findUnique({ where: { id: userId }, select: { name: true } }))?.name || "Usuário"
+            : "Sistema";
+          
+          logActivity(userId, userName, "task_status_changed", "task", task.id, `Status: ${task.status} → ${status} — "${task.title}"`);
 
-            if (allTasksDone && allChecklistDone) {
-              if (parent.status !== "Concluído") {
+          if (task.parent_id) {
+            const parent = await prisma.task.findUnique({
+              where: { id: task.parent_id },
+              include: { children: { select: { id: true, status: true } }, subtasks: { select: { done: true } } },
+            });
+
+            if (parent) {
+              const childrenStatus = parent.children.map((c: any) =>
+                c.id === task.id ? status : c.status,
+              );
+              const checklistItemsDone = parent.subtasks.map((s: any) => s.done);
+              const anyChildInProgress = childrenStatus.some((s) => s === "Em Andamento");
+
+              if (
+                (status === "Em Andamento" || anyChildInProgress) &&
+                (parent.status === "A Fazer" || parent.status === "Pausado")
+              ) {
                 await prisma.task.update({
                   where: { id: parent.id },
-                  data: { status: "Concluído", completed_at: new Date() },
+                  data: { status: "Em Andamento", started_at: parent.started_at || new Date(), paused_at: null },
                 });
               }
-            } else if (parent.status === "Concluído") {
-              // Reopen if something was undone
-              await prisma.task.update({
-                where: { id: parent.id },
-                data: { status: "Em Andamento", completed_at: null },
+
+              if (status === "Concluído" || status === "A Fazer" || status === "Pausado") {
+                const allTasksDone = childrenStatus.every((s) => s === "Concluído");
+                const allChecklistDone = checklistItemsDone.every((d) => d === true);
+                if (allTasksDone && allChecklistDone) {
+                  if (parent.status !== "Concluído") {
+                    await prisma.task.update({
+                      where: { id: parent.id },
+                      data: { status: "Concluído", completed_at: new Date() },
+                    });
+                  }
+                } else if (parent.status === "Concluído") {
+                  await prisma.task.update({
+                    where: { id: parent.id },
+                    data: { status: "Em Andamento", completed_at: null },
+                  });
+                }
+              }
+
+              if (status === "Pausado" || status === "Concluído") {
+                const activeChildren = childrenStatus.filter((s) => s !== "Concluído");
+                const allPaused = activeChildren.length > 0 && activeChildren.every((s) => s === "Pausado");
+                if (allPaused && parent.status === "Em Andamento") {
+                  await prisma.task.update({
+                    where: { id: parent.id },
+                    data: { status: "Pausado", paused_at: new Date(), status_updated_at: new Date() },
+                  });
+                }
+              }
+            }
+          }
+
+          if (status === "Concluído") {
+            const ds = new Date().toLocaleDateString();
+            const notificationsToCreate: any[] = [];
+
+            if (task.created_by_id) {
+              notificationsToCreate.push({
+                user_id: task.created_by_id, type: "task_completed",
+                title: `Tarefa Concluída: "${task.title}"`, message: `Tarefa concluída na data ${ds}`, task_id: Number(id),
               });
             }
-          }
 
-          // 3. Pause: Parent moves to "Pausado" if ALL non-completed children are "Pausado"
-          if (status === "Pausado" || status === "Concluído") {
-            const activeChildren = childrenStatus.filter(
-              (s) => s !== "Concluído",
-            );
-            const allPaused =
-              activeChildren.length > 0 &&
-              activeChildren.every((s) => s === "Pausado");
-
-            // Also check if any checklist items were being worked on?
-            // Checklist doesn't have "paused" state, so we just check child tasks.
-            if (allPaused && parent.status === "Em Andamento") {
-              await prisma.task.update({
-                where: { id: parent.id },
-                data: {
-                  status: "Pausado",
-                  paused_at: new Date(),
-                  status_updated_at: new Date(),
-                },
+            if (task.sector_id) {
+              const gestores = await prisma.user.findMany({
+                where: { sector_id: task.sector_id, Role: { name: { in: ["Gestor", "Gerente", "Coordenador de Setores", "Coordenador de Polo", "Admin"] } } },
+                select: { id: true },
               });
+              for (const g of gestores) {
+                if (g.id !== task.created_by_id && g.id !== userId) {
+                  notificationsToCreate.push({
+                    user_id: g.id, type: "task_completed",
+                    title: `Tarefa Concluída no Setor: "${task.title}"`, message: `Tarefa concluída na data ${ds}`, task_id: Number(id),
+                  });
+                }
+              }
+            }
+
+            if (task.parent_id) {
+              const [siblingsTasks, legacySubtasks] = await Promise.all([
+                prisma.task.findMany({ where: { parent_id: task.parent_id, id: { not: task.id } }, select: { responsible_id: true } }),
+                prisma.subtask.findMany({ where: { task_id: task.parent_id }, select: { responsible_id: true } }),
+              ]);
+              const notifiedSet = new Set<number>();
+              if (task.created_by_id) notifiedSet.add(task.created_by_id);
+              if (userId) notifiedSet.add(userId);
+              const siblingUsers = new Set<number>();
+              siblingsTasks.forEach((s) => { if (s.responsible_id && !notifiedSet.has(s.responsible_id)) siblingUsers.add(s.responsible_id); });
+              legacySubtasks.forEach((s) => { if (s.responsible_id && !notifiedSet.has(s.responsible_id)) siblingUsers.add(s.responsible_id); });
+              for (const uid of siblingUsers) {
+                notificationsToCreate.push({
+                  user_id: uid, type: "task_completed",
+                  title: `Subtarefa Finalizada`, message: `A subtarefa "${task.title}" vinculada à tarefa principal foi concluída.`, task_id: task.parent_id,
+                });
+              }
+            }
+
+            if (notificationsToCreate.length > 0) {
+              await prisma.notification.createMany({ data: notificationsToCreate });
+              broadcast("NOTIFICATIONS_UPDATED", {});
             }
           }
+        } catch (err) {
+          console.error("Error in status update background work:", err);
         }
-      }
+      };
 
-      if (status === "Concluído") {
-        const ds = new Date().toLocaleDateString();
+      runBackgroundWork();
 
-        // 1. Notify Creator
-        if (task.created_by_id) {
-          await notifyUser(
-            task.created_by_id,
-            "task_completed",
-            `Tarefa Concluída: "${task.title}"`,
-            `Tarefa concluída na data ${ds}`,
-            Number(id),
-          );
-        }
-
-        // 2. Notify Sector Gestor(es)
-        if (task.sector_id) {
-          const gestores = await prisma.user.findMany({
-            where: {
-              sector_id: task.sector_id,
-              Role: {
-                name: {
-                  in: [
-                    "Gestor",
-                    "Gerente",
-                    "Coordenador de Setores",
-                    "Coordenador de Polo",
-                    "Admin",
-                  ],
-                },
-              },
-            },
-            select: { id: true },
-          });
-          for (const g of gestores) {
-            if (g.id !== task.created_by_id && g.id !== userId) {
-              await notifyUser(
-                g.id,
-                "task_completed",
-                `Tarefa Concluída no Setor: "${task.title}"`,
-                `Tarefa concluída na data ${ds}`,
-                Number(id),
-              );
-            }
-          }
-        }
-
-        // 3. If Subtask, Notify Other Subtasks' Assignees of the Same Parent
-        if (task.parent_id) {
-          const siblingsTasks = await prisma.task.findMany({
-            where: { parent_id: task.parent_id, id: { not: task.id } },
-            select: { responsible_id: true },
-          });
-          const legacySubtasks = await prisma.subtask.findMany({
-            where: { task_id: task.parent_id },
-            select: { responsible_id: true },
-          });
-
-          const notifiedSet = new Set<number>();
-          if (task.created_by_id) notifiedSet.add(task.created_by_id);
-          if (userId) notifiedSet.add(userId);
-
-          const siblingUsers = new Set<number>();
-          siblingsTasks.forEach((s) => {
-            if (s.responsible_id && !notifiedSet.has(s.responsible_id)) {
-              siblingUsers.add(s.responsible_id);
-            }
-          });
-          legacySubtasks.forEach((s) => {
-            if (s.responsible_id && !notifiedSet.has(s.responsible_id)) {
-              siblingUsers.add(s.responsible_id);
-            }
-          });
-
-          for (const uid of siblingUsers) {
-            await notifyUser(
-              uid,
-              "task_completed",
-              `Subtarefa Finalizada`,
-              `A subtarefa "${task.title}" vinculada à tarefa principal foi concluída.`,
-              task.parent_id,
-            );
-          }
-        }
-      }
+      return response;
     } else if (action === "update_fields") {
       // Permission Validation
       const userRequesting = await prisma.user.findUnique({
@@ -1067,27 +1061,17 @@ export async function PATCH(req: Request) {
         );
       }
 
-      const basicFields = [
-        "title",
-        "description",
-        "priority",
-        "type",
-        "nucleus",
-        "quadra",
-        "lote",
-      ];
+      const basicFields = ["title", "description", "priority", "type", "nucleus", "quadra", "lote"];
       for (const f of basicFields) {
         if (data[f] !== undefined) {
-          await logHistory(task.id, userId, f, (task as any)[f], data[f]);
+          await logHistory(task.id, userId, f, (task as any)[f], data[f], cache);
           updateData[f] = data[f];
         }
       }
 
       // Handle retroactive date changes
-      const updatedStarted =
-        data.started_at !== undefined ? data.started_at : data.started;
-      const updatedCompleted =
-        data.completed_at !== undefined ? data.completed_at : data.completed;
+      const updatedStarted = data.started_at !== undefined ? data.started_at : data.started;
+      const updatedCompleted = data.completed_at !== undefined ? data.completed_at : data.completed;
 
       if (updatedStarted !== undefined || updatedCompleted !== undefined) {
         let newStarted = task.started_at;
@@ -1096,7 +1080,7 @@ export async function PATCH(req: Request) {
         if (updatedStarted !== undefined) {
           const s = updatedStarted ? new Date(updatedStarted) : null;
           if (s?.getTime() !== task.started_at?.getTime()) {
-            await logHistory(task.id, userId, "started_at", task.started_at, s);
+            await logHistory(task.id, userId, "started_at", task.started_at, s, cache);
             updateData.started_at = s;
             newStarted = s;
           }
@@ -1105,86 +1089,53 @@ export async function PATCH(req: Request) {
         if (updatedCompleted !== undefined) {
           const c = updatedCompleted ? new Date(updatedCompleted) : null;
           if (c?.getTime() !== task.completed_at?.getTime()) {
-            await logHistory(
-              task.id,
-              userId,
-              "completed_at",
-              task.completed_at,
-              c,
-            );
+            await logHistory(task.id, userId, "completed_at", task.completed_at, c, cache);
             updateData.completed_at = c;
             newCompleted = c;
           }
         }
 
         // Recalculate time_spent if both are valid dates, subtracting pauses
-        if (
-          newStarted &&
-          newCompleted &&
-          !isNaN(newStarted.getTime()) &&
-          !isNaN(newCompleted.getTime())
-        ) {
+        if (newStarted && newCompleted && !isNaN(newStarted.getTime()) && !isNaN(newCompleted.getTime())) {
           const existingPauses = await prisma.taskPause.findMany({
             where: { task_id: Number(id) },
+            select: { started_at: true, ended_at: true }
           });
           let totalPauseMs = 0;
           for (const p of existingPauses) {
             if (p.started_at && p.ended_at) {
-              totalPauseMs +=
-                new Date(p.ended_at).getTime() -
-                new Date(p.started_at).getTime();
+              totalPauseMs += new Date(p.ended_at).getTime() - new Date(p.started_at).getTime();
             }
           }
-          const diffMs =
-            newCompleted.getTime() - newStarted.getTime() - totalPauseMs;
-          if (diffMs > 0) {
-            updateData.time_spent = Math.floor(diffMs / 1000);
-          }
+          const diffMs = newCompleted.getTime() - newStarted.getTime() - totalPauseMs;
+          if (diffMs > 0) updateData.time_spent = Math.floor(diffMs / 1000);
         }
       }
 
+      const notifications: any[] = [];
+
       if (data.sector !== undefined) {
-        const sId = await resolveSectorId(data.sector);
+        const sId = await resolveSectorId(data.sector, cache.resolution.sectors);
         if (sId !== task.sector_id) {
-          await logHistory(task.id, userId, "sector_id", task.sector_id, sId);
+          await logHistory(task.id, userId, "sector_id", task.sector_id, sId, cache);
           updateData.sector_id = sId;
         }
       }
 
       if (data.responsible_id !== undefined) {
-        const rId =
-          data.responsible_id && !isNaN(Number(data.responsible_id))
-            ? Number(data.responsible_id)
-            : null;
-
+        const rId = data.responsible_id && !isNaN(Number(data.responsible_id)) ? Number(data.responsible_id) : null;
         if (rId !== task.responsible_id) {
-          await logHistory(
-            task.id,
-            userId,
-            "responsible_id",
-            task.responsible_id,
-            rId,
-          );
+          await logHistory(task.id, userId, "responsible_id", task.responsible_id, rId, cache);
           updateData.responsible_id = rId;
 
-          // Notify the newly assigned responsible
           if (rId) {
-            let changerName = "Alguém";
-            if (userId) {
-              const changer = await prisma.user.findUnique({
-                where: { id: userId },
-              });
-              if (changer) changerName = changer.name;
-            }
-            const ds = new Date().toLocaleDateString();
-            const ts = new Date().toLocaleTimeString().slice(0, 5);
-            await notifyUser(
-              rId,
-              "task_assigned",
-              "Nova Atribuição",
-              `${changerName} atribuiu a tarefa "${task.title}" a você em ${ds} às ${ts}h.`,
-              task.id,
-            );
+            notifications.push({
+              userId: rId,
+              type: "task_assigned",
+              title: "Nova Atribuição",
+              message: (changerName: string) => `${changerName} atribuiu a tarefa "${task.title}" a você em ${new Date().toLocaleDateString()} às ${new Date().toLocaleTimeString().slice(0, 5)}h.`,
+              taskId: task.id
+            });
           }
         }
       }
@@ -1192,22 +1143,12 @@ export async function PATCH(req: Request) {
       if (data.contract !== undefined) {
         const contractName = String(data.contract || "").trim();
         let cId: number | null = null;
-
         if (contractName && contractName !== "Selecione...") {
-          const c = await prisma.contract.findFirst({
-            where: { name: { equals: contractName, mode: "insensitive" } },
-          });
+          const c = await prisma.contract.findFirst({ where: { name: { equals: contractName, mode: "insensitive" } }, select: { id: true } });
           if (c) cId = c.id;
         }
-
         if (cId !== task.contract_id) {
-          await logHistory(
-            task.id,
-            userId,
-            "contract_id",
-            task.contract_id,
-            cId,
-          );
+          await logHistory(task.id, userId, "contract_id", task.contract_id, cId, cache);
           updateData.contract_id = cId;
         }
       }
@@ -1215,16 +1156,12 @@ export async function PATCH(req: Request) {
       if (data.city !== undefined) {
         const cityName = String(data.city || "").trim();
         let cityId: number | null = null;
-
         if (cityName && cityName !== "Selecione...") {
-          const c = await prisma.city.findFirst({
-            where: { name: { equals: cityName, mode: "insensitive" } },
-          });
+          const c = await prisma.city.findFirst({ where: { name: { equals: cityName, mode: "insensitive" } }, select: { id: true } });
           if (c) cityId = c.id;
         }
-
         if (cityId !== task.city_id) {
-          await logHistory(task.id, userId, "city_id", task.city_id, cityId);
+          await logHistory(task.id, userId, "city_id", task.city_id, cityId, cache);
           updateData.city_id = cityId;
         }
       }
@@ -1232,204 +1169,126 @@ export async function PATCH(req: Request) {
       if (data.deadline !== undefined) {
         const d = parseBackendDate(data.deadline);
         const oldD = task.deadline ? new Date(task.deadline) : null;
-
         if (d?.getTime() !== oldD?.getTime()) {
-          await logHistory(task.id, userId, "deadline", task.deadline, d);
+          await logHistory(task.id, userId, "deadline", task.deadline, d, cache);
           updateData.deadline = d;
-        }
-      }
-
-      if (data.started_at !== undefined) {
-        const d = data.started_at ? new Date(data.started_at) : null;
-        const oldD = task.started_at ? new Date(task.started_at) : null;
-        if (d?.getTime() !== oldD?.getTime()) {
-          await logHistory(task.id, userId, "started_at", task.started_at, d);
-          updateData.started_at = d;
-        }
-      }
-
-      if (data.completed_at !== undefined) {
-        const d = data.completed_at ? new Date(data.completed_at) : null;
-        const oldD = task.completed_at ? new Date(task.completed_at) : null;
-        if (d?.getTime() !== oldD?.getTime()) {
-          await logHistory(
-            task.id,
-            userId,
-            "completed_at",
-            task.completed_at,
-            d,
-          );
-          updateData.completed_at = d;
         }
       }
 
       if (data.coworkers !== undefined) {
         updateData.coworkers = {
-          deleteMany: {}, // Clear old assignments
-          create: data.coworkers.map((uid: number) => ({
-            user_id: Number(uid),
-          })),
+          deleteMany: {},
+          create: data.coworkers.map((uid: number) => ({ user_id: Number(uid) })),
         };
-        const currentCoworkers = (task.coworkers || []).map(
-          (c: any) => c.user_id,
-        );
-        const newCoworkers = data.coworkers
-          .map(Number)
-          .filter((uid: number) => !currentCoworkers.includes(uid));
-
-        let updaterName = "Alguém";
-        if (userId) {
-          const updater = await prisma.user.findUnique({
-            where: { id: userId },
-          });
-          if (updater) updaterName = updater.name;
-        }
-
-        const currentResponsibleId =
-          updateData.responsible_id !== undefined
-            ? updateData.responsible_id
-            : task.responsible_id;
-
-        const ds = new Date().toLocaleDateString();
-        const ts = new Date().toLocaleTimeString().slice(0, 5);
+        const currentCoworkers = (task.coworkers || []).map((c: any) => c.user_id);
+        const newCoworkers = data.coworkers.map(Number).filter((uid: number) => !currentCoworkers.includes(uid));
+        const currentResponsibleId = updateData.responsible_id !== undefined ? updateData.responsible_id : task.responsible_id;
 
         for (const uid of newCoworkers) {
-          // Notify only if NOT the main responsible (already notified in that block)
-          // and NOT the person making the change
           if (uid !== currentResponsibleId && uid !== userId) {
-            await notifyUser(
-              uid,
-              "task_assigned",
-              "Nova Atribuição (Equipe)",
-              `${updaterName} adicionou você à equipe da tarefa "${task.title}" em ${ds} às ${ts}h.`,
-              task.id,
-            );
+            notifications.push({
+              userId: uid,
+              type: "task_assigned",
+              title: "Nova Atribuição (Equipe)",
+              message: (changerName: string) => `${changerName} adicionou você à equipe da tarefa "${task.title}" em ${new Date().toLocaleDateString()} às ${new Date().toLocaleTimeString().slice(0, 5)}h.`,
+              taskId: task.id
+            });
           }
         }
       }
 
       await prisma.task.update({ where: { id: Number(id) }, data: updateData });
 
-      // Activity log with before/after details
-      const updaterName = userId
-        ? (
-            await prisma.user.findUnique({
-              where: { id: userId },
-              select: { name: true },
-            })
-          )?.name || "Usuário"
-        : "Sistema";
+      // Response early
+      broadcast("TASK_UPDATED", { taskId: Number(id), userId });
+      const response = NextResponse.json({ message: "Campos atualizados com sucesso" });
 
-      // Build before→after diff for each changed field
-      const FIELD_LABELS: Record<string, string> = {
-        title: "Título",
-        description: "Descrição",
-        priority: "Prioridade",
-        status: "Status",
-        type: "Tipo",
-        sector_id: "Setor",
-        responsible_id: "Responsável",
-        contract_id: "Contrato",
-        city_id: "Cidade",
-        neighborhood: "Bairro",
-        deadline: "Prazo",
-        started_at: "Início",
-        completed_at: "Conclusão",
-        address: "Endereço",
-        latitude: "Latitude",
-        longitude: "Longitude",
+      // Background Work
+      const runFieldsBgWork = async () => {
+        try {
+          const updater = userId ? (await prisma.user.findUnique({ where: { id: userId }, select: { name: true } })) : null;
+          const updaterName = updater?.name || "Usuário";
+
+          // Process complex notifications that need the updater's name
+          if (notifications.length > 0) {
+            const finalNotifications = notifications.map(n => ({
+              user_id: n.userId,
+              type: n.type,
+              title: n.title,
+              message: typeof n.message === "function" ? n.message(updaterName) : n.message,
+              task_id: n.taskId
+            }));
+            await prisma.notification.createMany({ data: finalNotifications });
+            broadcast("NOTIFICATIONS_UPDATED", {});
+          }
+
+          // Build before→after diff for logActivity
+          const FIELD_LABELS: Record<string, string> = {
+            title: "Título", description: "Descrição", priority: "Prioridade", status: "Status", type: "Tipo",
+            sector_id: "Setor", responsible_id: "Responsável", contract_id: "Contrato", city_id: "Cidade",
+            deadline: "Prazo", started_at: "Início", completed_at: "Conclusão", address: "Endereço"
+          };
+
+          const diffParts: string[] = [];
+          for (const key of Object.keys(updateData)) {
+            if (key === "updated_at" || key === "time_spent" || key === "paused_at" || key === "coworkers") continue;
+            const label = FIELD_LABELS[key] || key;
+            
+            // Re-resolve using the cache from logHistory
+            let oldValRaw = (task as any)[key];
+            let newValRaw = (updateData as any)[key];
+
+            const format = (v: any) => {
+              if (v instanceof Date) return v.toLocaleDateString("pt-BR");
+              return v ?? "vazio";
+            };
+
+            const resolveForLogs = async (val: any) => {
+              if (key === "sector_id") {
+                if (!val) return "vazio";
+                if (cache.sectors[val]) return cache.sectors[val];
+                const s = await prisma.sector.findUnique({ where: { id: val }, select: { name: true } });
+                if (s) cache.sectors[val] = s.name;
+                return s?.name || val;
+              }
+              if (key === "responsible_id") {
+                if (!val) return "vazio";
+                if (cache.users[val]) return cache.users[val];
+                const u = await prisma.user.findUnique({ where: { id: val }, select: { name: true } });
+                if (u) cache.users[val] = u.name;
+                return u?.name || val;
+              }
+              if (key === "contract_id") {
+                if (!val) return "vazio";
+                if (cache.contracts[val]) return cache.contracts[val];
+                const c = await prisma.contract.findUnique({ where: { id: val }, select: { name: true } });
+                if (c) cache.contracts[val] = c.name;
+                return c?.name || val;
+              }
+              if (key === "city_id") {
+                if (!val) return "vazio";
+                if (cache.cities[val]) return cache.cities[val];
+                const c = await prisma.city.findUnique({ where: { id: val }, select: { name: true } });
+                if (c) cache.cities[val] = c.name;
+                return c?.name || val;
+              }
+              return format(val);
+            };
+
+            const oldVal = await resolveForLogs(oldValRaw);
+            const newVal = await resolveForLogs(newValRaw);
+            if (oldVal !== newVal) diffParts.push(`${label}: "${oldVal}" → "${newVal}"`);
+          }
+
+          const diffStr = diffParts.length > 0 ? diffParts.join(" | ") : "campos editados";
+          logActivity(userId, updaterName, "task_updated", "task", task.id, `"${task.title}" — ${diffStr}`);
+        } catch (err) {
+          console.error("Error in fields update background work:", err);
+        }
       };
 
-      const diffParts: string[] = [];
-      for (const key of Object.keys(updateData)) {
-        if (key === "updated_at" || key === "time_spent" || key === "paused_at")
-          continue;
-        const label = FIELD_LABELS[key] || key;
-        let oldVal: any = (task as any)[key];
-        let newVal: any = (updateData as any)[key];
-
-        // Resolve IDs to names for readability
-        if (key === "sector_id") {
-          if (oldVal) {
-            const s = await prisma.sector.findUnique({
-              where: { id: oldVal },
-              select: { name: true },
-            });
-            oldVal = s?.name || oldVal;
-          }
-          if (newVal) {
-            const s = await prisma.sector.findUnique({
-              where: { id: newVal },
-              select: { name: true },
-            });
-            newVal = s?.name || newVal;
-          }
-        } else if (key === "responsible_id") {
-          if (oldVal) {
-            const u = await prisma.user.findUnique({
-              where: { id: oldVal },
-              select: { name: true },
-            });
-            oldVal = u?.name || oldVal;
-          }
-          if (newVal) {
-            const u = await prisma.user.findUnique({
-              where: { id: newVal },
-              select: { name: true },
-            });
-            newVal = u?.name || newVal;
-          }
-        } else if (key === "contract_id") {
-          if (oldVal) {
-            const c = await prisma.contract.findUnique({
-              where: { id: oldVal },
-              select: { name: true },
-            });
-            oldVal = c?.name || oldVal;
-          }
-          if (newVal) {
-            const c = await prisma.contract.findUnique({
-              where: { id: newVal },
-              select: { name: true },
-            });
-            newVal = c?.name || newVal;
-          }
-        } else if (key === "city_id") {
-          if (oldVal) {
-            const c = await prisma.city.findUnique({
-              where: { id: oldVal },
-              select: { name: true },
-            });
-            oldVal = c?.name || oldVal;
-          }
-          if (newVal) {
-            const c = await prisma.city.findUnique({
-              where: { id: newVal },
-              select: { name: true },
-            });
-            newVal = c?.name || newVal;
-          }
-        }
-
-        // Format dates
-        if (oldVal instanceof Date) oldVal = oldVal.toLocaleDateString("pt-BR");
-        if (newVal instanceof Date) newVal = newVal.toLocaleDateString("pt-BR");
-
-        const from = oldVal ?? "vazio";
-        const to = newVal ?? "vazio";
-        diffParts.push(`${label}: "${from}" → "${to}"`);
-      }
-
-      const diffStr =
-        diffParts.length > 0 ? diffParts.join(" | ") : "campos editados";
-      logActivity(
-        userId,
-        updaterName,
-        "task_updated",
-        "task",
-        task.id,
-        `"${task.title}" — ${diffStr}`,
-      );
+      runFieldsBgWork();
+      return response;
     } else if (action === "manage_pauses") {
       // Manage retroactive pauses — receives array of {started_at, ended_at}
       // Also optionally accepts started_at / completed_at to update dates in same request
