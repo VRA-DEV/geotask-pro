@@ -176,7 +176,7 @@ export default function DashboardPage({
   const { data: stats, isLoading: statsLoading } = useSWR(
     `/api/dashboard/stats?team_id=${team || ""}&sector_id=${fSector.join(",")}`,
     (url) => authFetch(url).then((res) => res.json()),
-    { refreshInterval: 10000 }
+    { revalidateOnFocus: true, dedupingInterval: 10000 }
   );
 
   const cityNeighborhoods = fCity ? citiesNeighborhoods[fCity] || [] : [];

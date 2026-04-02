@@ -2,19 +2,24 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "bonini-erp",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["next", "dev", "-H", "0.0.0.0"],
+      "cwd": "bonini_erp",
+      "port": 3002
+    },
+    {
       "name": "geotask-pro",
-      "runtimeExecutable": "node",
-      "runtimeArgs": ["node_modules/next/dist/bin/next", "dev"],
-      "port": 3000,
-      "autoPort": true
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["next", "dev"],
+      "port": 3000
     },
     {
       "name": "geotask-v2",
-      "runtimeExecutable": "node",
-      "runtimeArgs": ["node_modules/next/dist/bin/next", "dev"],
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["next", "dev"],
       "cwd": "geotask-pro-v2",
-      "port": 3000,
-      "autoPort": true
+      "port": 3001
     }
   ]
 }

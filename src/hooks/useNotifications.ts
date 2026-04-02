@@ -6,7 +6,6 @@ export function useNotifications(userId: number | null) {
     userId ? `/api/notifications?user_id=${userId}` : null,
     authFetcher,
     {
-      refreshInterval: 30000,
       revalidateOnFocus: true,
       dedupingInterval: 10000,
     },
