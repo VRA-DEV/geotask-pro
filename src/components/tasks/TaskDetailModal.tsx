@@ -4,6 +4,7 @@ import { getPermissions } from "@/lib/permissions";
 import { CheckCircle, Eye, Pause, Play, X, Send, Paperclip, FileText, Image, Trash2, Upload, Download, Plus, Clock, RotateCcw, Calendar, Check } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TeamSelectionModal from "./TeamSelectionModal";
+import ConfirmPasswordModal from "../shared/ConfirmPasswordModal";
 
 import { DatePicker } from "@/app/components/DatePicker";
 import { STATUS_COLOR } from "@/lib/constants";
@@ -163,6 +164,31 @@ export default function TaskDetailModal({
   const [loadingAttachments, setLoadingAttachments] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Deletion State
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingTask, setDeletingTask] = useState(false);
+
+  const handleDeleteTask = async (password: string) => {
+    setDeletingTask(true);
+    try {
+      const res = await authFetch(`/api/tasks?id=${t.id}&admin_id=${user.id}&password=${encodeURIComponent(password)}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || "Erro ao excluir tarefa. Verifique sua senha.");
+      } else {
+        setShowDeleteModal(false);
+        onClose();
+        if (onUpdate) await onUpdate(t.id, "refresh", {});
+      }
+    } catch (err) {
+      alert("Erro ao conectar ao servidor.");
+    } finally {
+      setDeletingTask(false);
+    }
+  };
 
   // Timing/Pauses State
   const [showTimingModal, setShowTimingModal] = useState(false);
@@ -919,15 +945,38 @@ export default function TaskDetailModal({
                   )}
                 </div>
 
-              <div className="col-span-full pt-2.5">
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="w-full p-3 bg-primary text-white border-none rounded-[10px] text-[13px] font-semibold cursor-pointer disabled:opacity-70"
-                >
-                  {saving ? "Salvando..." : "Salvar Alterações"}
-                </button>
+              <div className="col-span-full pt-2.5 flex gap-2">
+                {canEdit("status") && (
+                  <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="flex-1 p-3 bg-primary text-white border-none rounded-[10px] text-[13px] font-semibold cursor-pointer disabled:opacity-70"
+                  >
+                    {saving ? "Salvando..." : "Salvar Alterações"}
+                  </button>
+                )}
+
+                {user.role?.name === "Admin" && (
+                  <button
+                    onClick={() => setShowDeleteModal(true)}
+                    className="p-3 bg-red-500/10 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/50 rounded-[10px] text-[13px] font-semibold cursor-pointer hover:bg-red-500/20 transition-colors"
+                    title="Excluir tarefa definitivamente"
+                  >
+                    Excluir
+                  </button>
+                )}
               </div>
+
+              {showDeleteModal && (
+                <ConfirmPasswordModal
+                  isOpen={showDeleteModal}
+                  onClose={() => setShowDeleteModal(false)}
+                  onConfirm={handleDeleteTask}
+                  isLoading={deletingTask}
+                  title="Excluir Tarefa"
+                  description={`Tem certeza que deseja excluir DEFINITIVAMENTE a tarefa "${t.title}"? Esta ação não pode ser desfeita.`}
+                />
+              )}
             </div>
           )}
 

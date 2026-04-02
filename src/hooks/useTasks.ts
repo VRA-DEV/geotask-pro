@@ -56,12 +56,35 @@ export function useTasks(opts: UseTasksOptions = {}) {
   const tasks: Task[] = Array.isArray(data) ? data : data?.data || [];
   const pagination = data?.pagination || null;
 
+  /**
+   * Optimistically update a task in the local cache.
+   * Useful for status changes, field edits, etc.
+   */
+  const optimisticUpdateTask = async (taskId: number, partialData: Partial<Task>, updateFn: () => Promise<any>) => {
+    const currentTasks = [...tasks];
+    const newTasks = currentTasks.map(t => t.id === taskId ? { ...t, ...partialData } : t);
+
+    // If data is paginated, we need to preserve that structure
+    const optimisticData = Array.isArray(data) 
+      ? newTasks 
+      : { ...data, data: newTasks };
+
+    return mutate(updateFn(), {
+      optimisticData,
+      rollbackOnError: true,
+      populateCache: true,
+      revalidate: true,
+    });
+  };
+
   return {
     tasks,
     pagination,
     isLoading,
     error,
     mutate,
+    data, // Added raw data
+    optimisticUpdateTask,
     refresh: () => mutate(),
   };
 }

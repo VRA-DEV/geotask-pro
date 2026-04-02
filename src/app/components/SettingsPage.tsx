@@ -14,6 +14,7 @@ import {
   Users,
   Upload,
   Save,
+  X,
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useSWRConfig } from "swr";
@@ -26,6 +27,7 @@ import { TeamModal } from "./TeamModal";
 import { ManageTeamMembersModal } from "./ManageTeamMembersModal";
 import { Search, ChevronDown, ChevronRight, Copy } from "lucide-react";
 import { authFetch } from "@/lib/authFetch";
+import ConfirmPasswordModal from "../../components/shared/ConfirmPasswordModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -179,6 +181,10 @@ export function SettingsPage({
   const [showTeamModal, setShowTeamModal] = useState(false);
   const [editingTeam, setEditingTeam] = useState<any | null>(null);
 
+  const [showPermanentDeleteModal, setShowPermanentDeleteModal] = useState(false);
+  const [permanentDeleteUserId, setPermanentDeleteUserId] = useState<number | null>(null);
+  const [isDeletingUser, setIsDeletingUser] = useState(false);
+
   const [pendingPermissions, setPendingPermissions] = useState<{
     [roleId: number]: RolePermissions;
   }>({});
@@ -271,6 +277,30 @@ export function SettingsPage({
       else alert("Erro ao desativar usuário");
     } catch {
       alert("Erro ao desativar usuário");
+    }
+  };
+
+  const handlePermanentDeleteUser = async (password: string) => {
+    if (!permanentDeleteUserId) return;
+    setIsDeletingUser(true);
+    try {
+      const res = await authFetch(
+        `/api/users?id=${permanentDeleteUserId}&admin_id=${currentUser?.id}&password=${encodeURIComponent(password)}&permanent=true`,
+        { method: "DELETE" }
+      );
+      if (res.ok) {
+        setShowPermanentDeleteModal(false);
+        setPermanentDeleteUserId(null);
+        fetchData();
+        mutate("/api/lookups");
+      } else {
+        const data = await res.json();
+        alert(data.error || "Erro ao excluir usuário definitivamente.");
+      }
+    } catch {
+      alert("Erro ao conectar ao servidor.");
+    } finally {
+      setIsDeletingUser(false);
     }
   };
 
@@ -895,6 +925,20 @@ export function SettingsPage({
                         className="bg-slate-100 dark:bg-gray-700 border-none rounded-md p-[5px] cursor-pointer"
                       >
                         <UserCheck size={12} color="#10b981" />
+                      </button>
+                    )}
+
+                    {/* Permanent Delete */}
+                    {isAdmin && (
+                      <button
+                        title="Excluir DEFINITIVAMENTE"
+                        onClick={() => {
+                          setPermanentDeleteUserId(u.id);
+                          setShowPermanentDeleteModal(true);
+                        }}
+                        className="bg-red-600 border-none rounded-md p-[5px] cursor-pointer hover:bg-red-700 transition-colors"
+                      >
+                        <X size={12} color="#ffffff" />
                       </button>
                     )}
                   </div>
@@ -1550,6 +1594,20 @@ export function SettingsPage({
           }}
           team={managingTeam}
           T={T}
+        />
+      )}
+      {/* Permanent User Delete Modal */}
+      {showPermanentDeleteModal && (
+        <ConfirmPasswordModal
+          isOpen={showPermanentDeleteModal}
+          onClose={() => {
+            setShowPermanentDeleteModal(false);
+            setPermanentDeleteUserId(null);
+          }}
+          onConfirm={handlePermanentDeleteUser}
+          isLoading={isDeletingUser}
+          title="Excluir Usuário Definitivamente"
+          description={`Atenção: Você está prestes a excluir permanentemente este usuário e todas as suas associações. Esta ação NÃO pode ser desfeita.`}
         />
       )}
     </div>

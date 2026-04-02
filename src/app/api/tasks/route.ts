@@ -1530,34 +1530,61 @@ export async function PATCH(req: Request) {
 // DELETE /api/tasks
 export async function DELETE(req: Request) {
   try {
-    const id = new URL(req.url).searchParams.get("id");
-    const delUserId = new URL(req.url).searchParams.get("user_id");
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+    const adminId = searchParams.get("admin_id"); // User making the deletion request
+    const password = searchParams.get("password"); // Password of the admin
+
     if (!id)
       return NextResponse.json({ error: "ID obrigatório" }, { status: 400 });
+
+    if (!adminId || !password) {
+      return NextResponse.json({ error: "Permissão e senha são obrigatórias para exclusão." }, { status: 401 });
+    }
+
+    // Verify Admin permission and Password
+    const adminUser = await prisma.user.findUnique({
+      where: { id: Number(adminId) },
+      include: { Role: true },
+    });
+
+    if (!adminUser || adminUser.Role.name !== "Admin") {
+      return NextResponse.json({ error: "Apenas administradores podem excluir tarefas." }, { status: 403 });
+    }
+
+    const bcrypt = require("bcryptjs");
+    const passwordValid = await (adminUser.password_hash.startsWith("$2") 
+      ? bcrypt.compare(password, adminUser.password_hash) 
+      : adminUser.password_hash === password);
+
+    if (!passwordValid) {
+      return NextResponse.json({ error: "Senha incorreta." }, { status: 401 });
+    }
+
     const taskToDelete = await prisma.task.findUnique({
       where: { id: Number(id) },
       select: { title: true },
     });
-    await prisma.task.delete({ where: { id: Number(id) } });
 
-    if (delUserId) {
-      const delUser = await prisma.user.findUnique({
-        where: { id: Number(delUserId) },
-        select: { name: true },
-      });
-      logActivity(
-        Number(delUserId),
-        delUser?.name || "Usuário",
-        "task_deleted",
-        "task",
-        Number(id),
-        `Removeu a tarefa "${taskToDelete?.title || id}"`,
-      );
+    if (!taskToDelete) {
+      return NextResponse.json({ error: "Tarefa não encontrada" }, { status: 404 });
     }
 
-    broadcast("TASK_DELETED", { taskId: Number(id), userId: delUserId });
-    return NextResponse.json({ message: "Tarefa removida" });
+    await prisma.task.delete({ where: { id: Number(id) } });
+
+    logActivity(
+      Number(adminId),
+      adminUser.name,
+      "task_deleted",
+      "task",
+      Number(id),
+      `Excluiu definitivamente a tarefa "${taskToDelete.title}"`,
+    );
+
+    broadcast("TASK_DELETED", { taskId: Number(id), userId: adminId });
+    return NextResponse.json({ message: "Tarefa removida com sucesso" });
   } catch (error) {
+    console.error("Erro ao remover tarefa:", error);
     return NextResponse.json(
       { error: "Erro ao remover tarefa" },
       { status: 500 },

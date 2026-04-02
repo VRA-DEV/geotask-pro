@@ -1,3 +1,4 @@
+import { logActivity } from "@/lib/activityLog";
 import prisma from "@/lib/prisma";
 import { createUserSchema, updateUserSchema } from "@/lib/validators/user";
 import bcrypt from "bcryptjs";
@@ -189,22 +190,77 @@ export async function PATCH(req: Request) {
   }
 }
 
-// DELETE /api/users — soft delete
+// DELETE /api/users — soft or permanent delete
 export async function DELETE(req: Request) {
   try {
-    const id = new URL(req.url).searchParams.get("id");
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get("id");
+    const adminId = searchParams.get("admin_id");
+    const password = searchParams.get("password");
+    const permanent = searchParams.get("permanent") === "true";
+
     if (!id)
       return NextResponse.json({ error: "ID obrigatório" }, { status: 400 });
 
-    await prisma.user.update({
-      where: { id: Number(id) },
-      data: { active: false },
-    });
+    const targetUserId = Number(id);
 
-    return NextResponse.json({ message: "Usuário desativado" });
+    if (permanent) {
+      if (!adminId || !password) {
+        return NextResponse.json({ error: "Permissão e senha são obrigatórias para exclusão definitiva." }, { status: 401 });
+      }
+
+      // Verify Admin
+      const adminUser = await prisma.user.findUnique({
+        where: { id: Number(adminId) },
+        include: { Role: true },
+      });
+
+      if (!adminUser || adminUser.Role.name !== "Admin") {
+        return NextResponse.json({ error: "Apenas administradores podem excluir usuários definitivamente." }, { status: 403 });
+      }
+
+      const passwordValid = await (adminUser.password_hash.startsWith("$2")
+        ? bcrypt.compare(password, adminUser.password_hash)
+        : adminUser.password_hash === password);
+
+      if (!passwordValid) {
+        return NextResponse.json({ error: "Senha incorreta." }, { status: 401 });
+      }
+
+      const userToDelete = await prisma.user.findUnique({
+        where: { id: targetUserId },
+        select: { name: true },
+      });
+
+      if (!userToDelete) {
+        return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 });
+      }
+
+      // Permanent Delete
+      await prisma.user.delete({ where: { id: targetUserId } });
+
+      logActivity(
+        Number(adminId),
+        adminUser.name,
+        "user_deleted_permanent",
+        "user",
+        targetUserId,
+        `Excluiu definitivamente o usuário "${userToDelete.name}"`,
+      );
+
+      return NextResponse.json({ message: "Usuário removido definitivamente" });
+    } else {
+      // Soft Delete (Existing logic)
+      await prisma.user.update({
+        where: { id: targetUserId },
+        data: { active: false },
+      });
+      return NextResponse.json({ message: "Usuário desativado" });
+    }
   } catch (error) {
+    console.error("Erro ao deletar usuário:", error);
     return NextResponse.json(
-      { error: "Erro ao desativar usuário" },
+      { error: "Erro ao processar exclusão" },
       { status: 500 },
     );
   }

@@ -148,14 +148,25 @@ export default function GeoTask() {
 
   // ── SWR hooks (cached data fetching) ────────────────────────────────
   const { mutate: globalMutate } = useSWRConfig();
-  const { tasks: dashboardTasksRaw, mutate: mutateDashboardTasks } = useTasks({
+  const { 
+    tasks: dashboardTasksRaw, 
+    mutate: mutateDashboardTasks,
+    optimisticUpdateTask: optimisticUpdateDashboard,
+    data: dashboardDataRaw,
+  } = useTasks({
     teamId: dTeam ? Number(dTeam) : undefined,
     createdById: dCreatedByMe ? user?.id : undefined,
     summary: true,
     sortField: dSortField || undefined,
     sortOrder: dSortOrder || undefined,
   });
-  const { tasks: tasksHubTasksRaw, mutate: mutateTasksHub } = useTasks({
+
+  const { 
+    tasks: tasksHubTasksRaw, 
+    mutate: mutateTasksHub,
+    optimisticUpdateTask: optimisticUpdateTasksHub,
+    data: tasksHubDataRaw,
+  } = useTasks({
     teamId: fTeam ? Number(fTeam) : undefined,
     createdById: fCreatedByMe ? user?.id : undefined,
     search: fSearch,
@@ -250,19 +261,40 @@ export default function GeoTask() {
 
   // ── Task actions ────────────────────────────────────────────────────
   const handleCreateTask = async (newTask: any) => {
+    // Optimistic UI for creation
+    const tempId = Date.now() * -1; // Temporary negative ID
+    const optimisticTask = { 
+      ...newTask, 
+      id: tempId, 
+      created_at: new Date().toISOString(),
+      status: newTask.status || "A Fazer",
+      created_by_id: user?.id,
+      created_by: user,
+    };
+
     try {
-      // Fechar modal instantaneamente
       setShowNewTask(false);
 
-      const resp = await authFetch("/api/tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...newTask, created_by: user?.id }),
+      const updateFn = async () => {
+        const resp = await authFetch("/api/tasks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...newTask, created_by: user?.id }),
+        });
+        if (!resp.ok) throw new Error("Erro ao criar tarefa");
+        return resp.json();
+      };
+
+      // We can't use optimisticUpdateTask easily for NEW items since they don't exist yet, 
+      // but we can manually mutate the cache
+      mutateTasksHub(updateFn(), {
+        optimisticData: Array.isArray(tasksHubDataRaw) 
+          ? [optimisticTask, ...(tasksHubDataRaw as any[])] 
+          : { ...tasksHubDataRaw, data: [optimisticTask, ...((tasksHubDataRaw as any)?.data || [])] },
+        rollbackOnError: true,
       });
-      if (resp.ok) {
-        // Revalidar em paralelo
-        await Promise.all([mutateDashboardTasks(), mutateTasksHub()]);
-      } else alert("Erro ao criar tarefa");
+      
+      mutateDashboardTasks(); // Soft refresh for dashboard
     } catch (err) {
       console.error(err);
       alert("Erro ao criar tarefa");
@@ -279,18 +311,39 @@ export default function GeoTask() {
         await Promise.all([mutateDashboardTasks(), mutateTasksHub()]);
         return;
       }
-      const resp = await authFetch("/api/tasks", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, action, user_id: user?.id, ...data }),
-      });
-      if (resp.ok) {
-        // Revalidar em paralelo
-        Promise.all([mutateDashboardTasks(), mutateTasksHub()]);
-        setSelectedTask(null);
+
+      const updateFn = async () => {
+        const resp = await authFetch("/api/tasks", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, action, user_id: user?.id, ...data }),
+        });
+        if (!resp.ok) {
+          const errData = await resp.json().catch(() => ({}));
+          throw new Error(errData.error || "Erro ao atualizar");
+        }
+        return resp.json();
+      };
+
+      if (action === "update_status" || action === "update_fields") {
+        const partial = action === "update_status" ? { status: data.status } : data;
+        
+        // Apply to both hooks
+        optimisticUpdateTasksHub(id, partial, updateFn);
+        optimisticUpdateDashboard(id, partial, () => Promise.resolve());
+        
+        if (action === "update_status") {
+          setSelectedTask(null);
+        }
+      } else {
+        const resp = await updateFn();
+        if (resp) {
+          await Promise.all([mutateDashboardTasks(), mutateTasksHub()]);
+        }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      alert(err.message || "Erro ao atualizar tarefa");
     }
   };
 
