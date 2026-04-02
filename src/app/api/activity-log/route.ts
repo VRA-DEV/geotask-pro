@@ -1,7 +1,5 @@
-import { PrismaClient } from "@prisma/client";
+import prisma from "@/lib/prisma";
 import { NextResponse } from "next/server";
-
-const prisma = new PrismaClient();
 
 // GET /api/activity-log — Fetch logs with filters, pagination & summary
 export async function GET(req: Request) {

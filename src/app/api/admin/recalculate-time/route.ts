@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import prisma from "@/lib/prisma";
 
 /**
  * GET /api/admin/recalculate-time
@@ -37,15 +35,23 @@ export async function GET(req: Request) {
     const results: any[] = [];
     let updatedCount = 0;
 
+    // Batch: fetch all status history at once
+    const allHistory = await prisma.taskHistory.findMany({
+      where: {
+        task_id: { in: tasks.map((t) => t.id) },
+        field: "status",
+      },
+      orderBy: { created_at: "asc" },
+    });
+    const historyByTask = new Map<number, typeof allHistory>();
+    allHistory.forEach((h) => {
+      const list = historyByTask.get(h.task_id) || [];
+      list.push(h);
+      historyByTask.set(h.task_id, list);
+    });
+
     for (const task of tasks) {
-      // Fetch status history for this task
-      const history = await prisma.taskHistory.findMany({
-        where: {
-          task_id: task.id,
-          field: "status",
-        },
-        orderBy: { created_at: "asc" },
-      });
+      const history = historyByTask.get(task.id) || [];
 
       let totalElapsedMs = 0;
       let lastInProgressStart: Date | null = null;

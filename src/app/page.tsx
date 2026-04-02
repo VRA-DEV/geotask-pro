@@ -251,15 +251,17 @@ export default function GeoTask() {
   // ── Task actions ────────────────────────────────────────────────────
   const handleCreateTask = async (newTask: any) => {
     try {
+      // Fechar modal instantaneamente
+      setShowNewTask(false);
+
       const resp = await authFetch("/api/tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...newTask, created_by: user?.id }),
       });
       if (resp.ok) {
-        await mutateDashboardTasks();
-        await mutateTasksHub();
-        setShowNewTask(false);
+        // Revalidar em paralelo
+        await Promise.all([mutateDashboardTasks(), mutateTasksHub()]);
       } else alert("Erro ao criar tarefa");
     } catch (err) {
       console.error(err);
@@ -274,8 +276,7 @@ export default function GeoTask() {
   ) => {
     try {
       if (action === "refresh") {
-        await mutateDashboardTasks();
-        await mutateTasksHub();
+        await Promise.all([mutateDashboardTasks(), mutateTasksHub()]);
         return;
       }
       const resp = await authFetch("/api/tasks", {
@@ -284,8 +285,8 @@ export default function GeoTask() {
         body: JSON.stringify({ id, action, user_id: user?.id, ...data }),
       });
       if (resp.ok) {
-        await mutateDashboardTasks();
-        await mutateTasksHub();
+        // Revalidar em paralelo
+        Promise.all([mutateDashboardTasks(), mutateTasksHub()]);
         setSelectedTask(null);
       }
     } catch (err) {

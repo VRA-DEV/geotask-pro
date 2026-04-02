@@ -69,7 +69,8 @@
       "Bash(findstr \":3000 \")",
       "Bash(where npx.cmd)",
       "Bash(where npx:*)",
-      "Bash(node scripts/generate-doc.cjs)"
+      "Bash(node scripts/generate-doc.cjs)",
+      "Bash(npm uninstall:*)"
     ]
   }
 }

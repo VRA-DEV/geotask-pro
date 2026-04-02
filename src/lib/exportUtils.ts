@@ -1,11 +1,12 @@
 import { Task } from "@/types";
-import * as ExcelJS from "exceljs";
-import { saveAs } from "file-saver";
 import type jsPDF from "jspdf";
+import type * as ExcelJSTypes from "exceljs";
 
 // Lazy-loaded to avoid 1MB+ upfront bundle cost
 const getJsPDF = () => import("jspdf").then((m) => m.default);
 const getAutoTable = () => import("jspdf-autotable").then((m) => m.default);
+const getExcelJS = () => import("exceljs");
+const getFileSaver = () => import("file-saver").then((m) => m.saveAs);
 
 // ─── Company Info ────────────────────────────────────────────────────────────
 const COMPANY = {
@@ -629,7 +630,7 @@ const drawTimeline = (
 };
 
 // ─── EXCEL STYLING HELPERS ───────────────────────────────────────────────────
-const applyHeaderStyle = (cell: ExcelJS.Cell) => {
+const applyHeaderStyle = (cell: ExcelJSTypes.Cell) => {
   cell.fill = {
     type: "pattern",
     pattern: "solid",
@@ -645,7 +646,7 @@ const applyHeaderStyle = (cell: ExcelJS.Cell) => {
   };
 };
 
-const applyBodyStyle = (cell: ExcelJS.Cell, isItalic = true) => {
+const applyBodyStyle = (cell: ExcelJSTypes.Cell, isItalic = true) => {
   cell.font = { ...FONTS.body, italic: isItalic };
   cell.alignment = { vertical: "middle", horizontal: "left", wrapText: true };
   cell.border = {
@@ -656,7 +657,7 @@ const applyBodyStyle = (cell: ExcelJS.Cell, isItalic = true) => {
   };
 };
 
-const autoWidth = (ws: ExcelJS.Worksheet) => {
+const autoWidth = (ws: ExcelJSTypes.Worksheet) => {
   ws.columns.forEach((column: any) => {
     let maxLen = 0;
     column.eachCell!({ includeEmpty: true }, (cell: any) => {
@@ -675,6 +676,7 @@ export const exportToExcel = async (
   filterLabel?: string,
   sourcePage?: "dashboard" | "kanban" | "cronograma" | "lista",
 ) => {
+  const ExcelJS = await getExcelJS();
   const wb = new ExcelJS.Workbook();
 
   // Tentar carregar o modelo do arquivo público para preservar formatação/logo
@@ -938,6 +940,7 @@ export const exportToExcel = async (
   // Finalização e Download
   const buffer = await wb.xlsx.writeBuffer();
   const fileName = `relatorio_geotask_${new Date().toISOString().split("T")[0]}.xlsx`;
+  const saveAs = await getFileSaver();
   saveAs(new Blob([buffer]), fileName);
 
   // Activity Log (fire-and-forget)

@@ -3,8 +3,6 @@
 import { authFetch } from "@/lib/authFetch";
 import React, { useState } from "react";
 import { X, Upload, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
-import * as XLSX from "xlsx";
-
 interface ImportUsersModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -30,9 +28,10 @@ export const ImportUsersModal: React.FC<ImportUsersModalProps> = ({
     if (f) {
       setFile(f);
       const reader = new FileReader();
-      reader.onload = (evt) => {
+      reader.onload = async (evt) => {
         try {
           const bstr = evt.target?.result;
+          const XLSX = await import("xlsx");
           const wb = XLSX.read(bstr, { type: "binary" });
           const wsname = wb.SheetNames[0];
           const ws = wb.Sheets[wsname];
