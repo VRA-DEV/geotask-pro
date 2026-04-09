@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   Settings,
   List,
+  Trophy,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
@@ -78,6 +79,9 @@ const TaskDetailModal = dynamic(
   () => import("@/components/tasks/TaskDetailModal"),
 );
 const NewTaskModal = dynamic(() => import("@/components/tasks/NewTaskModal"));
+const GamingPage = dynamic(() => import("@/components/gaming/GamingPage"), {
+  loading: () => <PageLoader />,
+});
 
 // ── MAIN APP ──────────────────────────────────────────────────────────
 export default function GeoTask() {
@@ -472,6 +476,7 @@ export default function GeoTask() {
     { id: "tasks", label: "Minhas Tarefas", icon: Layers },
     { id: "notifications", label: "Notificações", icon: Bell },
     { id: "templates", label: "Templates", icon: FileText },
+    { id: "gaming", label: "Gaming e Metas", icon: Trophy },
     { id: "activity_log", label: "Log de Atividades", icon: ClipboardList },
     { id: "settings", label: "Configurações", icon: Settings },
   ].filter(({ id }) => {
@@ -693,6 +698,10 @@ export default function GeoTask() {
 
           {page === "activity_log" && canAccess("activity_log") && (
             <ActivityLogPage T={T} user={user} users={dbUsers} />
+          )}
+
+          {page === "gaming" && canAccess("gaming") && (
+            <GamingPage T={T} user={user} users={dbUsers} sectors={dbSectors} />
           )}
         </div>
       </div>

@@ -9,6 +9,7 @@ export interface AppPermissions {
     list: boolean;
     templates: boolean;
     activity_log: boolean;
+    gaming: boolean;
     settings: boolean;
     view_all_templates: boolean;
   };
@@ -49,7 +50,7 @@ export const getPermissions = (user?: User | null): AppPermissions => {
   const defaultPerms: AppPermissions = {
     pages: {
       dashboard: false, kanban: false, cronograma: false, mindmap: false,
-      list: true, templates: false, activity_log: false, settings: false,
+      list: true, templates: false, activity_log: false, gaming: true, settings: false,
       view_all_templates: false,
     },
     tasks: {
@@ -99,6 +100,7 @@ export const getPermissions = (user?: User | null): AppPermissions => {
   p.pages.dashboard = !isLiderado;
   p.pages.templates = !isLiderado && !isSocio;
   p.pages.activity_log = isAdmin || isGerente || isGM;
+  p.pages.gaming = true;
   p.pages.settings = isAdmin || isGerente || isCoordSetores || isGestor;
   p.pages.view_all_templates = isAdmin || isGerente || isCoordPolo || isCoordSetores || isDiretor || isGM;
 

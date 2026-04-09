@@ -1550,6 +1550,7 @@ export function SettingsPage({
         roles={roles}
         sectors={sectors}
         teams={teams}
+        users={users}
         T={T}
       />
 

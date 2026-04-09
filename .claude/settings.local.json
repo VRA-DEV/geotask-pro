@@ -70,7 +70,9 @@
       "Bash(where npx.cmd)",
       "Bash(where npx:*)",
       "Bash(node scripts/generate-doc.cjs)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(node -e \"try { require\\(''docx''\\); console.log\\(''docx installed''\\); } catch\\(e\\) { console.log\\(''docx not found''\\); }\")",
+      "Bash(node scripts/generate-manual.js)"
     ]
   }
 }

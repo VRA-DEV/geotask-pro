@@ -322,7 +322,15 @@ model User {
   Team                                    Team?             @relation(fields: [team_id], references: [id])
   user_sectors                            UserSector[]
 
+  manager_id                              Int?
+  manager                                 User?             @relation("UserSubordinates", fields: [manager_id], references: [id])
+  subordinates                            User[]            @relation("UserSubordinates")
+  gamings                                 Gaming[]          @relation("GamingUser")
+  gamings_evaluated                       Gaming[]          @relation("GamingEvaluator")
+  gaming_histories                        GamingHistory[]
+
   @@index([team_id])
+  @@index([manager_id])
 }
 
 model UserSector {
@@ -336,4 +344,65 @@ model UserSector {
   @@unique([user_id, sector_id])
   @@index([sector_id])
   @@index([user_id])
+}
+
+model Gaming {
+  id             Int              @id @default(autoincrement())
+  user_id        Int
+  evaluator_id   Int?             
+  cycle_type     String           // "Mensal", "Trimestral", etc
+  cycle_name     String           // Identificador do marco temporal (ex: Jan-2026)
+  status         String           @default("DRAFT") // DRAFT, CLOSED
+  created_at     DateTime         @default(now())
+  updated_at     DateTime         @updatedAt
+  closed_at      DateTime?
+
+  user           User             @relation("GamingUser", fields: [user_id], references: [id], onDelete: Cascade)
+  evaluator      User?            @relation("GamingEvaluator", fields: [evaluator_id], references: [id], onDelete: SetNull)
+  items          GamingItem[]
+  history        GamingHistory[]
+  snapshots      GamingSnapshot[] 
+
+  @@index([user_id])
+  @@index([evaluator_id])
+  @@index([status])
+}
+
+model GamingItem {
+  id             Int       @id @default(autoincrement())
+  gaming_id      Int
+  description    String
+  weight         Float     
+  target         Float     
+  achieved       Float?    
+
+  gaming         Gaming    @relation(fields: [gaming_id], references: [id], onDelete: Cascade)
+
+  @@index([gaming_id])
+}
+
+model GamingHistory {
+  id             Int       @id @default(autoincrement())
+  gaming_id      Int
+  user_id        Int?      
+  action         String    
+  details        Json?     
+  created_at     DateTime  @default(now())
+
+  gaming         Gaming    @relation(fields: [gaming_id], references: [id], onDelete: Cascade)
+  user           User?     @relation(fields: [user_id], references: [id], onDelete: SetNull)
+
+  @@index([gaming_id])
+}
+
+model GamingSnapshot {
+  id             Int       @id @default(autoincrement())
+  gaming_id      Int
+  file_url       String    
+  file_type      String    
+  created_at     DateTime  @default(now())
+
+  gaming         Gaming    @relation(fields: [gaming_id], references: [id], onDelete: Cascade)
+
+  @@index([gaming_id])
 }

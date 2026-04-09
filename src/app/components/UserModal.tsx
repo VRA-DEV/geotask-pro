@@ -12,6 +12,7 @@ interface UserModalProps {
   roles: any[];
   sectors: any[];
   teams: any[];
+  users: any[];
   T: any;
 }
 
@@ -23,6 +24,7 @@ export function UserModal({
   roles,
   sectors,
   teams,
+  users,
   T,
 }: UserModalProps) {
   const [name, setName] = useState("");
@@ -30,6 +32,7 @@ export function UserModal({
   const [roleId, setRoleId] = useState("");
   const [sectorId, setSectorId] = useState("");
   const [teamId, setTeamId] = useState("");
+  const [managerId, setManagerId] = useState("");
   const [secondarySectorIds, setSecondarySectorIds] = useState<number[]>([]);
   const [resetPassword, setResetPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -45,6 +48,7 @@ export function UserModal({
           user.sector_id?.toString() || user.sector?.id?.toString() || "",
         );
         setTeamId(user.team_id?.toString() || user.team?.id?.toString() || "");
+        setManagerId(user.manager_id?.toString() || "");
         setResetPassword(false);
 
         // Fetch user sectors
@@ -62,6 +66,7 @@ export function UserModal({
         setRoleId("");
         setSectorId("");
         setTeamId("");
+        setManagerId("");
         setSecondarySectorIds([]);
         setResetPassword(false);
       }
@@ -88,6 +93,7 @@ export function UserModal({
         role_id: Number(roleId),
         sector_id: Number(sectorId),
         team_id: teamId ? Number(teamId) : null,
+        manager_id: managerId ? Number(managerId) : null,
       };
 
       if (user) {
@@ -280,20 +286,42 @@ export function UserModal({
             </div>
           </div>
 
-          <div>
-            <label style={label}>Time / Equipe</label>
-            <select
-              value={teamId}
-              onChange={(e) => setTeamId(e.target.value)}
-              style={inp}
-            >
-              <option value="">Nenhum time</option>
-              {teams.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
+          <div
+            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}
+          >
+            <div>
+              <label style={label}>Time / Equipe</label>
+              <select
+                value={teamId}
+                onChange={(e) => setTeamId(e.target.value)}
+                style={inp}
+              >
+                <option value="">Nenhum time</option>
+                {teams.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label style={label}>Gestor Imediato</label>
+              <select
+                value={managerId}
+                onChange={(e) => setManagerId(e.target.value)}
+                style={inp}
+              >
+                <option value="">Topo da Cadeia</option>
+                {users && users
+                  .filter((u) => u.id !== user?.id && u.active)
+                  .map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                    </option>
+                  ))}
+              </select>
+            </div>
           </div>
 
           <div>

@@ -75,13 +75,14 @@ export async function POST(req: Request) {
       );
     }
 
-    const { name, email, role_id, sector_id, role, sector, avatar } =
+    const { name, email, role_id, sector_id, role, sector, avatar, manager_id } =
       parsed.data;
     const finalRoleId = Number(role_id || role);
     const finalSectorId = Number(sector_id || sector);
     const teamId = (parsed.data as any).team_id
       ? Number((parsed.data as any).team_id)
       : null;
+    const finalManagerId = manager_id ? Number(manager_id) : null;
 
     const initials = name
       .split(" ")
@@ -99,6 +100,7 @@ export async function POST(req: Request) {
         role_id: finalRoleId,
         sector_id: finalSectorId,
         team_id: teamId,
+        manager_id: finalManagerId,
         avatar: avatar || initials,
         password_hash: hash,
         must_change_password: true,
