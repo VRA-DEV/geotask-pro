@@ -14,7 +14,8 @@ function TemplateModal({
   template?: any;
   onClose: () => void;
   onSave: (t: any) => void;
-  sectors: string[];
+  sectors: any[];
+  users: any[];
 }) {
   const [name, setName] = useState(template?.name || "");
   // tasks: [{ title, sector, subtasks: [{ title, sector }] }]
@@ -25,7 +26,8 @@ function TemplateModal({
           sector: t.sector?.name || t.sector || "",
           subtasks: (t.subtasks || []).map((s: any) => ({
             title: typeof s === "string" ? s : s.title || "",
-            sector: s.sector?.name || s.sector || "",
+            sector: s.sector?.id || s.sector?.name || s.sector || "",
+            responsible: s.responsible?.id || s.responsible?.name || s.responsible || "",
           })),
         }))
       : [{ title: "", sector: "", subtasks: [] }],
@@ -47,7 +49,7 @@ function TemplateModal({
     const next = [...tasks];
     next[tIdx].subtasks = [
       ...(next[tIdx].subtasks || []),
-      { title: "", sector: "" },
+      { title: "", sector: "", responsible: "" },
     ];
     setTasks(next);
   };
@@ -122,6 +124,42 @@ function TemplateModal({
       })}
     </select>
   );
+
+  const UserSelect = ({
+    value,
+    onChange,
+    sectorId,
+  }: {
+    value: string;
+    onChange: (v: string) => void;
+    sectorId?: string;
+  }) => {
+    const filteredUsers = users.filter((u: any) => {
+      if (!sectorId) return true;
+      const uSid = String(u.sector_id || u.sector?.id || "");
+      const targetSid = String(sectorId);
+      return uSid === targetSid;
+    });
+
+    return (
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`px-2 py-1 rounded-md border border-slate-200 dark:border-gray-700 bg-slate-100 dark:bg-gray-700 text-[11px] outline-none min-w-[130px] cursor-pointer ${
+          value
+            ? "text-slate-900 dark:text-gray-50"
+            : "text-slate-500 dark:text-gray-400"
+        }`}
+      >
+        <option value="">Responsável...</option>
+        {filteredUsers.map((u: any) => (
+          <option key={u.id} value={u.id}>
+            {u.name}
+          </option>
+        ))}
+      </select>
+    );
+  };
 
   return (
     <div className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4 font-[system-ui,sans-serif]">
@@ -226,6 +264,13 @@ function TemplateModal({
                           onChange={(v) =>
                             handleSubtaskField(i, k, "sector", v)
                           }
+                        />
+                        <UserSelect
+                          value={st.responsible}
+                          onChange={(v) =>
+                            handleSubtaskField(i, k, "responsible", v)
+                          }
+                          sectorId={st.sector}
                         />
                         <button
                           onClick={() => handleRemoveSubtask(i, k)}

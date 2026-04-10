@@ -163,6 +163,10 @@ model Task {
   sector_id                      Int?
   team_id                        Int?
   status_updated_at              DateTime?
+  is_recurring                   Boolean          @default(false)
+  recurrence_config              Json?
+  next_recurrence_at             DateTime?
+  last_recurrence_at             DateTime?
   comments                       Comment[]
   mentions                       Mention[]
   notifications                  Notification[]

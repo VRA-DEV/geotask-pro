@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { type Prisma } from "@prisma/client";
 import { type NextRequest, NextResponse } from "next/server";
 import { broadcast } from "../events/route";
+import { calculateNextRecurrence } from "@/lib/recurrence";
 
 async function resolveSectorId(s: any, cache?: Record<string, number | null>): Promise<number | null> {
   if (!s) return null;
@@ -213,6 +214,9 @@ export async function GET(request: NextRequest) {
           responsible: { select: { id: true, name: true, team_id: true } },
           city: { select: { name: true } },
           contract: { select: { name: true } },
+          is_recurring: true,
+          recurrence_config: true,
+          next_recurrence_at: true,
         },
         orderBy: { [actualOrderBy]: actualOrder },
       });
@@ -452,6 +456,8 @@ export async function POST(req: Request) {
       parent_id,
       coworkers,
       team_id,
+      is_recurring,
+      recurrence_config,
     } = body;
 
     // Parallelize initial lookups
@@ -499,6 +505,9 @@ export async function POST(req: Request) {
       created_by_id: createdById,
       parent_id: parentId,
       team_id: team_id && !isNaN(Number(team_id)) ? Number(team_id) : null,
+      is_recurring: !!is_recurring,
+      recurrence_config: is_recurring ? recurrence_config : null,
+      next_recurrence_at: is_recurring ? calculateNextRecurrence(recurrence_config) : null,
     };
 
     if (coworkers && Array.isArray(coworkers) && coworkers.length > 0) {

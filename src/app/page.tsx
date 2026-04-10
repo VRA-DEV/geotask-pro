@@ -765,7 +765,8 @@ export default function GeoTask() {
             setEditingTemplate(null);
           }}
           onSave={handleSaveTemplate}
-          sectors={dbSectors.map((s: any) => s.name)}
+          sectors={dbSectors}
+          users={dbUsers}
         />
       )}
     </div>

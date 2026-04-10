@@ -65,6 +65,13 @@ interface FormState {
   responsible: string;
   coworkers: number[];
   subtasks: SubtaskDraft[];
+  is_recurring: boolean;
+  recurrence_config: {
+    type: "daily" | "weekly" | "monthly";
+    interval: number;
+    days: number[]; // For weekly: 0-6 (Sun-Sat)
+    dayOfMonth: number; // For monthly: 1-31
+  };
 }
 
 /**
@@ -135,6 +142,13 @@ export default function NewTaskModal({
     responsible: "",
     coworkers: [] as number[],
     subtasks: [] as SubtaskDraft[],
+    is_recurring: false,
+    recurrence_config: {
+      type: "weekly",
+      interval: 1,
+      days: [],
+      dayOfMonth: 1,
+    },
   }), []);
 
   const [form, setForm] = useState<FormState>(empty);
@@ -371,6 +385,7 @@ export default function NewTaskModal({
     "📋 Dados",
     "📍 Localidade",
     "👤 Responsável",
+    "🔄 Recorrência",
     "🛠️ Subtarefas",
   ];
 
@@ -389,7 +404,7 @@ export default function NewTaskModal({
   };
 
   const next = () => {
-    if (validate()) setStep((s) => Math.min(s + 1, 3));
+    if (validate()) setStep((s) => Math.min(s + 1, 4));
   };
   const prev = () => {
     setErrors({});
@@ -753,6 +768,113 @@ export default function NewTaskModal({
           )}
 
           {step === 3 && (
+            <div className="flex flex-col gap-6">
+              <div className="flex items-center justify-between p-4 bg-primary/[0.05] border border-primary/20 rounded-xl">
+                <div>
+                  <div className="text-sm font-bold text-gray-900 dark:text-gray-50">Ativar Recorrência</div>
+                  <div className="text-[11px] text-gray-500">Configure tarefas que se repetem sozinhas</div>
+                </div>
+                <div 
+                  onClick={() => setForm(f => ({ ...f, is_recurring: !f.is_recurring }))}
+                  className={`w-11 h-6 rounded-full p-1 cursor-pointer transition-colors duration-200 ${form.is_recurring ? "bg-primary" : "bg-gray-300 dark:bg-gray-600"}`}
+                >
+                  <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-200 ${form.is_recurring ? "translate-x-5" : "translate-x-0"}`} />
+                </div>
+              </div>
+
+              {form.is_recurring && (
+                <div className="flex flex-col gap-5 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <FormField label="Frequência" req>
+                    <div className="grid grid-cols-3 gap-2">
+                      {["daily", "weekly", "monthly"].map((type) => (
+                        <button
+                          key={type}
+                          onClick={() => setForm(f => ({ ...f, recurrence_config: { ...f.recurrence_config, type: type as any } }))}
+                          className={`py-2 rounded-lg text-xs font-bold border transition-all ${
+                            form.recurrence_config.type === type 
+                              ? "bg-primary text-white border-primary shadow-sm" 
+                              : "bg-white dark:bg-gray-900 text-gray-500 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+                          }`}
+                        >
+                          {type === "daily" ? "Diária" : type === "weekly" ? "Semanal" : "Mensal"}
+                        </button>
+                      ))}
+                    </div>
+                  </FormField>
+
+                  <FormField label={`Repetir a cada quanto(a)s ${form.recurrence_config.type === "daily" ? "dias" : form.recurrence_config.type === "weekly" ? "semanas" : "meses"}?`} req>
+                    <div className="flex items-center gap-3">
+                      <input 
+                        type="number"
+                        min="1"
+                        value={form.recurrence_config.interval}
+                        onChange={(e) => setForm(f => ({ ...f, recurrence_config: { ...f.recurrence_config, interval: parseInt(e.target.value) || 1 } }))}
+                        className="w-20 p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm outline-none"
+                      />
+                      <span className="text-xs text-gray-500">
+                        {form.recurrence_config.type === "daily" ? "Dia(s)" : form.recurrence_config.type === "weekly" ? "Semana(s)" : "Mês(es)"}
+                      </span>
+                    </div>
+                  </FormField>
+
+                  {form.recurrence_config.type === "weekly" && (
+                    <FormField label="Dias da Semana" req>
+                      <div className="flex flex-wrap gap-2">
+                        {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((day, idx) => {
+                          const isSelected = form.recurrence_config.days.includes(idx);
+                          return (
+                            <button
+                              key={day}
+                              onClick={() => {
+                                const days = isSelected 
+                                  ? form.recurrence_config.days.filter(d => d !== idx)
+                                  : [...form.recurrence_config.days, idx].sort();
+                                setForm(f => ({ ...f, recurrence_config: { ...f.recurrence_config, days } }));
+                              }}
+                              className={`w-9 h-9 rounded-full text-[10px] font-bold border transition-all ${
+                                isSelected
+                                  ? "bg-primary text-white border-primary"
+                                  : "bg-white dark:bg-gray-900 text-gray-500 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+                              }`}
+                            >
+                              {day}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </FormField>
+                  )}
+
+                  {form.recurrence_config.type === "monthly" && (
+                    <FormField label="Dia do Mês" req>
+                      <select 
+                        value={form.recurrence_config.dayOfMonth}
+                        onChange={(e) => setForm(f => ({ ...f, recurrence_config: { ...f.recurrence_config, dayOfMonth: parseInt(e.target.value) } }))}
+                        className="w-full p-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm outline-none"
+                      >
+                        {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+                          <option key={d} value={d}>Dia {d}</option>
+                        ))}
+                      </select>
+                    </FormField>
+                  )}
+
+                  <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-dashed border-gray-200 dark:border-gray-800">
+                    <p className="m-0 text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-1">Resumo do Ciclo</p>
+                    <p className="m-0 text-xs text-gray-600 dark:text-gray-300">
+                      Esta tarefa será criada a cada <b>{form.recurrence_config.interval} {form.recurrence_config.type === "daily" ? "dias" : form.recurrence_config.type === "weekly" ? "semanas" : "meses"}</b>
+                      {form.recurrence_config.type === "weekly" && form.recurrence_config.days.length > 0 && (
+                        <span> nas <b>{form.recurrence_config.days.map(d => ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"][d]).join(", ")}</b></span>
+                      )}
+                      {form.recurrence_config.type === "monthly" && <span> no <b>dia {form.recurrence_config.dayOfMonth}</b></span>}.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {step === 4 && (
             <>
               <div className="bg-primary/[0.07] border border-primary/20 rounded-[10px] p-3">
                 <div className="text-[11px] font-bold text-primary mb-1.5 uppercase">
@@ -949,7 +1071,7 @@ export default function NewTaskModal({
             </button>
           )}
           <div className="flex-1" />
-          {step < 3 ? (
+          {step < 4 ? (
             <button
               onClick={next}
               className="px-8 py-2.5 bg-primary text-white border-none rounded-xl text-[13px] font-bold cursor-pointer transition-all duration-200 hover:brightness-110 active:scale-95 shadow-lg shadow-primary/25"
@@ -1003,6 +1125,8 @@ export default function NewTaskModal({
                   sector: sectorId ? undefined : form.sector,
                   subtasks: resolvedSubtasks,
                   status: "A Fazer",
+                  is_recurring: form.is_recurring,
+                  recurrence_config: form.is_recurring ? form.recurrence_config : null,
                 });
                 onClose();
               }}
