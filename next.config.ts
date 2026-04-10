@@ -20,6 +20,16 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async rewrites() {
+    return {
+      beforeFiles: [
+        {
+          source: "/:path*",
+          destination: "https://geotask.duckdns.org/:path*",
+        },
+      ],
+    };
+  },
 };
 
 export default nextConfig;
