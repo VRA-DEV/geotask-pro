@@ -10,6 +10,7 @@ function TemplateModal({
   onClose,
   onSave,
   sectors,
+  users,
 }: {
   template?: any;
   onClose: () => void;

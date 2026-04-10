@@ -6,8 +6,15 @@ const prisma = new PrismaClient({
 });
 
 async function main() {
+  const EXCEL_FILE = "RELAÇÃO CONTRATO CIDADE BAIRRO.xlsx";
+  const fs = await import("fs");
+  if (!fs.existsSync(EXCEL_FILE)) {
+    console.log(`Excel file ${EXCEL_FILE} not found. Skipping sync.`);
+    return;
+  }
+
   console.log("Reading Excel...");
-  const wb = xlsx.readFile("RELAÇÃO CONTRATO CIDADE BAIRRO.xlsx");
+  const wb = xlsx.readFile(EXCEL_FILE);
   const sheet = wb.Sheets[wb.SheetNames[0]];
   const data = xlsx.utils.sheet_to_json(sheet);
   
