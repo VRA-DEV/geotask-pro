@@ -126,6 +126,7 @@ interface KanbanPageProps {
   setNeighbor?: (v: string) => void;
   setDateFrom?: (v: DateRange | undefined) => void;
   setDateTo?: (v: DateRange | undefined) => void;
+  setActiveTab?: (tab: string) => void;
 }
 
 // ── Inline helper components ────────────────────────────────────

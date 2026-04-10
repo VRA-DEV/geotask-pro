@@ -54,6 +54,7 @@ interface TaskFiltersProps {
   sortOrder?: string;
   setSortOrder?: (v: string) => void;
   displayedTasks?: any[];
+  setActiveTab?: (tab: string) => void;
 }
 
 export function TaskFilters({
